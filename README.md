@@ -1,18 +1,44 @@
-# Kosh – Multimodal Data Visualization
+# AI Kosh – Multimodal Data Visualization
 
-## Azure Credentials
+## Project Structure
 
-Copy `.env.example` to `.env` and fill in your Azure credentials:
-
-```bash
-cp .env.example .env
+```
+Kosh_V2/
+├── .env                          # Environment variables
+├── requirements.txt              # Global dependencies
+├── main.py                       # Integration Team entry point
+├── shared_workspace/             # Data bridge (auto-created)
+│   ├── 1_raw_uploads/
+│   ├── 2_processed_data/
+│   └── 3_models/
+├── core/                         # Integration Team
+│   ├── auth_router.py
+│   ├── auth_utils.py
+│   ├── core_db.py
+│   ├── core_models.py
+│   └── dashboard_router.py
+└── modules/                      # 5 Team Modules
+    ├── team1_automl/
+    ├── team2_feature_eng/
+    ├── team3_ocr/
+    ├── team4_anonymization/
+    └── team5_multimodal/
 ```
 
 ## Quick Start
 
 ```bash
 pip install -r requirements.txt
-uvicorn app.main:app --reload --port 8000
+uvicorn main:app --reload --port 8000
 ```
 
 Open `http://localhost:8000/docs` for the interactive API explorer.
+
+## Team Local Testing
+
+Each team can run independently:
+
+```bash
+cd modules/team5_multimodal
+python run_local.py   # → http://localhost:8005/docs
+```

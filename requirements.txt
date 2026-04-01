@@ -11,5 +11,8 @@ groq>=0.25.0
 # --- PDF Extraction ---
 pdfplumber>=0.11.0
 
+# --- Auth ---
+python-jose[cryptography]>=3.3.0
+
 # --- Dev ---
 python-dotenv>=1.0.1

@@ -1,3 +1,8 @@
+"""
+models.py  –  Pydantic schemas for Team 5 Multimodal text & PDF analysis.
+Migrated from app/models/text_models.py.
+"""
+
 from pydantic import BaseModel, Field
 
 

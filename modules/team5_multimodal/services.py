@@ -1,3 +1,8 @@
+"""
+services.py  –  Core business logic for Team 5 Multimodal.
+Migrated from app/services/text_service.py.
+"""
+
 import io
 import json
 import logging
@@ -5,9 +10,8 @@ import logging
 import pdfplumber
 from groq import AsyncGroq
 
-from app.core.azure_clients import get_groq_client
-from app.core.config import get_settings
-from app.models.text_models import TextAnalysisResult
+from modules.team5_multimodal.config import get_settings
+from modules.team5_multimodal.models import TextAnalysisResult
 
 logger = logging.getLogger(__name__)
 
@@ -47,9 +51,20 @@ Rules:
 - Return ONLY the raw JSON object. No markdown fences, no commentary."""
 
 
+_groq_client: AsyncGroq | None = None
+
+
+def _get_groq_client() -> AsyncGroq:
+    global _groq_client
+    if _groq_client is None:
+        s = get_settings()
+        _groq_client = AsyncGroq(api_key=s.groq_api_key)
+    return _groq_client
+
+
 class TextAnalysisService:
     def __init__(self) -> None:
-        self._client: AsyncGroq = get_groq_client()
+        self._client: AsyncGroq = _get_groq_client()
         self._settings = get_settings()
 
     async def analyze(self, text: str) -> TextAnalysisResult:

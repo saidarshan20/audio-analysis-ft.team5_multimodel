@@ -1,12 +1,17 @@
+"""
+router.py  –  MANDATORY router for Team 5 (Multimodal).
+Contains only API endpoints; business logic lives in services.py.
+"""
+
 import logging
 
 from fastapi import APIRouter, HTTPException, UploadFile, File
 
-from app.models.text_models import TextAnalysisResponse
-from app.services.text_service import TextAnalysisService
+from modules.team5_multimodal.models import TextAnalysisResponse
+from modules.team5_multimodal.services import TextAnalysisService
 
 logger = logging.getLogger(__name__)
-router = APIRouter(prefix="/text", tags=["Text Analysis"])
+router = APIRouter(prefix="/team5", tags=["Team 5 - Multimodal"])
 
 PDF_CONTENT_TYPES = {
     "application/pdf",
