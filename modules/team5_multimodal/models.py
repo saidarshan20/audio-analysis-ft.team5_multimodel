@@ -51,3 +51,53 @@ class TextAnalysisResponse(BaseModel):
     filename: str
     content_type: str
     result: TextAnalysisResult
+
+
+# ──────────────────────────────────────────────
+#  Code Analysis Models
+# ──────────────────────────────────────────────
+
+class Component(BaseModel):
+    id: str
+    name: str
+    type: str  # frontend | backend | api | database | service | config | other
+    description: str
+    files: list[str]
+
+
+class Connection(BaseModel):
+    source: str  # component id
+    target: str  # component id
+    type: str  # import | api_call | data_flow | config
+    description: str
+
+
+class CodeArchResult(BaseModel):
+    title: str
+    summary: str
+    components: list[Component]
+    connections: list[Connection]
+
+
+class KeyFile(BaseModel):
+    file_path: str
+    summary: str
+    key_functions: list[str]
+
+
+class FlowStep(BaseModel):
+    step: int
+    description: str
+
+
+class CodeDetailResult(BaseModel):
+    key_files: list[KeyFile]
+    flow: list[FlowStep]
+
+
+class CodeAnalysisResponse(BaseModel):
+    status: str = "success"
+    filename: str
+    file_count: int
+    architecture: CodeArchResult
+    details: CodeDetailResult
