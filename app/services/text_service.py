@@ -1,10 +1,11 @@
+import io
 import json
 import logging
 
-from azure.ai.documentintelligence.models import AnalyzeDocumentRequest
-from openai import AsyncAzureOpenAI
+import pdfplumber
+from groq import AsyncGroq
 
-from app.core.azure_clients import get_doc_intelligence_client, get_openai_client
+from app.core.azure_clients import get_groq_client
 from app.core.config import get_settings
 from app.models.text_models import TextAnalysisResult
 
@@ -48,13 +49,13 @@ Rules:
 
 class TextAnalysisService:
     def __init__(self) -> None:
-        self._openai: AsyncAzureOpenAI = get_openai_client()
+        self._client: AsyncGroq = get_groq_client()
         self._settings = get_settings()
 
     async def analyze(self, text: str) -> TextAnalysisResult:
-        """Send text to GPT-4o and parse the structured JSON response."""
-        response = await self._openai.chat.completions.create(
-            model=self._settings.azure_openai_deployment,
+        """Send text to Groq LLM and parse the structured JSON response."""
+        response = await self._client.chat.completions.create(
+            model=self._settings.groq_model,
             response_format={"type": "json_object"},
             messages=[
                 {"role": "system", "content": SYSTEM_PROMPT},
@@ -64,18 +65,18 @@ class TextAnalysisService:
         )
 
         raw = response.choices[0].message.content
-        logger.debug("GPT-4o raw response: %s", raw)
+        logger.debug("LLM raw response: %s", raw)
 
         data = json.loads(raw)  # type: ignore[arg-type]
         return TextAnalysisResult.model_validate(data)
 
-    async def extract_pdf_text(self, pdf_bytes: bytes) -> str:
-        """Use Azure Document Intelligence to OCR / extract text from a PDF."""
-        client = get_doc_intelligence_client()
-
-        poller = await client.begin_analyze_document(
-            model_id="prebuilt-read",
-            body=AnalyzeDocumentRequest(bytes_source=pdf_bytes),
-        )
-        result = await poller.result()
-        return result.content or ""
+    @staticmethod
+    def extract_pdf_text(pdf_bytes: bytes) -> str:
+        """Extract text from a PDF using pdfplumber (local, no cloud dependency)."""
+        text_parts: list[str] = []
+        with pdfplumber.open(io.BytesIO(pdf_bytes)) as pdf:
+            for page in pdf.pages:
+                page_text = page.extract_text()
+                if page_text:
+                    text_parts.append(page_text)
+        return "\n".join(text_parts)

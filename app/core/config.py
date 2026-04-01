@@ -3,15 +3,9 @@ from functools import lru_cache
 
 
 class Settings(BaseSettings):
-    # --- Azure OpenAI ---
-    azure_openai_endpoint: str = ""
-    azure_openai_api_key: str = ""
-    azure_openai_api_version: str = "2024-12-01-preview"
-    azure_openai_deployment: str = "gpt-4o"
-
-    # --- Azure Document Intelligence ---
-    azure_doc_intelligence_endpoint: str = ""
-    azure_doc_intelligence_key: str = ""
+    # --- Groq ---
+    groq_api_key: str = ""
+    groq_model: str = "llama-3.3-70b-versatile"
 
     # --- CORS ---
     cors_origins: list[str] = ["http://localhost:3000", "http://localhost:5173"]

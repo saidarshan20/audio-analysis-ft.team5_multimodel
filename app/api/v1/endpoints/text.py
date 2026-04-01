@@ -24,11 +24,11 @@ async def analyze_text(file: UploadFile = File(...)):
 
     service = TextAnalysisService()
 
-    # Route: PDF → Document Intelligence → text; otherwise treat as plain text
+    # Route: PDF → pdfplumber local extraction; otherwise treat as plain text
     if file.content_type in PDF_CONTENT_TYPES or (
         file.filename and file.filename.lower().endswith(".pdf")
     ):
-        text = await service.extract_pdf_text(raw_bytes)
+        text = service.extract_pdf_text(raw_bytes)
         if not text.strip():
             raise HTTPException(
                 status_code=422,

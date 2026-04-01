@@ -5,11 +5,11 @@ pydantic>=2.10.0
 pydantic-settings>=2.7.0
 python-multipart>=0.0.18
 
-# --- Azure AI ---
-openai>=1.60.0
-azure-ai-documentintelligence>=1.0.0
-azure-identity>=1.19.0
-azure-core>=1.32.0
+# --- AI (Groq) ---
+groq>=0.25.0
+
+# --- PDF Extraction ---
+pdfplumber>=0.11.0
 
 # --- Dev ---
 python-dotenv>=1.0.1
