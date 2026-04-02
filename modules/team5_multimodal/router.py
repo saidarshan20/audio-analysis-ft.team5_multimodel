@@ -102,9 +102,20 @@ async def analyze_code(file: UploadFile = File(...)):
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 
+# ──────────────────────────────────────────────
+#  NEW INTEGRATION: Multimodal Image Analysis Pipeline
+#  Added image processing endpoint bridging YOLO, CLIP, and UMAP.
+# ──────────────────────────────────────────────
 @router.post("/image-analyze", response_model=ImageAnalysisResponse)
 async def analyze_images(file: UploadFile = File(...)):
-    """Accept a ZIP file of images and perform clustering and object detection."""
+    """
+    Accepts a ZIP file containing raw images and processes them via the ImageAnalysisService.
+    - YOLOv8 extracts bounding boxes.
+    - OpenAI CLIP generates semantic embeddings.
+    - Scikit-Learn KMeans clusters the embeddings.
+    - UMAP reduces dimensions for 2D graphing.
+    - Matplotlib generates a final scatter plot in the shared_workspace.
+    """
     if not file.filename or not file.filename.lower().endswith(".zip"):
         raise HTTPException(status_code=400, detail="Only ZIP files are supported.")
 

@@ -105,6 +105,8 @@ class CodeAnalysisResponse(BaseModel):
 
 # ──────────────────────────────────────────────
 #  Image Analysis Models (Multimodal)
+#  NEW: Added by Team 5 to handle the output of the YOLO/CLIP/UMAP pipeline.
+#  These models ensure the API response is strictly typed and documented for the FrontEnd.
 # ──────────────────────────────────────────────
 
 class DetectedObject(BaseModel):
