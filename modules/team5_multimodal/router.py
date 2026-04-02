@@ -59,6 +59,11 @@ async def analyze_text(file: UploadFile = File(...)):
         result=result,
     )
 
+from pydantic import BaseModel
+
+class GithubAnalysisRequest(BaseModel):
+    repo_url: str
+
 
 @router.post("/code-analyze", response_model=CodeAnalysisResponse)
 async def analyze_code(file: UploadFile = File(...)):
@@ -76,11 +81,11 @@ async def analyze_code(file: UploadFile = File(...)):
         # 1. Extract ZIP
         root_dir = service.extract_zip(zip_bytes)
         
-        # 2. Build file tree
-        file_tree = service.build_file_tree(root_dir)
+        # 2. Build AST JSON graph
+        graph_data = service.build_code_graph(root_dir)
         
         # 3. Pass 1: Architecture
-        arch_result = await service.analyze_architecture(file_tree)
+        arch_result = await service.analyze_architecture(graph_data)
         
         # 4. Pass 2: Detailed analysis
         code_snippets = service.select_important_files(root_dir)
@@ -100,6 +105,45 @@ async def analyze_code(file: UploadFile = File(...)):
 
     except Exception as exc:
         logger.exception("Code analysis failed")
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+@router.post("/code-analyze/github", response_model=CodeAnalysisResponse)
+async def analyze_code_github(payload: GithubAnalysisRequest):
+    """Clone a GitHub repository and perform 2-pass LLM analysis."""
+    service = CodeAnalysisService()
+
+    try:
+        # 1. Clone Repo
+        root_dir = service.clone_github_repo(payload.repo_url)
+        
+        # 2. Build AST JSON graph
+        graph_data = service.build_code_graph(root_dir)
+        
+        # 3. Pass 1: Architecture
+        arch_result = await service.analyze_architecture(graph_data)
+        
+        # 4. Pass 2: Detailed analysis
+        code_snippets = service.select_important_files(root_dir)
+        detail_result = await service.analyze_files(arch_result, code_snippets)
+        
+        # Count files (approximate for the response)
+        file_count = 0
+        for _, _, files in os.walk(root_dir):
+            file_count += len(files)
+
+        repo_name = payload.repo_url.rstrip('/').split('/')[-1]
+
+        return CodeAnalysisResponse(
+            filename=f"{repo_name} (GitHub)",
+            file_count=file_count,
+            architecture=arch_result,
+            details=detail_result
+        )
+
+    except ValueError as val_err:
+        raise HTTPException(status_code=400, detail=str(val_err))
+    except Exception as exc:
+        logger.exception("GitHub code analysis failed")
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 

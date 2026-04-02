@@ -26,10 +26,12 @@ export interface CodeAnalysisResult {
   architecture: {
     title: string;
     summary: string;
+    detected_patterns: string[];
     components: Array<{
       id: string;
       name: string;
       type: string;
+      layer: string; // presentation | application | domain | infrastructure | other
       description: string;
       files: string[];
     }>;
@@ -117,6 +119,24 @@ export async function analyzeCodebase(file: File): Promise<CodeAnalysisResult> {
   if (!response.ok) {
     const err = await response.json().catch(() => ({ detail: 'Unknown error' }));
     throw new Error(err.detail || `Code analysis failed with status ${response.status}`);
+  }
+
+  return response.json();
+}
+
+/**
+ * Executes a codebase structure analysis targeting a public GitHub repository.
+ */
+export async function analyzeGithubRepo(url: string): Promise<CodeAnalysisResult> {
+  const response = await fetch(`${BASE_URL}/team5/code-analyze/github`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ repo_url: url }),
+  });
+
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({ detail: 'Unknown error' }));
+    throw new Error(err.detail || `GitHub analysis failed with status ${response.status}`);
   }
 
   return response.json();

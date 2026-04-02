@@ -61,6 +61,7 @@ class Component(BaseModel):
     id: str
     name: str
     type: str  # frontend | backend | api | database | service | config | other
+    layer: str = "other"  # presentation | application | domain | infrastructure | other
     description: str
     files: list[str]
 
@@ -75,6 +76,7 @@ class Connection(BaseModel):
 class CodeArchResult(BaseModel):
     title: str
     summary: str
+    detected_patterns: list[str] = Field(default_factory=list)
     components: list[Component]
     connections: list[Connection]
 

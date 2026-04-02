@@ -36,3 +36,9 @@ matplotlib>=3.7.0
 azure-cognitiveservices-vision-computervision>=0.9.0
 torch>=2.0.0
 torchvision>=0.15.0
+
+# --- Codebase AST Analysis (Team 5) ---
+tree-sitter>=0.23.0
+tree-sitter-python>=0.23.0
+tree-sitter-typescript>=0.23.0
+networkx>=3.0

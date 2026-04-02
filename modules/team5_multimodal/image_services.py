@@ -30,7 +30,7 @@ from msrest.authentication import CognitiveServicesCredentials
 
 from modules.team5_multimodal.config import get_settings
 from modules.team5_multimodal.models import (
-    DetectedObject, ClusterPoint, ImageAnalysisResult
+    DetectedObject, ClusterPoint, ZipPipelineResult
 )
 
 logger = logging.getLogger(__name__)
@@ -91,7 +91,7 @@ class ImageAnalysisService:
             logger.error(f"Azure API Error on {img_path}: {e}")
         return None
 
-    def process_images(self, extract_dir: str) -> ImageAnalysisResult:
+    def process_images(self, extract_dir: str) -> ZipPipelineResult:
         root = Path(extract_dir)
         valid_exts = {".jpg", ".jpeg", ".png", ".bmp", ".webp"}
         
@@ -190,7 +190,7 @@ class ImageAnalysisService:
         plot_path = self.proc_dir / f"cluster_plot_{uuid.uuid4().hex[:8]}.png"
         self._generate_plot(coords, labels, plot_path)
 
-        return ImageAnalysisResult(
+        return ZipPipelineResult(
             clusters=cluster_points,
             plot_file_path=str(plot_path.relative_to(self.base_dir))
         )

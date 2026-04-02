@@ -13,7 +13,7 @@ import tempfile
 import zipfile
 from pathlib import Path
 
-from groq import AsyncGroq
+from openai import AsyncOpenAI
 
 from modules.team5_multimodal.config import get_settings
 from modules.team5_multimodal.models import CodeArchResult, CodeDetailResult
@@ -25,6 +25,7 @@ SKIP_DIRS = {
     "__pycache__", ".git", ".svn", ".hg", "node_modules", ".venv", "venv",
     "env", ".tox", ".mypy_cache", ".pytest_cache", "dist", "build",
     ".next", ".nuxt", ".idea", ".vscode", "__MACOSX",
+    "docs", "tests", "scripts", "examples", "benchmarks", "site", "test"
 }
 
 # Extensions we consider "source code" for Pass 2
@@ -41,38 +42,37 @@ CONFIG_FILES = {
     "tsconfig.json", "vite.config.ts", "next.config.js", "cargo.toml",
 }
 
-MAX_FILE_LINES = 500        # cap per file for Pass 2
-MAX_IMPORTANT_FILES = 15    # how many files to send in Pass 2
-MAX_FILE_SIZE_BYTES = 50_000  # skip very large files
+MAX_FILE_LINES = 250        # cap per file for Pass 2 (NVIDIA benefit)
+MAX_IMPORTANT_FILES = 15     # how many files to send in Pass 2 (NVIDIA benefit)
+MAX_FILE_SIZE_BYTES = 25_000  # allow slightly larger files
 
 
 # ─────────────────── Prompts ───────────────────
 
 ARCH_SYSTEM_PROMPT = """You are a senior software architect.
 
-Your task is to analyze a codebase FILE TREE and produce a clean, minimal architectural understanding of the system.
+Your task is to analyze an AST DEPENDENCY GRAPH representing codebase files and functions to produce a clean, semantic architectural map.
 
 IMPORTANT RULES:
-- Do NOT guess technologies not present in file names.
-- Do NOT invent files, components, or connections.
-- Keep architecture SIMPLE and MEANINGFUL (max 12 components).
+- Identify **Architectural Layers** (Presentation, Application, Domain, Infrastructure, or Cross-cutting).
+- Detect **Design Patterns** present in the structure (e.g., Factory, Singleton, Observer, Middleware, Dependency Injection).
 - Group related files into logical components.
-- Prefer clarity over completeness.
-
-OUTPUT:
-Return ONLY valid JSON. No explanations. No markdown.
+- Keep architecture MEANINGFUL (max 15 components).
+- Return ONLY valid JSON.
 
 SCHEMA:
 {
   "title": "string",
-  "summary": "2-3 sentence high-level description of the project",
+  "summary": "2-3 sentence high-level description",
+  "detected_patterns": ["Pattern Name 1", "Pattern Name 2"],
   "components": [
     {
       "id": "string",
       "name": "string",
       "type": "frontend | backend | api | database | service | config | other",
-      "description": "what this component does",
-      "files": ["file_path1", "file_path2"]
+      "layer": "presentation | application | domain | infrastructure | other",
+      "description": "2-sentence technical role of this component",
+      "files": ["file_path"]
     }
   ],
   "connections": [
@@ -80,76 +80,71 @@ SCHEMA:
       "source": "component_id",
       "target": "component_id",
       "type": "import | api_call | data_flow | config",
-      "description": "short explanation of relationship"
+      "description": "how they interact"
     }
   ]
 }
 
-GUIDELINES:
-- Identify entry points (e.g., main.py, index.js, app.tsx).
-- Group files into components based on folder structure and naming.
-- Only include meaningful connections (avoid noise).
-- If unsure, omit rather than hallucinate.
-- Keep descriptions concise and technical."""
+LAYER DEFINITIONS:
+- **Presentation**: UI, Controllers, Routes, Templates.
+- **Application**: Use Cases, Services, Orchestrators.
+- **Domain**: Entities, Models, Business Logic, Core Rules.
+- **Infrastructure**: DB Drivers, External API Clients, Logging, Middleware.
+- **Other**: Entry points, Configs, Scripts."""
 
-DETAIL_SYSTEM_PROMPT = """You are a senior software engineer explaining a codebase to another engineer.
+DETAIL_SYSTEM_PROMPT = """You are a lead engineer explaining a codebase to a new architect.
 
-Your task is to analyze selected IMPORTANT FILES and produce concise, accurate insights.
+Your task is to analyze the provided code snippets and the architecture context to explain HOW components interact and WHY specific logic exists.
 
 IMPORTANT RULES:
-- Do NOT hallucinate functionality not visible in code.
-- Do NOT explain trivial code.
-- Focus only on important logic and purpose.
-- Keep output concise and structured.
-
-OUTPUT:
-Return ONLY valid JSON. No explanations. No markdown.
+- Focus on **Critical Paths**: Explain the lifecycle of a request or the core data transformation.
+- Highlight **Technical Debt or Optimization** opportunities if seen.
+- Explain component **Collaboration**: How does Component A use Component B?
+- Keep output concise and strictly JSON.
 
 SCHEMA:
 {
   "key_files": [
     {
       "file_path": "string",
-      "summary": "what this file does in 1-2 sentences",
-      "key_functions": [
-        "function_name: short explanation"
-      ]
+      "summary": "Deep insight into this file's role",
+      "key_functions": ["func_name: detailed technical purpose"]
     }
   ],
   "flow": [
     {
-      "step": 1,
-      "description": "step-by-step system flow (user → backend → db etc.)"
+      "step": int,
+      "description": "High-detail technical step (e.g., 'API Route validates JWT via AuthMiddleware before hitting Service layer')"
     }
   ]
-}
-
-GUIDELINES:
-- Only include 5–10 most important files.
-- Prioritize entry points and core logic files.
-- Extract real function names if visible.
-- Flow should reflect actual system behavior.
-- Keep flow under 8 steps."""
+}"""
 
 
 # ─────────────────── Groq client ───────────────────
 
-_groq_client: AsyncGroq | None = None
+_openai_client: AsyncOpenAI | None = None
 
 
-def _get_groq_client() -> AsyncGroq:
-    global _groq_client
-    if _groq_client is None:
+def _get_llm_client() -> AsyncOpenAI:
+    global _openai_client
+    if _openai_client is None:
         s = get_settings()
-        _groq_client = AsyncGroq(api_key=s.groq_api_key)
-    return _groq_client
+        # Use Nvidia NIM endpoint if configured, else fall back to standard OpenAI
+        if s.nvidia_api_key:
+            _openai_client = AsyncOpenAI(
+                base_url="https://integrate.api.nvidia.com/v1",
+                api_key=s.nvidia_api_key
+            )
+        else:
+            _openai_client = AsyncOpenAI(api_key=s.groq_api_key, base_url="https://api.groq.com/openai/v1")
+    return _openai_client
 
 
 # ─────────────────── Service ───────────────────
 
 class CodeAnalysisService:
     def __init__(self) -> None:
-        self._client: AsyncGroq = _get_groq_client()
+        self._client: AsyncOpenAI = _get_llm_client()
         self._settings = get_settings()
 
     # ── ZIP extraction ──
@@ -172,28 +167,73 @@ class CodeAnalysisService:
                 return candidate
         return tmp_dir
 
+    @staticmethod
+    def clone_github_repo(repo_url: str) -> str:
+        """Clone a public GitHub repository into a temporary directory."""
+        import subprocess
+
+        if not repo_url.startswith("https://github.com/"):
+            raise ValueError("Only standard https://github.com/ URLs are supported.")
+
+        tmp_dir = tempfile.mkdtemp(prefix="github_clone_")
+        target_dir = os.path.join(tmp_dir, "repo")
+
+        try:
+            logger.info("Cloning github repo %s into %s", repo_url, target_dir)
+            subprocess.run(
+                ["git", "clone", "--depth", "1", repo_url, target_dir],
+                check=True,
+                capture_output=True,
+                text=True
+            )
+            return target_dir
+        except subprocess.CalledProcessError as exc:
+            logger.error("Git clone failed: %s", exc.stderr)
+            raise ValueError(f"Failed to clone repository: {exc.stderr}") from exc
+
+
     # ── File tree builder ──
 
     @staticmethod
-    def build_file_tree(root_dir: str) -> str:
-        """Walk the directory and return a text file-tree string."""
-        root = Path(root_dir)
-        lines: list[str] = []
+    def build_code_graph(root_dir: str) -> str:
+        """Walk the directory, parse AST with NetworkX, and return JSON graph data."""
+        from modules.team5_multimodal.graph_builder import CodeGraphBuilder
+        import json
+        import networkx as nx
+        
+        builder = CodeGraphBuilder(root_dir)
+        builder.build_graph()
+        graph = builder.graph
+        
+        in_degree = dict(graph.in_degree())
+        out_degree = dict(graph.out_degree())
+        try:
+            betweenness = nx.betweenness_centrality(graph, k=min(50, len(graph.nodes)))
+        except Exception:
+            betweenness = {n: 0 for n in graph.nodes}
 
-        def _walk(directory: Path, prefix: str = "") -> None:
-            children = sorted(directory.iterdir(), key=lambda p: (not p.is_dir(), p.name.lower()))
-            children = [c for c in children if c.name not in SKIP_DIRS and not c.name.startswith(".")]
-            for i, child in enumerate(children):
-                is_last = i == len(children) - 1
-                connector = "└── " if is_last else "├── "
-                lines.append(f"{prefix}{connector}{child.name}")
-                if child.is_dir():
-                    extension = "    " if is_last else "│   "
-                    _walk(child, prefix + extension)
-
-        lines.append(root.name + "/")
-        _walk(root)
-        return "\n".join(lines)
+        top_files = []
+        for node, data in graph.nodes(data=True):
+            if data.get("type") == "file":
+                score = (0.5 * in_degree.get(node, 0)) + (0.3 * out_degree.get(node, 0)) + (0.2 * betweenness.get(node, 0.0) * 100)
+                top_files.append((node, score))
+                
+        top_files.sort(key=lambda x: x[1], reverse=True)
+        top_central_files = [f[0] for f in top_files[:20]]
+        
+        graph_data = builder.serialize_graph(max_nodes=100)
+        
+        enriched_data = {
+            "top_central_files": top_central_files,
+            "graph_stats": {
+                "total_nodes": len(graph.nodes),
+                "total_edges": len(graph.edges),
+            },
+            "nodes": graph_data.get("nodes", []),
+            "edges": graph_data.get("links", [])
+        }
+        
+        return json.dumps(enriched_data)
 
     # ── Important file selector ──
 
@@ -203,34 +243,102 @@ class CodeAnalysisService:
         root = Path(root_dir)
         selected: list[tuple[str, str]] = []  # (relative_path, content)
 
-        for path in sorted(root.rglob("*")):
-            if len(selected) >= MAX_IMPORTANT_FILES:
-                break
+        # 1. Build graph for network metrics
+        from modules.team5_multimodal.graph_builder import CodeGraphBuilder
+        import networkx as nx
+        
+        builder = CodeGraphBuilder(root_dir)
+        graph = builder.build_graph()
+        
+        in_degree = dict(graph.in_degree())
+        out_degree = dict(graph.out_degree())
+        try:
+            betweenness = nx.betweenness_centrality(graph, k=min(100, len(graph.nodes)))
+        except Exception:
+            betweenness = {n: 0 for n in graph.nodes}
+
+        def get_importance_score(rel_path: str) -> float:
+            path_str = rel_path.replace("\\", "/")
+            if path_str not in graph.nodes:
+                return 0.0
+            
+            i_deg = in_degree.get(path_str, 0)
+            o_deg = out_degree.get(path_str, 0)
+            b_cent = betweenness.get(path_str, 0.0)
+            return (0.5 * i_deg) + (0.3 * o_deg) + (0.2 * b_cent * 100)
+
+        def is_probably_docs(content: str) -> bool:
+            lines = content.splitlines()
+            if len(lines) == 0:
+                return True
+            
+            comment_lines = sum(1 for l in lines if l.strip().startswith(("#", "//", "/*", "* ")))
+            comment_ratio = comment_lines / len(lines)
+            
+            tutorial_keywords = ["example", "tutorial", "guide", "how to", "step"]
+            keyword_hits = sum(1 for l in lines if any(k in l.lower() for k in tutorial_keywords))
+            
+            return comment_ratio > 0.4 or keyword_hits > 10
+
+        def is_entry_point(content: str) -> bool:
+            entry_patterns = [
+                'if __name__ == "__main__":',
+                "FastAPI(",
+                "@app.get",
+                "APIRouter",
+                "app.listen(",
+                "server.listen("
+            ]
+            return any(pat in content for pat in entry_patterns)
+
+        all_files = list(root.rglob("*"))
+        file_candidates = []
+
+        for path in all_files:
             if not path.is_file():
                 continue
-            # Skip ignored dirs
             if any(part in SKIP_DIRS for part in path.parts):
                 continue
-            # Skip large files
             try:
-                if path.stat().st_size > MAX_FILE_SIZE_BYTES:
+                if path.stat().st_size > (MAX_FILE_SIZE_BYTES * 4): # Increased threshold
                     continue
             except OSError:
                 continue
 
-            rel = str(path.relative_to(root))
-
             # Include if source extension or config file
             if path.suffix.lower() in SOURCE_EXTENSIONS or path.name.lower() in CONFIG_FILES:
                 try:
+                    rel = str(path.relative_to(root))
                     content = path.read_text(encoding="utf-8", errors="replace")
-                    # Cap lines
-                    content_lines = content.splitlines()
-                    if len(content_lines) > MAX_FILE_LINES:
-                        content = "\n".join(content_lines[:MAX_FILE_LINES]) + "\n... (truncated)"
-                    selected.append((rel, content))
+                    if not content.strip():
+                        continue
+                        
+                    if is_probably_docs(content):
+                        continue
+                        
+                    is_entry = is_entry_point(content)
+                    score = get_importance_score(rel)
+                    
+                    file_candidates.append({
+                        "path": rel,
+                        "content": content,
+                        "score": score,
+                        "is_entry": is_entry,
+                        "is_config": path.name.lower() in CONFIG_FILES
+                    })
                 except Exception:
                     continue
+
+        # Sort: Entry points first, then graph-based score weighting. Config files get slight bump.
+        file_candidates.sort(key=lambda x: (x["is_entry"], x["score"] + (1.0 if x["is_config"] else 0.0)), reverse=True)
+
+        for cand in file_candidates[:MAX_IMPORTANT_FILES]:
+            content_lines = cand["content"].splitlines()
+            if len(content_lines) > MAX_FILE_LINES:
+                content = "\n".join(content_lines[:MAX_FILE_LINES]) + "\n... (truncated)"
+            else:
+                content = cand["content"]
+            selected.append((cand["path"], content))
 
         # Format as snippets
         parts: list[str] = []
@@ -240,11 +348,12 @@ class CodeAnalysisService:
 
     # ── LLM calls ──
 
-    async def analyze_architecture(self, file_tree: str) -> CodeArchResult:
-        """Pass 1: file tree → architecture JSON."""
-        user_msg = f"FILE TREE:\n{file_tree}"
+    async def analyze_architecture(self, graph_json: str) -> CodeArchResult:
+        """Pass 1: graph data JSON → architecture JSON."""
+        user_msg = f"AST DEPENDENCY GRAPH (JSON node-link format):\n{graph_json}"
+        model_id = self._settings.nvidia_model if self._settings.nvidia_api_key else self._settings.groq_model
         response = await self._client.chat.completions.create(
-            model=self._settings.groq_model,
+            model=model_id,
             response_format={"type": "json_object"},
             messages=[
                 {"role": "system", "content": ARCH_SYSTEM_PROMPT},
@@ -263,8 +372,9 @@ class CodeAnalysisService:
         """Pass 2: architecture context + code snippets → detailed analysis JSON."""
         context = json.dumps(arch_output.model_dump(), indent=2)
         user_msg = f"CONTEXT:\n{context}\n\nFILES:\n{code_snippets}"
+        model_id = self._settings.nvidia_model if self._settings.nvidia_api_key else self._settings.groq_model
         response = await self._client.chat.completions.create(
-            model=self._settings.groq_model,
+            model=model_id,
             response_format={"type": "json_object"},
             messages=[
                 {"role": "system", "content": DETAIL_SYSTEM_PROMPT},

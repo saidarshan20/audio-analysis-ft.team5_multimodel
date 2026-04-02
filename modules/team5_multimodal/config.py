@@ -9,9 +9,13 @@ from pydantic_settings import BaseSettings
 
 
 class Team5Settings(BaseSettings):
-    # --- Groq ---
+    # --- API Keys ---
     groq_api_key: str = ""
+    nvidia_api_key: str = ""
+    
+    # --- Models ---
     groq_model: str = "llama-3.3-70b-versatile"
+    nvidia_model: str = "meta/llama-3.3-70b-instruct"
 
     # --- Image Analysis (Local Models) ---
     yolo_model: str = "yolov8n.pt"
