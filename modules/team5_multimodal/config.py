@@ -18,6 +18,10 @@ class Team5Settings(BaseSettings):
     caption_model: str = "Salesforce/blip-image-captioning-base"
     embedding_model: str = "sentence-transformers/clip-ViT-B-32"
 
+    # --- Azure AI Vision (Optional Defaults) ---
+    azure_vision_key: str = ""
+    azure_vision_endpoint: str = ""
+
     # --- CORS (for run_local.py standalone testing) ---
     cors_origins: list[str] = ["http://localhost:3000", "http://localhost:5173"]
 

@@ -8,10 +8,13 @@ import os
 
 from fastapi import APIRouter, HTTPException, UploadFile, File
 
-from modules.team5_multimodal.models import TextAnalysisResponse, CodeAnalysisResponse, MultiImageAnalysisResponse
+from modules.team5_multimodal.models import (
+    TextAnalysisResponse, CodeAnalysisResponse, MultiImageAnalysisResponse, ImageAnalysisResponse
+)
 from modules.team5_multimodal.services import TextAnalysisService
 from modules.team5_multimodal.code_analysis_service import CodeAnalysisService
-from modules.team5_multimodal.image_analysis_service import ImageAnalysisService
+from modules.team5_multimodal.image_analysis_service import ImageAnalysisService as TeammateImageAnalysisService
+from modules.team5_multimodal.image_services import ImageAnalysisService as ZipImageAnalysisService
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/team5", tags=["Team 5 - Multimodal"])
@@ -101,12 +104,12 @@ async def analyze_code(file: UploadFile = File(...)):
 
 
 @router.post("/analyze-images", response_model=MultiImageAnalysisResponse)
-async def analyze_images(files: list[UploadFile] = File(...)):
+async def analyze_images_teammate(files: list[UploadFile] = File(...)):
     """Accept multiple images and return object detection, captions, and UMAP clusters."""
     if not files:
         raise HTTPException(status_code=400, detail="No files uploaded.")
 
-    service = ImageAnalysisService()
+    service = TeammateImageAnalysisService()
     results = []
     embeddings = []
     filenames = []
@@ -139,4 +142,47 @@ async def analyze_images(files: list[UploadFile] = File(...)):
 
     except Exception as exc:
         logger.exception("Image analysis failed")
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+# ──────────────────────────────────────────────
+#  NEW INTEGRATION: Multimodal Image Analysis Pipeline
+#  Added image processing endpoint bridging YOLO, CLIP, and UMAP.
+# ──────────────────────────────────────────────
+@router.post("/image-analyze", response_model=ImageAnalysisResponse)
+async def analyze_images_zip(file: UploadFile = File(...)):
+    """
+    Accepts a ZIP file containing raw images and processes them via the ImageAnalysisService.
+    - YOLOv8 extracts bounding boxes.
+    - OpenAI CLIP generates semantic embeddings.
+    - Scikit-Learn KMeans clusters the embeddings.
+    - UMAP reduces dimensions for 2D graphing.
+    - Matplotlib generates a final scatter plot in the shared_workspace.
+    """
+    if not file.filename or not file.filename.lower().endswith(".zip"):
+        raise HTTPException(status_code=400, detail="Only ZIP files are supported.")
+
+    zip_bytes = await file.read()
+    if not zip_bytes:
+        raise HTTPException(status_code=400, detail="Uploaded file is empty.")
+
+    service = ZipImageAnalysisService()
+
+    try:
+        # Extract images from ZIP
+        extract_dir = service.extract_zip(zip_bytes)
+        
+        # Run ML Pipeline
+        analysis_result = service.process_images(extract_dir)
+
+        return ImageAnalysisResponse(
+            filename=file.filename,
+            processed_count=len(analysis_result.clusters),
+            result=analysis_result
+        )
+
+    except ValueError as val_err:
+        raise HTTPException(status_code=400, detail=str(val_err))
+    except Exception as exc:
+        logger.exception("Image analysis pipeline failed")
         raise HTTPException(status_code=500, detail=str(exc)) from exc

@@ -104,7 +104,7 @@ class CodeAnalysisResponse(BaseModel):
 
 
 # ──────────────────────────────────────────────
-#  Image Analysis Models
+#  Image Analysis Models (Teammate's Version)
 # ──────────────────────────────────────────────
 
 class DetectionBox(BaseModel):
@@ -137,3 +137,32 @@ class MultiImageAnalysisResponse(BaseModel):
     results: list[ImageAnalysisResult]
     projection: list[ProjectionPoint]
     clusters: list[ClusterInfo]
+
+
+# ──────────────────────────────────────────────
+#  Image Analysis Models (Multimodal ZIP Version)
+#  NEW: Added by Team 5 to handle the output of the YOLO/CLIP/UMAP pipeline.
+#  These models ensure the API response is strictly typed and documented for the FrontEnd.
+# ──────────────────────────────────────────────
+
+class DetectedObject(BaseModel):
+    label: str
+    confidence: float
+    bbox: list[float]  # [x_min, y_min, x_max, y_max]
+
+class ClusterPoint(BaseModel):
+    filename: str
+    cluster_id: int
+    umap_x: float
+    umap_y: float
+    objects: list[DetectedObject]
+    description: str | None = None
+
+class ZipPipelineResult(BaseModel):
+    clusters: list[ClusterPoint]
+    plot_file_path: str
+
+class ImageAnalysisResponse(BaseModel):
+    status: str = "success"
+    processed_count: int
+    result: ZipPipelineResult
