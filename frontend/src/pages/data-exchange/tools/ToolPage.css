@@ -1,0 +1,432 @@
+/* ── Shared Tool Page Styles (xt- prefix) ───────────────────────────────── */
+
+/* Page wrapper */
+.xt-page {
+  background: #ffffff;
+  padding: 32px 48px 80px;
+  max-width: 1320px;
+  margin: 0 auto;
+  min-height: 80vh;
+}
+
+/* Back link */
+.xt-back-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: #64748b;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  margin-bottom: 20px;
+  transition: color 0.15s;
+}
+.xt-back-btn:hover { color: #fb8c36; }
+
+/* ── Header ──────────────────────────────────────────────────────────────── */
+.xt-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.xt-header-icon {
+  width: 56px;
+  height: 56px;
+  border-radius: 14px;
+  background: #fb8c36;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  flex-shrink: 0;
+}
+
+.xt-header-title {
+  font-size: 26px;
+  font-weight: 700;
+  color: #1e293b;
+  margin: 0 0 4px;
+}
+
+.xt-header-subtitle {
+  font-size: 14px;
+  color: #94a3b8;
+  margin: 0;
+}
+
+/* ── Stepper card ─────────────────────────────────────────────────────────── */
+.xt-stepper-card {
+  background: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 24px 60px;
+  display: flex;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.xt-stepper {
+  display: flex;
+  align-items: flex-start;
+  width: 100%;
+}
+
+.xt-step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+
+.xt-step-circle {
+  width: 54px;
+  height: 54px;
+  border-radius: 50%;
+  border: 2px solid #e2e8f0;
+  background: white;
+  color: #94a3b8;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+.xt-step-circle.active {
+  background: #fb8c36;
+  border-color: #fb8c36;
+  color: white;
+  box-shadow: 0 0 0 4px rgba(251, 140, 54, 0.12);
+}
+.xt-step-circle.done {
+  background: #fb8c36;
+  border-color: #fb8c36;
+  color: white;
+}
+
+.xt-step-label {
+  font-size: 12px;
+  color: #94a3b8;
+  white-space: nowrap;
+  font-weight: 500;
+  text-align: center;
+}
+.xt-step-label.active {
+  color: #fb8c36;
+  font-weight: 600;
+}
+
+/* line between steps — sits at vertical centre of the 54px circles */
+.xt-connector {
+  flex: 1;
+  height: 2px;
+  background: #e2e8f0;
+  margin-top: 27px; /* half of 54px circle */
+  min-width: 24px;
+}
+.xt-connector.done { background: #fb8c36; }
+
+/* ── Content panel card ──────────────────────────────────────────────────── */
+.xt-panel {
+  background: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 36px 40px;
+}
+
+.xt-panel-title {
+  font-size: 22px;
+  font-weight: 700;
+  color: #1e293b;
+  text-align: center;
+  margin: 0 0 8px;
+}
+
+.xt-panel-subtitle {
+  font-size: 14px;
+  color: #94a3b8;
+  text-align: center;
+  margin: 0 0 28px;
+}
+.xt-panel-subtitle .xt-link {
+  color: #fb8c36;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+/* ── Tabs (segmented control) ────────────────────────────────────────────── */
+.xt-tabs {
+  display: flex;
+  background: #f1f5f9;
+  border-radius: 8px;
+  padding: 3px;
+  gap: 2px;
+  margin-bottom: 20px;
+}
+
+.xt-tab {
+  flex: 1;
+  padding: 10px 16px;
+  border-radius: 6px;
+  background: transparent;
+  color: #64748b;
+  font-size: 14px;
+  font-weight: 500;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: all 0.15s;
+}
+.xt-tab.active {
+  background: white;
+  color: #1e293b;
+  font-weight: 600;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+/* ── Search ──────────────────────────────────────────────────────────────── */
+.xt-search-wrap {
+  position: relative;
+  margin-bottom: 10px;
+}
+.xt-search-icon {
+  position: absolute;
+  left: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #94a3b8;
+}
+.xt-search-input {
+  width: 100%;
+  padding: 11px 16px 11px 40px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  font-size: 14px;
+  color: #1e293b;
+  outline: none;
+  box-sizing: border-box;
+  transition: border-color 0.2s;
+  background: white;
+}
+.xt-search-input:focus { border-color: #fb8c36; }
+
+.xt-count {
+  font-size: 13px;
+  color: #94a3b8;
+  margin-bottom: 12px;
+}
+
+/* ── Dataset list ─────────────────────────────────────────────────────────── */
+.xt-dataset-list {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  overflow: hidden;
+  max-height: 420px;
+  overflow-y: auto;
+}
+
+.xt-dataset-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 18px 20px;
+  border-bottom: 1px solid #f1f5f9;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.xt-dataset-row:last-child { border-bottom: none; }
+.xt-dataset-row:hover { background: #fafafa; }
+.xt-dataset-row.selected { background: #fff7ed; }
+
+.xt-dataset-info { flex: 1; }
+.xt-dataset-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1e293b;
+  display: block;
+  margin-bottom: 3px;
+  line-height: 1.4;
+}
+.xt-dataset-desc {
+  font-size: 12px;
+  color: #94a3b8;
+  display: block;
+}
+
+.xt-dataset-badge {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: #fffbeb;
+  color: #d97706;
+  border: 1px solid #fde68a;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* ── Drop zone (OCR) ─────────────────────────────────────────────────────── */
+.xt-dropzone {
+  border: 2px dashed #d1d5db;
+  border-radius: 12px;
+  padding: 80px 40px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  background: #ffffff;
+  cursor: pointer;
+  transition: border-color 0.2s;
+}
+.xt-dropzone:hover { border-color: #fb8c36; }
+
+.xt-dropzone-icon {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  background: rgba(251, 140, 54, 0.1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fb8c36;
+}
+
+.xt-dropzone-title {
+  font-size: 20px;
+  font-weight: 700;
+  color: #1e293b;
+  margin: 0;
+}
+.xt-dropzone-subtitle {
+  font-size: 13px;
+  color: #94a3b8;
+  margin: 0;
+}
+
+.xt-file-badges {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: center;
+  margin-top: 4px;
+}
+.xt-file-badge {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #475569;
+  background: white;
+}
+.xt-max-size {
+  font-size: 12px;
+  color: #94a3b8;
+}
+
+/* ── Upload zone (inside panels) ─────────────────────────────────────────── */
+.xt-upload-zone {
+  border: 2px dashed #d1d5db;
+  border-radius: 10px;
+  padding: 40px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  text-align: center;
+  background: #fafafa;
+  color: #94a3b8;
+  font-size: 14px;
+}
+.xt-upload-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  background: #fb8c36;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+.xt-upload-btn:hover { opacity: 0.9; }
+
+/* ── Anonymization two-col layout ────────────────────────────────────────── */
+.xt-anon-layout {
+  display: grid;
+  grid-template-columns: 1fr 300px;
+  gap: 24px;
+}
+
+.xt-workflow-card {
+  background: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  padding: 28px;
+  align-self: start;
+}
+.xt-workflow-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: #1e293b;
+  margin: 0 0 16px;
+}
+.xt-workflow-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.xt-workflow-list li {
+  font-size: 13px;
+  color: #475569;
+  line-height: 1.5;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+.xt-workflow-list li::before {
+  content: "•";
+  color: #fb8c36;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+/* Browse Catalog inner section */
+.xt-browse-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: #1e293b;
+  margin: 20px 0 4px;
+}
+.xt-browse-subtitle {
+  font-size: 13px;
+  color: #94a3b8;
+  margin: 0 0 16px;
+}
+
+/* ── Responsive ──────────────────────────────────────────────────────────── */
+@media (max-width: 900px) {
+  .xt-page { padding: 20px 16px 40px; }
+  .xt-stepper-card { padding: 20px 16px; }
+  .xt-anon-layout { grid-template-columns: 1fr; }
+  .xt-panel { padding: 24px; }
+}

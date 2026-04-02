@@ -1,0 +1,37 @@
+.app-container {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+.main-content {
+  flex: 1;
+  padding-bottom: 40px;
+}
+
+/* Card pattern background */
+.card-pattern {
+  background-image: linear-gradient(30deg, #eaeef3 12%, transparent 12.5%, transparent 87%, #eaeef3 87.5%, #eaeef3), 
+                    linear-gradient(150deg, #eaeef3 12%, transparent 12.5%, transparent 87%, #eaeef3 87.5%, #eaeef3), 
+                    linear-gradient(30deg, #eaeef3 12%, transparent 12.5%, transparent 87%, #eaeef3 87.5%, #eaeef3), 
+                    linear-gradient(150deg, #eaeef3 12%, transparent 12.5%, transparent 87%, #eaeef3 87.5%, #eaeef3), 
+                    linear-gradient(60deg, #e4e9f0 25%, transparent 25.5%, transparent 75%, #e4e9f0 75%, #e4e9f0), 
+                    linear-gradient(60deg, #e4e9f0 25%, transparent 25.5%, transparent 75%, #e4e9f0 75%, #e4e9f0);
+  background-size: 80px 140px;
+  background-position: 0 0, 0 0, 40px 70px, 40px 70px, 0 0, 40px 70px;
+}
+
+.view-animate-in {
+  animation: fadeIn 0.3s ease-in-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

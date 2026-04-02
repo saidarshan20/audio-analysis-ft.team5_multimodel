@@ -1,0 +1,22 @@
+@echo off
+title AI Sphere - React Development Server
+echo ==============================================
+echo Starting AI Sphere React Application...
+echo ==============================================
+
+:: Change to the directory of the batch script
+cd /d "%~dp0"
+
+echo.
+echo Installing dependencies (if any are missing)...
+call npm install
+
+echo.
+echo Starting the Vite Development Server...
+echo Please wait for the local URL (usually http://localhost:5173/) to appear.
+echo Press Ctrl + C in this window to stop the server at any time.
+echo.
+
+call npm run dev
+
+pause
