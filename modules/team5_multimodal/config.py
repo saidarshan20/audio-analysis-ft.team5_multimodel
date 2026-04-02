@@ -13,6 +13,11 @@ class Team5Settings(BaseSettings):
     groq_api_key: str = ""
     groq_model: str = "llama-3.3-70b-versatile"
 
+    # --- Image Analysis (Local Models) ---
+    yolo_model: str = "yolov8n.pt"
+    caption_model: str = "Salesforce/blip-image-captioning-base"
+    embedding_model: str = "sentence-transformers/clip-ViT-B-32"
+
     # --- CORS (for run_local.py standalone testing) ---
     cors_origins: list[str] = ["http://localhost:3000", "http://localhost:5173"]
 

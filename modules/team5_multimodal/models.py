@@ -101,3 +101,39 @@ class CodeAnalysisResponse(BaseModel):
     file_count: int
     architecture: CodeArchResult
     details: CodeDetailResult
+
+
+# ──────────────────────────────────────────────
+#  Image Analysis Models
+# ──────────────────────────────────────────────
+
+class DetectionBox(BaseModel):
+    label: str
+    confidence: float
+    box: list[float]  # [x1, y1, x2, y2]
+
+
+class ImageAnalysisResult(BaseModel):
+    filename: str
+    caption: str
+    detections: list[DetectionBox]
+
+
+class ProjectionPoint(BaseModel):
+    x: float
+    y: float
+    cluster: int
+    filename: str
+
+
+class ClusterInfo(BaseModel):
+    cluster_id: int
+    description: str
+    count: int
+
+
+class MultiImageAnalysisResponse(BaseModel):
+    status: str = "success"
+    results: list[ImageAnalysisResult]
+    projection: list[ProjectionPoint]
+    clusters: list[ClusterInfo]

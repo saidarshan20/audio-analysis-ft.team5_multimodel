@@ -8,9 +8,10 @@ import os
 
 from fastapi import APIRouter, HTTPException, UploadFile, File
 
-from modules.team5_multimodal.models import TextAnalysisResponse, CodeAnalysisResponse
+from modules.team5_multimodal.models import TextAnalysisResponse, CodeAnalysisResponse, MultiImageAnalysisResponse
 from modules.team5_multimodal.services import TextAnalysisService
 from modules.team5_multimodal.code_analysis_service import CodeAnalysisService
+from modules.team5_multimodal.image_analysis_service import ImageAnalysisService
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/team5", tags=["Team 5 - Multimodal"])
@@ -96,4 +97,46 @@ async def analyze_code(file: UploadFile = File(...)):
 
     except Exception as exc:
         logger.exception("Code analysis failed")
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+@router.post("/analyze-images", response_model=MultiImageAnalysisResponse)
+async def analyze_images(files: list[UploadFile] = File(...)):
+    """Accept multiple images and return object detection, captions, and UMAP clusters."""
+    if not files:
+        raise HTTPException(status_code=400, detail="No files uploaded.")
+
+    service = ImageAnalysisService()
+    results = []
+    embeddings = []
+    filenames = []
+
+    try:
+        for file in files:
+            # Basic type check
+            if not file.content_type.startswith("image/"):
+                logger.warning("Skipping non-image file: %s", file.filename)
+                continue
+
+            raw_bytes = await file.read()
+            if not raw_bytes:
+                continue
+
+            # Run detection, captioning, embedding
+            res, embed = service.analyze_image(raw_bytes, file.filename or "unknown")
+            results.append(res)
+            embeddings.append(embed)
+            filenames.append(file.filename or "unknown")
+
+        # Perform clustering and 2D projection
+        projection, clusters = service.perform_clustering(embeddings, filenames)
+
+        return MultiImageAnalysisResponse(
+            results=results,
+            projection=projection,
+            clusters=clusters
+        )
+
+    except Exception as exc:
+        logger.exception("Image analysis failed")
         raise HTTPException(status_code=500, detail=str(exc)) from exc

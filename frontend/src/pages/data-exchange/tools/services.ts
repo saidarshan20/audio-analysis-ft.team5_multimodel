@@ -53,6 +53,34 @@ export interface CodeAnalysisResult {
   };
 }
 
+export interface ImageAnalysisResult {
+  filename: string;
+  caption: string;
+  detections: Array<{
+    x1: number;
+    y1: number;
+    x2: number;
+    y2: number;
+    label: string;
+    confidence: number;
+  }>;
+}
+
+export interface MultiImageAnalysisResponse {
+  results: ImageAnalysisResult[];
+  projection: Array<{
+    x: number;
+    y: number;
+    cluster: number;
+    filename: string;
+  }>;
+  clusters: Array<{
+    cluster_id: number;
+    description: string;
+    count: number;
+  }>;
+}
+
 /**
  * Uploads a .txt or .pdf file for multi-modal text analysis
  */
@@ -89,6 +117,26 @@ export async function analyzeCodebase(file: File): Promise<CodeAnalysisResult> {
   if (!response.ok) {
     const err = await response.json().catch(() => ({ detail: 'Unknown error' }));
     throw new Error(err.detail || `Code analysis failed with status ${response.status}`);
+  }
+
+  return response.json();
+}
+
+/**
+ * Uploads multiple images for object detection, captioning, and clustering
+ */
+export async function analyzeImages(files: File[]): Promise<MultiImageAnalysisResponse> {
+  const formData = new FormData();
+  files.forEach(file => formData.append('files', file));
+
+  const response = await fetch(`${BASE_URL}/team5/analyze-images`, {
+    method: 'POST',
+    body: formData,
+  });
+
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({ detail: 'Unknown error' }));
+    throw new Error(err.detail || `Image analysis failed with status ${response.status}`);
   }
 
   return response.json();

@@ -1,8 +1,15 @@
 import { useState, useRef } from 'react';
-import { ArrowLeft, BarChart2, Database, Upload, Search, Loader2, FileText, Code2, Sparkles } from 'lucide-react';
+import { ArrowLeft, BarChart2, Database, Upload, Search, Loader2, FileText, Code2, Sparkles, Image as ImageIcon } from 'lucide-react';
 import { toast } from 'sonner';
 import './ToolPage.css';
-import { analyzeTextFile, analyzeCodebase, TextAnalysisResult, CodeAnalysisResult } from './services';
+import { 
+  analyzeTextFile, 
+  analyzeCodebase, 
+  analyzeImages,
+  TextAnalysisResult, 
+  CodeAnalysisResult,
+  MultiImageAnalysisResponse 
+} from './services';
 
 type DatasetTab = 'catalog' | 'upload';
 
@@ -48,6 +55,7 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
   const [loading, setLoading] = useState(false);
   const [textResult, setTextResult] = useState<TextAnalysisResult | null>(null);
   const [codeResult, setCodeResult] = useState<CodeAnalysisResult | null>(null);
+  const [imgResult, setImgResult] = useState<MultiImageAnalysisResponse | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const filtered = DATASETS.filter(d =>
@@ -56,35 +64,41 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
   );
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
 
     setLoading(true);
     setTextResult(null);
     setCodeResult(null);
+    setImgResult(null);
 
-    const isZip = file.name.toLowerCase().endsWith('.zip');
-    const isDoc = file.name.toLowerCase().endsWith('.pdf') || file.name.toLowerCase().endsWith('.txt');
+    const isZip = files.length === 1 && files[0].name.toLowerCase().endsWith('.zip');
+    const isDoc = files.length === 1 && (files[0].name.toLowerCase().endsWith('.pdf') || files[0].name.toLowerCase().endsWith('.txt'));
+    const isImages = files.every(f => f.type.startsWith('image/'));
 
     try {
       if (isZip) {
         toast.loading('Analyzing codebase architecture...', { id: 'analysis' });
-        const res = await analyzeCodebase(file);
+        const res = await analyzeCodebase(files[0]);
         setCodeResult(res);
         toast.success('Code analysis complete!', { id: 'analysis' });
       } else if (isDoc) {
         toast.loading('Extracting insights from document...', { id: 'analysis' });
-        const res = await analyzeTextFile(file);
+        const res = await analyzeTextFile(files[0]);
         setTextResult(res);
         toast.success('Document analysis complete!', { id: 'analysis' });
+      } else if (isImages) {
+        toast.loading(`Analyzing ${files.length} images...`, { id: 'analysis' });
+        const res = await analyzeImages(files);
+        setImgResult(res);
+        toast.success('Image analysis complete!', { id: 'analysis' });
       } else {
-        toast.error('Unsupported file type. Please upload .txt, .pdf, or .zip', { id: 'analysis' });
+        toast.error('Unsupported file combo. Please upload a single document/zip or multiple images.', { id: 'analysis' });
       }
     } catch (err: any) {
       toast.error(err.message || 'Analysis failed', { id: 'analysis' });
     } finally {
       setLoading(false);
-      // Reset input so the same file can be uploaded again
       if (fileInputRef.current) fileInputRef.current.value = '';
     }
   };
@@ -156,14 +170,15 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
 
         {activeTab === 'upload' && (
           <div className="view-animate-in">
-            {!textResult && !codeResult ? (
+            {!textResult && !codeResult && !imgResult ? (
               <div className="xt-upload-zone" onClick={() => !loading && fileInputRef.current?.click()}>
                 <input
                   type="file"
                   ref={fileInputRef}
                   onChange={handleFileChange}
                   style={{ display: 'none' }}
-                  accept=".txt,.pdf,.zip"
+                  multiple
+                  accept=".txt,.pdf,.zip,image/*"
                 />
                 {loading ? (
                   <Loader2 size={36} className="animate-spin" color="#fb8c36" />
@@ -171,16 +186,17 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
                   <Upload size={36} color="#fb8c36" />
                 )}
                 <p>{loading ? 'Processing through AI engine...' : 'Click or Drag files here to analyze'}</p>
-                <div className="xt-file-chips">
-                   <span className="chip"><FileText size={12}/> Document (.pdf, .txt)</span>
-                   <span className="chip"><Code2 size={12}/> Codebase (.zip)</span>
-                </div>
+                 <div className="xt-file-chips">
+                    <span className="chip"><FileText size={12}/> Docs</span>
+                    <span className="chip"><Code2 size={12}/> Code</span>
+                    <span className="chip"><ImageIcon size={12}/> Images</span>
+                 </div>
               </div>
             ) : (
               <div className="analysis-results">
                 <div className="results-header">
-                  <h3>Analysis Results</h3>
-                  <button className="xt-upload-btn" onClick={() => { setTextResult(null); setCodeResult(null); }}>
+                   <h3>Analysis Results</h3>
+                  <button className="xt-upload-btn" onClick={() => { setTextResult(null); setCodeResult(null); setImgResult(null); }}>
                     Analyze Another File
                   </button>
                 </div>
@@ -229,6 +245,67 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
                     </div>
                   </div>
                 )}
+
+                {imgResult && (
+                  <div className="img-analysis-view">
+                    <div className="viz-row">
+                      <div className="scatter-box result-card">
+                         <h4><BarChart2 size={16}/> UMAP Projection</h4>
+                         <p className="viz-desc">Semantic clustering of uploaded images based on CLIP embeddings.</p>
+                         <div className="scatter-plot">
+                            <svg viewBox="0 0 100 100" className="umap-svg">
+                               {imgResult.projection.map((p, i) => (
+                                 <circle 
+                                   key={i}
+                                   cx={50 + p.x * 10} 
+                                   cy={50 + p.y * 10} 
+                                   r="1.5" 
+                                   fill={`var(--cluster-${p.cluster % 5})`}
+                                   className="dot"
+                                 >
+                                   <title>{p.filename} (Cluster {p.cluster})</title>
+                                 </circle>
+                               ))}
+                            </svg>
+                         </div>
+                      </div>
+                      <div className="clusters-box result-card">
+                         <h4>Clusters</h4>
+                         <div className="cluster-list">
+                            {imgResult.clusters.map(c => (
+                              <div key={c.cluster_id} className="cluster-item">
+                                <span className="cluster-dot" style={{ background: `var(--cluster-${c.cluster_id % 5})` }}></span>
+                                <div>
+                                  <strong>{c.description}</strong>
+                                  <span>{c.count} images</span>
+                                </div>
+                              </div>
+                            ))}
+                         </div>
+                      </div>
+                    </div>
+
+                    <div className="image-grid">
+                      {imgResult.results.map((res, i) => (
+                        <div key={i} className="img-card result-card">
+                           <div className="img-thumbnail">
+                              <ImageIcon size={24} color="#334155" />
+                              <span className="filename-small">{res.filename}</span>
+                           </div>
+                           <div className="img-details">
+                              <p className="caption">"{res.caption}"</p>
+                              <div className="detections">
+                                 {res.detections.slice(0, 3).map((d, j) => (
+                                   <span key={j} className="det-tag">{d.label} {Math.round(d.confidence*100)}%</span>
+                                 ))}
+                                 {res.detections.length > 3 && <span className="det-tag">+{res.detections.length - 3} more</span>}
+                              </div>
+                           </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -253,9 +330,36 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
         .timeline-item .date { color: #fb8c36; font-weight: bold; margin-right: 10px; }
         .components-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 15px; margin-top: 15px; }
         .comp-item { background: #1e293b; padding: 12px; border-radius: 8px; font-size: 12px; }
-        .comp-item strong { color: #fb8c36; display: block; margin-bottom: 4px; }
+         .comp-item strong { color: #fb8c36; display: block; margin-bottom: 4px; }
         .comp-item span { color: #94a3b8; font-size: 10px; text-transform: uppercase; }
         .comp-item p { margin: 8px 0 0; line-height: 1.4; color: #cbd5e1; }
+
+        /* Image Analysis Styles */
+        :root {
+          --cluster-0: #fb8c36;
+          --cluster-1: #4ade80;
+          --cluster-2: #60a5fa;
+          --cluster-3: #a78bfa;
+          --cluster-4: #f472b6;
+        }
+        .img-analysis-view { display: flex; flex-direction: column; gap: 20px; }
+        .viz-row { display: grid; grid-template-columns: 1fr 250px; gap: 20px; }
+        .umap-svg { width: 100%; height: 300px; background: #020617; border-radius: 8px; border: 1px solid #1e293b; }
+        .dot { transition: transform 0.2s; cursor: crosshair; }
+        .dot:hover { transform: scale(3); stroke: white; stroke-width: 0.5px; }
+        .cluster-list { display: flex; flex-direction: column; gap: 12px; margin-top: 15px; }
+        .cluster-item { display: flex; align-items: center; gap: 10px; font-size: 12px; }
+        .cluster-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+        .cluster-item span { color: #94a3b8; font-size: 10px; display: block; }
+        .image-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 15px; }
+        .img-card { padding: 12px !important; display: flex; gap: 12px; }
+        .img-thumbnail { width: 60px; height: 60px; background: #1e293b; border-radius: 6px; display: flex; flex-direction: column; align-items: center; justify-content: center; overflow: hidden; }
+        .filename-small { font-size: 8px; color: #94a3b8; margin-top: 4px; text-align: center; width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 0 4px; }
+        .img-details { flex: 1; }
+        .caption { font-size: 12px; color: #f1f5f9; font-style: italic; margin-bottom: 8px; line-height: 1.4; }
+        .detections { display: flex; flex-wrap: wrap; gap: 4px; }
+        .det-tag { background: #334155; color: #cbd5e1; font-size: 9px; padding: 2px 6px; border-radius: 4px; }
+        .viz-desc { font-size: 12px; color: #94a3b8; margin-bottom: 10px; }
       `}</style>
     </div>
   );
