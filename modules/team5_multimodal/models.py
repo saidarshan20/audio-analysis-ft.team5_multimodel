@@ -101,3 +101,30 @@ class CodeAnalysisResponse(BaseModel):
     file_count: int
     architecture: CodeArchResult
     details: CodeDetailResult
+
+
+# ──────────────────────────────────────────────
+#  Image Analysis Models (Multimodal)
+# ──────────────────────────────────────────────
+
+class DetectedObject(BaseModel):
+    label: str
+    confidence: float
+    bbox: list[float]  # [x_min, y_min, x_max, y_max]
+
+class ClusterPoint(BaseModel):
+    filename: str
+    cluster_id: int
+    umap_x: float
+    umap_y: float
+    objects: list[DetectedObject]
+    description: str | None = None
+
+class ImageAnalysisResult(BaseModel):
+    clusters: list[ClusterPoint]
+    plot_file_path: str
+
+class ImageAnalysisResponse(BaseModel):
+    status: str = "success"
+    processed_count: int
+    result: ImageAnalysisResult

@@ -13,6 +13,10 @@ class Team5Settings(BaseSettings):
     groq_api_key: str = ""
     groq_model: str = "llama-3.3-70b-versatile"
 
+    # --- Azure AI Vision (Optional Defaults) ---
+    azure_vision_key: str = ""
+    azure_vision_endpoint: str = ""
+
     # --- CORS (for run_local.py standalone testing) ---
     cors_origins: list[str] = ["http://localhost:3000", "http://localhost:5173"]
 

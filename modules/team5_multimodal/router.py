@@ -8,9 +8,12 @@ import os
 
 from fastapi import APIRouter, HTTPException, UploadFile, File
 
-from modules.team5_multimodal.models import TextAnalysisResponse, CodeAnalysisResponse
+from modules.team5_multimodal.models import (
+    TextAnalysisResponse, CodeAnalysisResponse, ImageAnalysisResponse
+)
 from modules.team5_multimodal.services import TextAnalysisService
 from modules.team5_multimodal.code_analysis_service import CodeAnalysisService
+from modules.team5_multimodal.image_services import ImageAnalysisService
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/team5", tags=["Team 5 - Multimodal"])
@@ -96,4 +99,36 @@ async def analyze_code(file: UploadFile = File(...)):
 
     except Exception as exc:
         logger.exception("Code analysis failed")
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+@router.post("/image-analyze", response_model=ImageAnalysisResponse)
+async def analyze_images(file: UploadFile = File(...)):
+    """Accept a ZIP file of images and perform clustering and object detection."""
+    if not file.filename or not file.filename.lower().endswith(".zip"):
+        raise HTTPException(status_code=400, detail="Only ZIP files are supported.")
+
+    zip_bytes = await file.read()
+    if not zip_bytes:
+        raise HTTPException(status_code=400, detail="Uploaded file is empty.")
+
+    service = ImageAnalysisService()
+
+    try:
+        # Extract images from ZIP
+        extract_dir = service.extract_zip(zip_bytes)
+        
+        # Run ML Pipeline
+        analysis_result = service.process_images(extract_dir)
+
+        return ImageAnalysisResponse(
+            filename=file.filename,
+            processed_count=len(analysis_result.clusters),
+            result=analysis_result
+        )
+
+    except ValueError as val_err:
+        raise HTTPException(status_code=400, detail=str(val_err))
+    except Exception as exc:
+        logger.exception("Image analysis pipeline failed")
         raise HTTPException(status_code=500, detail=str(exc)) from exc
