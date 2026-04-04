@@ -7,6 +7,9 @@ import logging
 import os
 
 from fastapi import APIRouter, HTTPException, UploadFile, File
+from fastapi.responses import StreamingResponse
+import json
+import asyncio
 
 from modules.team5_multimodal.models import (
     TextAnalysisResponse, CodeAnalysisResponse, MultiImageAnalysisResponse, ImageAnalysisResponse
@@ -65,86 +68,44 @@ class GithubAnalysisRequest(BaseModel):
     repo_url: str
 
 
-@router.post("/code-analyze", response_model=CodeAnalysisResponse)
+@router.post("/code-analyze")
 async def analyze_code(file: UploadFile = File(...)):
-    """Accept a ZIP file of a codebase and perform 2-pass LLM analysis."""
+    """Accept a ZIP file of a codebase and perform 2-pass LLM analysis via stream."""
     if not file.filename or not file.filename.lower().endswith(".zip"):
         raise HTTPException(status_code=400, detail="Only ZIP files are supported.")
 
     zip_bytes = await file.read()
-    if not zip_bytes:
-        raise HTTPException(status_code=400, detail="Uploaded file is empty.")
-
     service = CodeAnalysisService()
 
-    try:
-        # 1. Extract ZIP
-        root_dir = service.extract_zip(zip_bytes)
-        
-        # 2. Build AST JSON graph
-        graph_data = service.build_code_graph(root_dir)
-        
-        # 3. Pass 1: Architecture
-        arch_result = await service.analyze_architecture(graph_data)
-        
-        # 4. Pass 2: Detailed analysis
-        code_snippets = service.select_important_files(root_dir)
-        detail_result = await service.analyze_files(arch_result, code_snippets)
-        
-        # Count files (approximate for the response)
-        file_count = 0
-        for _, _, files in os.walk(root_dir):
-            file_count += len(files)
+    async def event_generator():
+        try:
+            yield json.dumps({"type": "progress", "step": "extracting", "message": "Extracting ZIP archive..."}) + "\n"
+            root_dir = service.extract_zip(zip_bytes)
+            
+            async for update in service.analyze_repo_stream(root_dir, file.filename):
+                yield json.dumps(update) + "\n"
+        except Exception as e:
+            yield json.dumps({"type": "error", "message": str(e)}) + "\n"
 
-        return CodeAnalysisResponse(
-            filename=file.filename,
-            file_count=file_count,
-            architecture=arch_result,
-            details=detail_result
-        )
+    return StreamingResponse(event_generator(), media_type="application/x-ndjson")
 
-    except Exception as exc:
-        logger.exception("Code analysis failed")
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
-
-@router.post("/code-analyze/github", response_model=CodeAnalysisResponse)
+@router.post("/code-analyze/github")
 async def analyze_code_github(payload: GithubAnalysisRequest):
-    """Clone a GitHub repository and perform 2-pass LLM analysis."""
+    """Clone a GitHub repository and perform 2-pass LLM analysis via stream."""
     service = CodeAnalysisService()
 
-    try:
-        # 1. Clone Repo
-        root_dir = service.clone_github_repo(payload.repo_url)
-        
-        # 2. Build AST JSON graph
-        graph_data = service.build_code_graph(root_dir)
-        
-        # 3. Pass 1: Architecture
-        arch_result = await service.analyze_architecture(graph_data)
-        
-        # 4. Pass 2: Detailed analysis
-        code_snippets = service.select_important_files(root_dir)
-        detail_result = await service.analyze_files(arch_result, code_snippets)
-        
-        # Count files (approximate for the response)
-        file_count = 0
-        for _, _, files in os.walk(root_dir):
-            file_count += len(files)
+    async def event_generator():
+        try:
+            yield json.dumps({"type": "progress", "step": "cloning", "message": f"Cloning {payload.repo_url}..."}) + "\n"
+            root_dir = service.clone_github_repo(payload.repo_url)
+            
+            repo_name = payload.repo_url.rstrip('/').split('/')[-1]
+            async for update in service.analyze_repo_stream(root_dir, repo_name):
+                yield json.dumps(update) + "\n"
+        except Exception as e:
+            yield json.dumps({"type": "error", "message": str(e)}) + "\n"
 
-        repo_name = payload.repo_url.rstrip('/').split('/')[-1]
-
-        return CodeAnalysisResponse(
-            filename=f"{repo_name} (GitHub)",
-            file_count=file_count,
-            architecture=arch_result,
-            details=detail_result
-        )
-
-    except ValueError as val_err:
-        raise HTTPException(status_code=400, detail=str(val_err))
-    except Exception as exc:
-        logger.exception("GitHub code analysis failed")
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+    return StreamingResponse(event_generator(), media_type="application/x-ndjson")
 
 
 @router.post("/analyze-images", response_model=MultiImageAnalysisResponse)

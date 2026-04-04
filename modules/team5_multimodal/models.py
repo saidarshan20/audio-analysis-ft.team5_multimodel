@@ -95,6 +95,8 @@ class FlowStep(BaseModel):
 class CodeDetailResult(BaseModel):
     key_files: list[KeyFile]
     flow: list[FlowStep]
+    tech_debt: list[str] = Field(default_factory=list)
+    security_risks: list[str] = Field(default_factory=list)
 
 
 class CodeAnalysisResponse(BaseModel):

@@ -52,6 +52,19 @@ export interface CodeAnalysisResult {
       step: number;
       description: string;
     }>;
+    tech_debt?: string[];
+    security_risks?: string[];
+  };
+  metadata?: {
+    nodes_count: number;
+    edges_count: number;
+    input_tokens: number;
+    output_tokens: number;
+    total_tokens: number;
+    total_duration_sec: number;
+    arch_model?: string;
+    detail_model?: string;
+    context_chars?: number;
   };
 }
 
@@ -105,9 +118,12 @@ export async function analyzeTextFile(file: File): Promise<TextAnalysisResult> {
 }
 
 /**
- * Uploads a .zip codebase for architecture and flow analysis
+ * Uploads a .zip codebase for architecture and flow analysis via stream
  */
-export async function analyzeCodebase(file: File): Promise<CodeAnalysisResult> {
+export async function analyzeCodebase(
+  file: File, 
+  onProgress?: (step: string, message: string) => void
+): Promise<CodeAnalysisResult> {
   const formData = new FormData();
   formData.append('file', file);
 
@@ -121,13 +137,16 @@ export async function analyzeCodebase(file: File): Promise<CodeAnalysisResult> {
     throw new Error(err.detail || `Code analysis failed with status ${response.status}`);
   }
 
-  return response.json();
+  return processAnalysisStream(response, onProgress);
 }
 
 /**
- * Executes a codebase structure analysis targeting a public GitHub repository.
+ * Executes a codebase structure analysis targeting a public GitHub repository via stream
  */
-export async function analyzeGithubRepo(url: string): Promise<CodeAnalysisResult> {
+export async function analyzeGithubRepo(
+  url: string,
+  onProgress?: (step: string, message: string) => void
+): Promise<CodeAnalysisResult> {
   const response = await fetch(`${BASE_URL}/team5/code-analyze/github`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -139,7 +158,50 @@ export async function analyzeGithubRepo(url: string): Promise<CodeAnalysisResult
     throw new Error(err.detail || `GitHub analysis failed with status ${response.status}`);
   }
 
-  return response.json();
+  return processAnalysisStream(response, onProgress);
+}
+
+/**
+ * Helper to process the NDJSON stream from the backend
+ */
+async function processAnalysisStream(
+  response: Response, 
+  onProgress?: (step: string, message: string) => void
+): Promise<CodeAnalysisResult> {
+  const reader = response.body?.getReader();
+  if (!reader) throw new Error("No response body");
+
+  const decoder = new TextDecoder();
+  let result: CodeAnalysisResult | null = null;
+  let buffer = "";
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split("\n");
+    buffer = lines.pop() || "";
+
+    for (const line of lines) {
+      if (!line.trim()) continue;
+      try {
+        const data = JSON.parse(line);
+        if (data.type === 'progress') {
+          onProgress?.(data.step, data.message);
+        } else if (data.type === 'result') {
+          result = data.payload;
+        } else if (data.type === 'error') {
+          throw new Error(data.message);
+        }
+      } catch (e) {
+        console.error("Error parsing stream line:", e, line);
+      }
+    }
+  }
+
+  if (!result) throw new Error("Analysis completed without result");
+  return result;
 }
 
 /**

@@ -51,23 +51,35 @@ class CodeGraphBuilder:
 
     def _get_query_for_lang(self, ext: str):
         """Returns the appropriate tree-sitter query for the given file extension."""
-        if ext == '.py':
-            return PY_LANGUAGE.query("""
-                (import_statement (dotted_name) @import)
-                (import_from_statement module_name: (dotted_name) @from)
-                (function_definition name: (identifier) @func_name)
-                (class_definition name: (identifier) @class_name)
-            """)
+        if ext == '.py' and PY_LANGUAGE:
+            try:
+                return tree_sitter.Query(PY_LANGUAGE, """
+                    (import_statement) @import
+                    (import_from_statement module_name: (dotted_name) @from)
+                    (function_definition name: (identifier) @func_name)
+                    (class_definition name: (identifier) @class_name)
+                """)
+            except Exception as e:
+                logger.error(f"Failed to create Python query: {e}")
+                return None
         elif ext in ['.ts', '.tsx', '.js', '.jsx']:
-            # For TS/JS, we look for import declarations and function/class declarations
+            # For TS/JS, we look for import statements (modern tree-sitter node type)
             lang = TS_LANGUAGE if ext in ['.ts', '.js'] else TSX_LANGUAGE
-            return lang.query("""
-                (import_statement source: (string (string_fragment) @import))
-                (call_expression function: (identifier) @require_call arguments: (arguments (string (string_fragment) @import)) (#eq? @require_call "require"))
-                (function_declaration name: (identifier) @func_name)
-                (arrow_function) @func_name_arrow
-                (class_declaration name: (identifier) @class_name)
-            """)
+            if not lang:
+                return None
+            try:
+                return tree_sitter.Query(lang, """
+                    (import_statement source: (string) @import)
+                    (call_expression 
+                        function: (identifier) @require_call 
+                        arguments: (arguments (string) @import)
+                        (#eq? @require_call "require"))
+                    (function_declaration (identifier) @func_name)
+                    (class_declaration (identifier) @class_name)
+                """)
+            except Exception as e:
+                logger.error(f"Failed to create TS query: {e}")
+                return None
         return None
 
     def _parse_file(self, full_path: Path) -> Dict[str, List[str]]:
@@ -87,6 +99,8 @@ class CodeGraphBuilder:
             if not query:
                 return {"imports": [], "functions": [], "classes": []}
                 
+            # Tree-sitter (0.22+) API: Use QueryCursor to execute captures
+            # In 0.25.2+, cursor.captures(node) returns a dict {capture_name: [nodes]}
             cursor = tree_sitter.QueryCursor(query)
             captures = cursor.captures(tree.root_node)
             
@@ -94,14 +108,17 @@ class CodeGraphBuilder:
             
             for capture_name, nodes in captures.items():
                 for node in nodes:
-                    text = code_bytes[node.start_byte:node.end_byte].decode('utf-8', errors='replace')
-                    
-                    if capture_name in ("import", "from"):
-                        features["imports"].append(text)
-                    elif capture_name == "func_name":
-                        features["functions"].append(text)
-                    elif capture_name == "class_name":
-                        features["classes"].append(text)
+                    try:
+                        text = code_bytes[node.start_byte:node.end_byte].decode('utf-8', errors='replace')
+                        
+                        if capture_name in ("import", "from"):
+                            features["imports"].append(text)
+                        elif capture_name == "func_name":
+                            features["functions"].append(text)
+                        elif capture_name == "class_name":
+                            features["classes"].append(text)
+                    except Exception as capture_err:
+                        logger.debug("Error extracting capture %s: %s", capture_name, capture_err)
                         
             return features
             
