@@ -8,6 +8,7 @@ import os
 from pathlib import Path
 
 from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 
 # ──── Core routers (Integration Team) ────
@@ -52,6 +53,8 @@ def create_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+
+    application.mount("/shared_workspace", StaticFiles(directory=str(BASE_DIR / "shared_workspace")), name="shared_workspace")
 
     # ── Mount core routes ──
     application.include_router(auth_router)

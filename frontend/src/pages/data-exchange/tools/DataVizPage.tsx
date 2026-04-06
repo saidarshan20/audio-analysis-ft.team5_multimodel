@@ -10,9 +10,11 @@ import {
   analyzeCodebase,
   analyzeGithubRepo,
   analyzeImages,
+  analyzeImagesZip,
   TextAnalysisResult,
   CodeAnalysisResult,
-  MultiImageAnalysisResponse
+  MultiImageAnalysisResponse,
+  ImageZipAnalysisResponse
 } from './services';
 import MermaidDiagram from '../../../components/MermaidDiagram';
 
@@ -56,13 +58,14 @@ const generateMermaidGraph = (arch: any) => {
 };
 
 type DatasetTab = 'catalog' | 'upload';
-type FileType = 'csv' | 'text' | 'pdf' | 'images' | 'videos' | 'music' | 'code';
+type FileType = 'csv' | 'text' | 'pdf' | 'images' | 'images-zip' | 'videos' | 'music' | 'code';
 
 const FILE_TYPES: { id: FileType; label: string; desc: string; icon: any }[] = [
   { id: 'csv',    label: 'CSV Data',  desc: 'Tabular data & spreadsheets', icon: FileSpreadsheet },
   { id: 'text',   label: 'Text File', desc: 'Plain text & documents',     icon: FileText },
   { id: 'pdf',    label: 'PDF Doc',   desc: 'PDF reports & exports',      icon: Search }, 
   { id: 'images', label: 'Images',    desc: 'Multi-image analysis',       icon: ImageIcon },
+  { id: 'images-zip', label: 'Image Batch (zip)', desc: 'Batch UMAP clustering pipeline', icon: ImageIcon },
   { id: 'code',   label: 'Codebase',  desc: 'ZIP repo analysis',          icon: Code2 },
   { id: 'videos', label: 'Videos',    desc: 'Video streams & files',      icon: Video },
   { id: 'music',  label: 'Audio',     desc: 'Voice & sound analysis',     icon: Music },
@@ -116,6 +119,8 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
   const [textResult, setTextResult] = useState<TextAnalysisResult | null>(null);
   const [codeResult, setCodeResult] = useState<CodeAnalysisResult | null>(null);
   const [imgResult, setImgResult] = useState<MultiImageAnalysisResponse | null>(null);
+  const [imgZipResult, setImgZipResult] = useState<ImageZipAnalysisResponse | null>(null);
+  const [selectedClusterPoint, setSelectedClusterPoint] = useState<any | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // -- Mock Data for Samples --
@@ -223,6 +228,8 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
     setTextResult(null);
     setCodeResult(null);
     setImgResult(null);
+    setImgZipResult(null);
+    setSelectedClusterPoint(null);
 
     // 1) Github Fast-Path
     if (usingGithub) {
@@ -246,7 +253,7 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
     const isImages = files.every(f => f.type.startsWith('image/'));
 
     try {
-      if (isZip) {
+      if (fileType === 'code' && isZip) {
         toast.loading('Analyzing codebase architecture...', { id: 'analysis' });
         const res = await analyzeCodebase(files[0]);
         setCodeResult(res);
@@ -256,7 +263,12 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
         const res = await analyzeTextFile(files[0]);
         setTextResult(res);
         toast.success('Document analysis complete!', { id: 'analysis' });
-      } else if (isImages) {
+      } else if (fileType === 'images-zip' && isZip) {
+        toast.loading(`Processing Image ZIP Batch...`, { id: 'analysis' });
+        const res = await analyzeImagesZip(files[0]);
+        setImgZipResult(res);
+        toast.success(`Analysis complete! Processed ${res.processed_count} images.`, { id: 'analysis' });
+      } else if (fileType === 'images' && isImages) {
         toast.loading(`Analyzing ${files.length} images...`, { id: 'analysis' });
         const res = await analyzeImages(files);
         setImgResult(res);
@@ -339,7 +351,7 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
 
         {activeTab === 'upload' && (
           <div className="view-animate-in">
-            {!textResult && !codeResult && !imgResult ? (
+            {!textResult && !codeResult && !imgResult && !imgZipResult ? (
               <div className="wizard-container" style={{boxShadow: 'none', border: 'none', background: 'transparent', padding: '20px 0'}}>
                 {/* Step 1: Type Selection */}
                 <div className="wizard-header" style={{textAlign: 'left', marginBottom: '20px'}}>
@@ -438,7 +450,7 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
               <div className="analysis-results">
                 <div className="results-header">
                   <h3>Analysis Results</h3>
-                  <button className="xt-upload-btn" onClick={() => { setTextResult(null); setCodeResult(null); setImgResult(null); setSelectedFiles([]); }}>
+                  <button className="xt-upload-btn" onClick={() => { setTextResult(null); setCodeResult(null); setImgResult(null); setImgZipResult(null); setSelectedFiles([]); }}>
                     Analyze Another File
                   </button>
                 </div>
@@ -635,11 +647,198 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
                     </div>
                   </div>
                 )}
+
+                {imgZipResult && (
+                  <div className="img-analysis-view">
+                    <div className="viz-row">
+                      <div className="scatter-box result-card">
+                        <h4><BarChart2 size={16} /> Batch UMAP Analysis</h4>
+                        <p className="viz-desc">Semantic clustering map generated by the FastAPI backend using Matplotlib.</p>
+                        <div style={{ marginTop: '15px', background: '#020617', padding: '10px', borderRadius: '8px', border: '1px solid #1e293b', display: 'flex', justifyContent: 'center' }}>
+                          <img 
+                            src={`${import.meta.env.VITE_API_URL ?? 'http://localhost:8000'}/${imgZipResult.result.plot_file_path}`} 
+                            alt="Cluster Plot" 
+                            style={{ maxWidth: '100%', maxHeight: '400px', borderRadius: '8px', objectFit: 'contain' }} 
+                            onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                          />
+                        </div>
+                      </div>
+                      <div className="clusters-box result-card">
+                        <h4>Cluster Summaries</h4>
+                        <p className="viz-desc">Aggregated statistics from the processed ZIP batch ({imgZipResult.processed_count} total images).</p>
+                        <div className="cluster-list" style={{ marginTop: '15px' }}>
+                          {imgZipResult.result.clusters.map((c, idx) => (
+                            <div key={idx} className="cluster-item" style={{ background: '#1e293b', padding: '15px', borderRadius: '8px', marginBottom: '10px', alignItems: 'flex-start' }}>
+                              <span className="cluster-dot" style={{ background: `var(--cluster-${c.cluster_id % 5})`, display: 'inline-block', marginTop: '4px' }}></span>
+                              <div style={{ width: '100%' }}>
+                                <strong style={{ color: '#fb8c36', display: 'block', fontSize: '13px' }}>{c.description}</strong>
+                                <span style={{ color: '#60a5fa', margin: '6px 0', display: 'block' }}>Detected Contexts:</span>
+                                <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                                  {c.objects.slice(0, 6).map((obj, i) => (
+                                      <span key={i} className="chip" style={{ fontSize: '9px', background: 'rgba(51, 65, 85, 0.5)' }}>{obj.label}</span>
+                                  ))}
+                                  {c.objects.length > 6 && <span className="chip" style={{ fontSize: '9px', opacity: 0.7 }}>+{c.objects.length - 6}</span>}
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div style={{ padding: '30px 0 10px' }}>
+                      <h3 style={{ marginBottom: '20px', fontSize: '1.25rem', color: '#f8fafc', display: 'flex', alignItems: 'center', gap: '8px', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '10px' }}>
+                        <ImageIcon size={20} color="#60a5fa" /> Annotated Detection Gallery
+                      </h3>
+                      
+                      <style>{`
+                        .premium-gallery-card {
+                          background: rgba(15, 23, 42, 0.4);
+                          border: 1px solid rgba(255, 255, 255, 0.05);
+                          border-radius: 12px;
+                          overflow: hidden;
+                          display: flex;
+                          flex-direction: column;
+                          transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+                          box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+                          position: relative;
+                        }
+                        .premium-gallery-card:hover {
+                          transform: translateY(-5px);
+                          box-shadow: 0 15px 30px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(96, 165, 250, 0.4);
+                          background: rgba(30, 41, 59, 0.7);
+                        }
+                        .premium-gallery-img {
+                          width: 100%;
+                          height: 180px;
+                          object-fit: cover;
+                          transition: transform 0.5s ease;
+                        }
+                        .premium-gallery-card:hover .premium-gallery-img {
+                          transform: scale(1.08);
+                        }
+                        .premium-gallery-info {
+                          padding: 14px 16px;
+                          background: linear-gradient(to top, rgba(15, 23, 42, 1) 0%, rgba(15, 23, 42, 0.85) 100%);
+                          border-top: 1px solid rgba(255,255,255,0.05);
+                          position: relative;
+                          z-index: 2;
+                        }
+                        .premium-gallery-meta {
+                          display: flex;
+                          justify-content: space-between;
+                          align-items: center;
+                          margin-top: 10px;
+                        }
+                        .premium-cluster-badge {
+                          padding: 4px 10px;
+                          border-radius: 20px;
+                          font-size: 10px;
+                          font-weight: 700;
+                          letter-spacing: 0.5px;
+                          text-transform: uppercase;
+                          box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+                        }
+                      `}</style>
+
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '24px' }}>
+                        {imgZipResult.result.clusters.map((c, i) => (
+                          <div key={i} className="premium-gallery-card" onClick={() => setSelectedClusterPoint(c)} style={{ cursor: 'pointer' }}>
+                            <div style={{ overflow: 'hidden' }}>
+                              {c.annotated_image_path ? (
+                                <img 
+                                  className="premium-gallery-img"
+                                  src={`${import.meta.env.VITE_API_URL ?? 'http://localhost:8000'}/${c.annotated_image_path}`} 
+                                  alt={c.filename}
+                                  onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                                />
+                              ) : (
+                                <div className="premium-gallery-img" style={{ background: '#1e293b', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748b', fontSize: '12px' }}>No Tracking Data</div>
+                              )}
+                            </div>
+                            <div className="premium-gallery-info">
+                              <span style={{ display: 'block', color: '#e2e8f0', fontSize: '14px', fontWeight: '500', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                {c.filename}
+                              </span>
+                              <div className="premium-gallery-meta">
+                                <span style={{ fontSize: '12px', color: '#94a3b8', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                  <Search size={12} /> {c.objects.length} Objects
+                                </span>
+                                <span className="premium-cluster-badge" style={{ 
+                                  color: '#fff', 
+                                  background: `var(--cluster-${c.cluster_id % 5})`,
+                                  border: `1px solid rgba(255,255,255,0.2)`
+                                }}>
+                                  Cluster {c.cluster_id}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>
         )}
       </div>
+
+      {selectedClusterPoint && (
+        <div 
+          style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', background: 'rgba(2, 6, 23, 0.9)', backdropFilter: 'blur(10px)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '40px' }}
+          onClick={() => setSelectedClusterPoint(null)}
+        >
+          <div 
+            style={{ background: '#0f172a', borderRadius: '16px', border: '1px solid #1e293b', width: '100%', maxWidth: '1000px', maxHeight: '90vh', overflow: 'hidden', display: 'flex', flexDirection: 'column', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ padding: '20px', borderBottom: '1px solid #1e293b', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#1e293b' }}>
+              <h3 style={{ margin: 0, color: '#f8fafc', fontSize: '18px' }}>{selectedClusterPoint.filename}</h3>
+              <button 
+                onClick={() => setSelectedClusterPoint(null)} 
+                style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: '28px', padding: 0, lineHeight: 1 }}
+              >
+                &times;
+              </button>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'row', flex: 1, overflow: 'hidden' }}>
+              <div style={{ flex: '1', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#020617', padding: '20px', overflow: 'auto' }}>
+                 {selectedClusterPoint.annotated_image_path ? (
+                    <img src={`${import.meta.env.VITE_API_URL ?? 'http://localhost:8000'}/${selectedClusterPoint.annotated_image_path}`} alt="Full size" style={{ maxWidth: '100%', maxHeight: '70vh', objectFit: 'contain', borderRadius: '4px' }} />
+                 ) : (
+                    <div style={{ color: '#64748b' }}>No Tracking Data</div>
+                 )}
+              </div>
+              <div style={{ width: '350px', display: 'flex', flexDirection: 'column', gap: '20px', padding: '20px', overflowY: 'auto', background: '#0f172a', borderLeft: '1px solid #1e293b' }}>
+                <div>
+                  <span style={{ fontSize: '12px', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '1px', fontWeight: 'bold' }}>AI Caption</span>
+                  <p style={{ margin: '8px 0 0', color: '#f1f5f9', fontSize: '15px', lineHeight: '1.5', background: 'rgba(30, 41, 59, 0.5)', padding: '15px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                    {selectedClusterPoint.description || "No caption available."}
+                  </p>
+                </div>
+                <div>
+                  <span style={{ fontSize: '12px', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '1px', fontWeight: 'bold' }}>Detected Objects ({selectedClusterPoint.objects.length})</span>
+                  <div style={{ marginTop: '8px', display: 'flex', flexWrap: 'wrap', gap: '8px', padding: '15px', background: 'rgba(30, 41, 59, 0.5)', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                    {selectedClusterPoint.objects.map((obj: any, idx: number) => (
+                      <span key={idx} style={{ background: '#334155', color: '#f8fafc', padding: '6px 12px', borderRadius: '6px', fontSize: '12px', border: '1px solid #475569' }}>
+                        {obj.label} <span style={{ color: '#60a5fa', marginLeft: '4px', fontWeight: 'bold' }}>{Math.round(obj.confidence * 100)}%</span>
+                      </span>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                   <span style={{ fontSize: '12px', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '1px', fontWeight: 'bold' }}>Assigned Cluster</span>
+                   <div style={{ marginTop: '8px', padding: '12px 15px', background: `var(--cluster-${selectedClusterPoint.cluster_id % 5})`, color: '#fff', borderRadius: '8px', fontWeight: 'bold', display: 'inline-block', boxShadow: '0 4px 6px rgba(0,0,0,0.1)' }}>
+                     Cluster {selectedClusterPoint.cluster_id}
+                   </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       <style>{`
         .xt-file-chips { display: flex; gap: 10px; margin-top: 15px; }

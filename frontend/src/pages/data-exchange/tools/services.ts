@@ -83,6 +83,23 @@ export interface MultiImageAnalysisResponse {
   }>;
 }
 
+export interface ImageZipAnalysisResponse {
+  status: string;
+  processed_count: number;
+  result: {
+    clusters: Array<{
+      filename: string;
+      cluster_id: number;
+      umap_x: number;
+      umap_y: number;
+      objects: Array<{ label: string; confidence: number; bbox: number[] }>;
+      description: string | null;
+      annotated_image_path: string | null;
+    }>;
+    plot_file_path: string;
+  };
+}
+
 /**
  * Uploads a .txt or .pdf file for multi-modal text analysis
  */
@@ -157,6 +174,26 @@ export async function analyzeImages(files: File[]): Promise<MultiImageAnalysisRe
   if (!response.ok) {
     const err = await response.json().catch(() => ({ detail: 'Unknown error' }));
     throw new Error(err.detail || `Image analysis failed with status ${response.status}`);
+  }
+
+  return response.json();
+}
+
+/**
+ * Uploads a .zip file for batched multi-modal image analysis
+ */
+export async function analyzeImagesZip(file: File): Promise<ImageZipAnalysisResponse> {
+  const formData = new FormData();
+  formData.append('file', file);
+
+  const response = await fetch(`${BASE_URL}/team5/image-analyze-zip`, {
+    method: 'POST',
+    body: formData,
+  });
+
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({ detail: 'Unknown error' }));
+    throw new Error(err.detail || `ZIP Image analysis failed with status ${response.status}`);
   }
 
   return response.json();

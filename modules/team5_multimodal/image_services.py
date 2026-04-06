@@ -20,7 +20,7 @@ matplotlib.use('Agg')  # Headless backend for fastAPI
 # Machine Learning
 from ultralytics import YOLO
 import torch
-from transformers import CLIPProcessor, CLIPModel
+from transformers import CLIPProcessor, CLIPModel, BlipProcessor, BlipForConditionalGeneration
 from sklearn.cluster import KMeans
 import umap
 
@@ -50,6 +50,14 @@ except Exception as e:
     _clip_model = None
     _clip_processor = None
 
+try:
+    _blip_processor = BlipProcessor.from_pretrained("Salesforce/blip-image-captioning-base")
+    _blip_model = BlipForConditionalGeneration.from_pretrained("Salesforce/blip-image-captioning-base")
+except Exception as e:
+    logger.error(f"Failed to load BLIP model: {e}")
+    _blip_processor = None
+    _blip_model = None
+
 
 class ImageAnalysisService:
     def __init__(self):
@@ -61,12 +69,8 @@ class ImageAnalysisService:
         self.raw_dir.mkdir(parents=True, exist_ok=True)
         self.proc_dir.mkdir(parents=True, exist_ok=True)
 
-        # Initialize Azure Client if keys exist
+        # Initialize Azure Client if keys exist (Skipped for Local BLIP)
         self.cv_client = None
-        key = self.settings.azure_vision_key
-        endpoint = self.settings.azure_vision_endpoint
-        if key and endpoint:
-            self.cv_client = ComputerVisionClient(endpoint, CognitiveServicesCredentials(key))
 
     def extract_zip(self, zip_bytes: bytes) -> str:
         """Extracts zip blob into shared_workspace/1_raw_uploads/"""
@@ -79,16 +83,17 @@ class ImageAnalysisService:
         return str(out_dir)
 
     def get_image_description(self, img_path: str) -> str | None:
-        """Use Azure AI Vision to describe image (if configured)"""
-        if not self.cv_client:
-            return "No Azure Keys Configured"
+        """Use Local BLIP Model to describe image"""
         try:
-            with open(img_path, "rb") as img_stream:
-                analysis = self.cv_client.describe_image_in_stream(img_stream)
-                if analysis.captions:
-                    return analysis.captions[0].text
+            if _blip_model and _blip_processor:
+                img = Image.open(img_path).convert("RGB")
+                inputs = _blip_processor(img, return_tensors="pt")
+                out = _blip_model.generate(**inputs)
+                return _blip_processor.decode(out[0], skip_special_tokens=True)
+            else:
+                return "Local BLIP Model Not Loaded"
         except Exception as e:
-            logger.error(f"Azure API Error on {img_path}: {e}")
+            logger.error(f"BLIP Captioning Error on {img_path}: {e}")
         return None
 
     def process_images(self, extract_dir: str) -> ZipPipelineResult:
@@ -111,14 +116,19 @@ class ImageAnalysisService:
         metadata_list = []
 
         # 1. Pipeline: YOLO + CLIP + Azure
+        annotated_dir = self.proc_dir / f"annotated_{uuid.uuid4().hex[:8]}"
+        annotated_dir.mkdir(parents=True, exist_ok=True)
+        
         for img_path in image_files:
             str_path = str(img_path)
             
             # --- YOLO Object Detection ---
             objs = []
+            rel_annotated_path = None
             if _yolo_model:
                 results = _yolo_model(str_path, verbose=False)
-                for r in results:
+                if len(results) > 0:
+                    r = results[0]
                     boxes = r.boxes
                     for box in boxes:
                         x1, y1, x2, y2 = box.xyxy[0].tolist()
@@ -126,6 +136,13 @@ class ImageAnalysisService:
                         cls = int(box.cls[0])
                         label = _yolo_model.names[cls]
                         objs.append(DetectedObject(label=label, confidence=conf, bbox=[x1, y1, x2, y2]))
+                    
+                    # Generate annotated image
+                    im_array = r.plot()
+                    im_pil = Image.fromarray(im_array[..., ::-1])
+                    out_img = annotated_dir / img_path.name
+                    im_pil.save(str(out_img))
+                    rel_annotated_path = str(out_img.relative_to(self.base_dir))
 
             # --- CLIP Embeddings ---
             emb = np.zeros(512)
@@ -153,7 +170,8 @@ class ImageAnalysisService:
             metadata_list.append({
                 "filename": img_path.name,
                 "objects": objs,
-                "description": desc
+                "description": desc,
+                "annotated_path": rel_annotated_path
             })
 
         # 2. KMeans Clustering
@@ -182,7 +200,8 @@ class ImageAnalysisService:
                     umap_x=float(coords[i][0]),
                     umap_y=float(coords[i][1]),
                     objects=metadata_list[i]["objects"],
-                    description=metadata_list[i]["description"]
+                    description=metadata_list[i]["description"],
+                    annotated_image_path=metadata_list[i]["annotated_path"]
                 )
             )
 

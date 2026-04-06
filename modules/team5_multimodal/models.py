@@ -159,6 +159,7 @@ class ClusterPoint(BaseModel):
     umap_y: float
     objects: list[DetectedObject]
     description: str | None = None
+    annotated_image_path: str | None = None
 
 class ZipPipelineResult(BaseModel):
     clusters: list[ClusterPoint]

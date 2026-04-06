@@ -193,7 +193,7 @@ async def analyze_images_teammate(files: list[UploadFile] = File(...)):
 #  NEW INTEGRATION: Multimodal Image Analysis Pipeline
 #  Added image processing endpoint bridging YOLO, CLIP, and UMAP.
 # ──────────────────────────────────────────────
-@router.post("/image-analyze", response_model=ImageAnalysisResponse)
+@router.post("/image-analyze-zip", response_model=ImageAnalysisResponse)
 async def analyze_images_zip(file: UploadFile = File(...)):
     """
     Accepts a ZIP file containing raw images and processes them via the ImageAnalysisService.
