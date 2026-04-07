@@ -43,8 +43,13 @@ class ImageAnalysisService:
         if ImageAnalysisService._caption_model is None:
             logger.info("Loading BLIP captioning model from %s...", self.settings.caption_model)
             # from_pretrained is the standard method for HF models
-            ImageAnalysisService._caption_processor = BlipProcessor.from_pretrained(self.settings.caption_model)
-            ImageAnalysisService._caption_model = BlipForConditionalGeneration.from_pretrained(self.settings.caption_model)
+            token = self.settings.hf_token if self.settings.hf_token else None
+            ImageAnalysisService._caption_processor = BlipProcessor.from_pretrained(
+                self.settings.caption_model, token=token
+            )
+            ImageAnalysisService._caption_model = BlipForConditionalGeneration.from_pretrained(
+                self.settings.caption_model, token=token
+            )
 
         if ImageAnalysisService._embed_model is None:
             logger.info("Loading CLIP embedding model from %s...", self.settings.embedding_model)

@@ -13,6 +13,8 @@ class Team5Settings(BaseSettings):
     groq_api_key: str = ""
     nvidia_api_key: str = ""
     
+    hf_token: str = ""
+    
     # --- Models ---
     groq_model: str = "llama-3.3-70b-versatile"
     nvidia_model: str = "meta/llama-3.3-70b-instruct"
@@ -34,9 +36,14 @@ class Team5Settings(BaseSettings):
             os.path.dirname(__file__), "..", "..", ".env"
         ),
         "env_file_encoding": "utf-8",
+        "extra": "ignore",
     }
 
 
 @lru_cache
 def get_settings() -> Team5Settings:
-    return Team5Settings()
+    settings = Team5Settings()
+    # Set global environment variable for libraries like transformers/sentence-transformers
+    if settings.hf_token:
+        os.environ["HF_TOKEN"] = settings.hf_token
+    return settings

@@ -39,4 +39,4 @@ def create_app() -> FastAPI:
 app = create_app()
 
 if __name__ == "__main__":
-    uvicorn.run("modules.team5_multimodal.run_local:app", host="0.0.0.0", port=8005, reload=True)
+    uvicorn.run("modules.team5_multimodal.run_local:app", host="0.0.0.0", port=8000, reload=True)

@@ -1,7 +1,8 @@
 import { useState, useRef } from 'react';
 import { 
   ArrowLeft, BarChart2, Database, Upload, Search, Loader2, FileText, Code2, 
-  Sparkles, Image as ImageIcon, FileSpreadsheet, Music, Video, ArrowRight 
+  Sparkles, Image as ImageIcon, FileSpreadsheet, Music, Video, ArrowRight,
+  Activity, Clock, Zap, Cpu, Network
 } from 'lucide-react';
 import { toast } from 'sonner';
 import './ToolPage.css';
@@ -17,6 +18,14 @@ import {
   ImageZipAnalysisResponse
 } from './services';
 import MermaidDiagram from '../../../components/MermaidDiagram';
+
+type HistoryItem = {
+  id: string;
+  type: FileType | 'github';
+  label: string;
+  timestamp: number;
+  data: TextAnalysisResult | CodeAnalysisResult | MultiImageAnalysisResponse;
+};
 
 const generateMermaidGraph = (arch: any) => {
   if (!arch || !arch.components || !arch.connections) return '';
@@ -34,7 +43,19 @@ const generateMermaidGraph = (arch: any) => {
   Object.entries(layers).forEach(([layerName, comps]) => {
     mermaidStr += `  subgraph ${layerName} ["${layerName.toUpperCase()} LAYER"]\n`;
     comps.forEach(c => {
-      mermaidStr += `    node_${c.id}["${c.name}"]\n`;
+      let shapeStart = '["';
+      let shapeEnd = '"]';
+      const t = c.type.toLowerCase();
+      if (t.includes('database') || t.includes('storage') || t.includes('cache')) {
+        shapeStart = '[("'; shapeEnd = '")]';
+      } else if (t.includes('api') || t.includes('endpoint') || t.includes('interface')) {
+        shapeStart = '{{"'; shapeEnd = '"}}';
+      } else if (t.includes('queue') || t.includes('stream') || t.includes('event')) {
+        shapeStart = '>("'; shapeEnd = '")';
+      } else if (t.includes('function') || t.includes('lambda')) {
+        shapeStart = '(("'; shapeEnd = '"))';
+      }
+      mermaidStr += `    node_${c.id}${shapeStart}${c.name}${shapeEnd}\n`;
     });
     mermaidStr += `  end\n`;
   });
@@ -116,12 +137,81 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
   
   // -- Analysis State --
   const [loading, setLoading] = useState(false);
+  const [analysisStep, setAnalysisStep] = useState<string>('');
+  const [progressMsg, setProgressMsg] = useState<string>('');
   const [textResult, setTextResult] = useState<TextAnalysisResult | null>(null);
   const [codeResult, setCodeResult] = useState<CodeAnalysisResult | null>(null);
   const [imgResult, setImgResult] = useState<MultiImageAnalysisResponse | null>(null);
   const [imgZipResult, setImgZipResult] = useState<ImageZipAnalysisResponse | null>(null);
   const [selectedClusterPoint, setSelectedClusterPoint] = useState<any | null>(null);
+  const [history, setHistory] = useState<HistoryItem[]>(() => {
+    const saved = localStorage.getItem('kosh_analysis_history');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        console.error("Failed to parse history", e);
+        return [];
+      }
+    }
+    return [];
+  });
+  const [showHistory, setShowHistory] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const saveToHistory = (type: HistoryItem['type'], data: any, label: string) => {
+    const newItem: HistoryItem = {
+      id: crypto.randomUUID(),
+      type,
+      label,
+      timestamp: Date.now(),
+      data
+    };
+    const updated = [newItem, ...history].slice(0, 10); // Keep last 10
+    setHistory(updated);
+    localStorage.setItem('kosh_analysis_history', JSON.stringify(updated));
+  };
+
+  const loadHistoryItem = (item: HistoryItem) => {
+    // Clear current results
+    setTextResult(null);
+    setCodeResult(null);
+    setImgResult(null);
+
+    // Filter type to restorer
+    if (item.type === 'code' || item.type === 'github') {
+      setCodeResult(item.data as CodeAnalysisResult);
+    } else if (item.type === 'images') {
+      setImgResult(item.data as MultiImageAnalysisResponse);
+    } else {
+      setTextResult(item.data as TextAnalysisResult);
+    }
+    setShowHistory(false);
+    toast.success(`Restored analysis: ${item.label}`);
+  };
+
+  const deleteHistoryItem = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const updated = history.filter(h => h.id !== id);
+    setHistory(updated);
+    localStorage.setItem('kosh_analysis_history', JSON.stringify(updated));
+  };
+
+  const handleDownloadResult = () => {
+    const activeData = textResult || codeResult || imgResult;
+    if (!activeData) return;
+
+    const blob = new Blob([JSON.stringify(activeData, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `kosh_analysis_${new Date().toISOString().split('T')[0]}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    toast.success("Analysis results exported as JSON");
+  };
 
   // -- Mock Data for Samples --
   const MOCK_IMG_RESULT: MultiImageAnalysisResponse = {
@@ -180,6 +270,14 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
         { step: 1, description: 'User visits the Web Storefront.' },
         { step: 2, description: 'Web Storefront requests authentication via Auth Service.' },
         { step: 3, description: 'User navigates catalog, triggering API calls to Catalog Service.' }
+      ],
+      tech_debt: [
+        'Auth tokens lack automatic rotation and granular scopes, creating a maintenance burden.',
+        'Catalog REST routes are missing pagination, leading to possible memory bloat on large queries.'
+      ],
+      security_risks: [
+        'SQL Injection vulnerability in catalog search query execution.',
+        'Hardcoded JWT secret keys scattered within the auth module.'
       ]
     }
   };
@@ -203,12 +301,15 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
       setLoading(false);
       if (fileType === 'images') {
         setImgResult(MOCK_IMG_RESULT);
+        saveToHistory('images', MOCK_IMG_RESULT, 'Sample: Images');
         toast.success("Loaded Image Sample");
       } else if (fileType === 'code') {
         setCodeResult(MOCK_CODE_RESULT);
+        saveToHistory('code', MOCK_CODE_RESULT, 'Sample: Codebase');
         toast.success("Loaded Codebase Sample");
       } else if (['csv', 'text', 'pdf'].includes(fileType)) {
         setTextResult(MOCK_TEXT_RESULT);
+        saveToHistory(fileType as any, MOCK_TEXT_RESULT, `Sample: ${fileType.toUpperCase()}`);
         toast.success(`Loaded ${fileType.toUpperCase()} Sample`);
       } else {
         toast.info(`Sample for ${fileType} coming soon!`);
@@ -225,23 +326,32 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
     }
 
     setLoading(true);
+    setAnalysisStep('init');
+    setProgressMsg('Initializing analysis pipeline...');
     setTextResult(null);
     setCodeResult(null);
     setImgResult(null);
     setImgZipResult(null);
     setSelectedClusterPoint(null);
 
+    const onProgress = (step: string, msg: string) => {
+      setAnalysisStep(step);
+      setProgressMsg(msg);
+      toast.loading(msg, { id: 'analysis' });
+    };
+
     // 1) Github Fast-Path
     if (usingGithub) {
       try {
-        toast.loading(`Cloning and analyzing ${githubUrl}...`, { id: 'analysis' });
-        const res = await analyzeGithubRepo(githubUrl);
+        const res = await analyzeGithubRepo(githubUrl, onProgress);
         setCodeResult(res);
+        saveToHistory('github', res, `Repo: ${githubUrl.split('/').pop()}`);
         toast.success('GitHub analysis complete!', { id: 'analysis' });
       } catch (err: any) {
         toast.error(err.message || 'GitHub Analysis failed', { id: 'analysis' });
       } finally {
         setLoading(false);
+        setAnalysisStep('');
       }
       return;
     }
@@ -255,13 +365,15 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
     try {
       if (fileType === 'code' && isZip) {
         toast.loading('Analyzing codebase architecture...', { id: 'analysis' });
-        const res = await analyzeCodebase(files[0]);
+        const res = await analyzeCodebase(files[0], onProgress);
         setCodeResult(res);
+        saveToHistory('code', res, files[0].name);
         toast.success('Code analysis complete!', { id: 'analysis' });
       } else if (isDoc) {
         toast.loading('Extracting insights from document...', { id: 'analysis' });
         const res = await analyzeTextFile(files[0]);
         setTextResult(res);
+        saveToHistory(fileType as any, res, files[0].name);
         toast.success('Document analysis complete!', { id: 'analysis' });
       } else if (fileType === 'images-zip' && isZip) {
         toast.loading(`Processing Image ZIP Batch...`, { id: 'analysis' });
@@ -272,6 +384,7 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
         toast.loading(`Analyzing ${files.length} images...`, { id: 'analysis' });
         const res = await analyzeImages(files);
         setImgResult(res);
+        saveToHistory('images', res, `Gallery: ${files.length} images`);
         toast.success('Image analysis complete!', { id: 'analysis' });
       } else {
         toast.error('Unsupported file combo.', { id: 'analysis' });
@@ -280,6 +393,7 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
       toast.error(err.message || 'Analysis failed', { id: 'analysis' });
     } finally {
       setLoading(false);
+      setAnalysisStep('');
       if (fileInputRef.current) fileInputRef.current.value = '';
     }
   };
@@ -350,9 +464,60 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
         )}
 
         {activeTab === 'upload' && (
-          <div className="view-animate-in">
+          <div className="view-animate-in" style={{ position: 'relative' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
+              <div />
+              {history.length > 0 && !textResult && !codeResult && !imgResult && !imgZipResult && (
+                <button 
+                  className="xt-tab" 
+                  style={{ background: 'rgba(96, 165, 250, 0.1)', color: '#60a5fa', border: '1px solid rgba(96, 165, 250, 0.2)' }}
+                  onClick={() => setShowHistory(!showHistory)}
+                >
+                  {showHistory ? 'Hide History' : `Past Analyses (${history.length})`}
+                </button>
+              )}
+            </div>
+
+            {showHistory && (
+              <div className="history-panel glass-card" style={{ marginBottom: '20px', padding: '15px' }}>
+                <h3 style={{ fontSize: '14px', marginBottom: '12px', color: '#fb8c36' }}>Local Analysis History</h3>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  {history.map(item => (
+                    <div 
+                      key={item.id} 
+                      className="history-item" 
+                      onClick={() => loadHistoryItem(item)}
+                      style={{ 
+                        background: '#1e293b', 
+                        padding: '10px 15px', 
+                        borderRadius: '8px', 
+                        cursor: 'pointer', 
+                        display: 'flex', 
+                        justifyContent: 'space-between', 
+                        alignItems: 'center',
+                        border: '1px solid #334155'
+                      }}
+                    >
+                      <div>
+                        <div style={{ fontWeight: '600', fontSize: '13px' }}>{item.label}</div>
+                        <div style={{ fontSize: '10px', color: '#94a3b8' }}>
+                          {item.type.toUpperCase()} • {new Date(item.timestamp).toLocaleString()}
+                        </div>
+                      </div>
+                      <button 
+                        onClick={(e) => deleteHistoryItem(item.id, e)}
+                        style={{ background: 'transparent', border: 'none', color: '#f87171', cursor: 'pointer', padding: '5px' }}
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {!textResult && !codeResult && !imgResult && !imgZipResult ? (
-              <div className="wizard-container" style={{boxShadow: 'none', border: 'none', background: 'transparent', padding: '20px 0'}}>
+              <div className="wizard-container" style={{boxShadow: 'none', border: 'none', background: 'transparent', padding: '0px 0'}}>
                 {/* Step 1: Type Selection */}
                 <div className="wizard-header" style={{textAlign: 'left', marginBottom: '20px'}}>
                   <h2 style={{fontSize: '18px'}}>1. Select Analysis Type</h2>
@@ -382,7 +547,11 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
                 </div>
                 
                 <div style={{display: 'grid', gridTemplateColumns: fileType === 'code' ? '1fr 1fr 200px' : '1fr 200px', gap: '20px'}}>
-                  <div className="action-area" onClick={() => !loading && fileInputRef.current?.click()} style={{marginBottom: 0, padding: '20px'}}>
+                  <div 
+                    className={`action-area glass-card ${loading && selectedFiles.length > 0 ? 'active-loading' : ''}`} 
+                    onClick={() => !loading && fileInputRef.current?.click()} 
+                    style={{marginBottom: 0, padding: '24px', position: 'relative'}}
+                  >
                     <input
                       type="file"
                       ref={fileInputRef}
@@ -391,58 +560,132 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
                       multiple
                       accept=".txt,.pdf,.zip,image/*"
                     />
-                    <div className="action-icon" style={{marginBottom: '8px'}}>
-                      {loading ? <Loader2 size={24} className="animate-spin" /> : <Upload size={24} />}
+                    <div className="action-icon" style={{marginBottom: '12px', color: loading && selectedFiles.length > 0 ? '#fb8c36' : 'inherit'}}>
+                      {loading && selectedFiles.length > 0 ? <Loader2 size={32} className="animate-spin" /> : <Upload size={32} />}
                     </div>
-                    <div className="action-title" style={{fontSize: '14px'}}>
-                      {selectedFiles.length > 0 ? `${selectedFiles.length} file(s) selected` : 'Upload File'}
+                    <div className="action-title" style={{fontSize: '15px', fontWeight: 600}}>
+                      {selectedFiles.length > 0 ? `${selectedFiles.length} file(s) selected` : 'Upload local files'}
                     </div>
+                    <p style={{fontSize: '11px', color: '#94a3b8', marginTop: '4px'}}>Supports .zip, .txt, .pdf, images</p>
                   </div>
 
                   {fileType === 'code' && (
-                    <div className="action-area" style={{marginBottom: 0, padding: '20px', cursor: 'default'}}>
-                      <div className="action-icon" style={{marginBottom: '8px'}}>
-                        <Code2 size={24} />
+                    <div 
+                      className={`action-area glass-card ${loading && githubUrl.trim().length > 5 ? 'active-loading' : ''}`}
+                      style={{marginBottom: 0, padding: '24px', cursor: 'default'}}
+                    >
+                      <div className="action-icon" style={{marginBottom: '12px', color: loading && githubUrl.trim().length > 5 ? '#fb8c36' : 'inherit'}}>
+                        {loading && githubUrl.trim().length > 5 ? <Loader2 size={32} className="animate-spin" /> : <Code2 size={32} />}
                       </div>
-                      <div className="action-title" style={{fontSize: '14px', marginBottom: '10px'}}>GitHub Repository</div>
+                      <div className="action-title" style={{fontSize: '15px', fontWeight: 600, marginBottom: '12px'}}>GitHub Repository</div>
                       <input 
                         type="url"
                         className="xt-search-input"
                         placeholder="https://github.com/..."
                         value={githubUrl}
                         onChange={(e) => setGithubUrl(e.target.value)}
-                        style={{ width: '100%', background: '#0f172a', border: '1px solid #334155' }}
+                        style={{ width: '100%', background: '#020617', border: '1px solid #334155', height: '36px', fontSize: '12px' }}
                       />
                       <button 
                         onClick={() => setGithubUrl('https://github.com/tiangolo/fastapi')} 
                         style={{marginTop: '10px', fontSize: '11px', color: '#60a5fa', background: 'transparent', border: 'none', cursor: 'pointer', padding: 0, textDecoration: 'underline'}}
                       >
-                        Try Sample: https://github.com/tiangolo/fastapi
+                        Try: tiangolo/fastapi
                       </button>
                     </div>
                   )}
 
-                  <div className="action-area" style={{marginBottom: 0, padding: '20px', cursor: 'default', borderStyle: 'solid'}}>
-                    <div className="action-icon" style={{marginBottom: '8px'}}>
-                      <Database size={24} />
+                  <div className="action-area glass-card" style={{marginBottom: 0, padding: '24px', cursor: 'default', display: 'flex', flexDirection: 'column', justifyContent: 'center'}}>
+                    <div className="action-icon" style={{marginBottom: '12px'}}>
+                      <Database size={32} />
                     </div>
-                    <div className="action-title" style={{fontSize: '14px'}}>Demo Run</div>
-                    <button className="sample-file-btn" onClick={handleUseSample} disabled={loading} style={{width: '100%'}}>
+                    <div className="action-title" style={{fontSize: '15px', fontWeight: 600, marginBottom: '12px'}}>Quick Demo</div>
+                    <button className="sample-file-btn" onClick={handleUseSample} disabled={loading} style={{width: '100%', padding: '10px'}}>
                       Use Sample
                     </button>
                   </div>
                 </div>
 
                 {/* Step 3: Footer */}
-                <div className="wizard-footer" style={{marginTop: '30px', justifyContent: 'flex-end'}}>
+                <div className="wizard-footer" style={{marginTop: '40px', flexDirection: 'column', alignItems: 'center'}}>
+                  {loading && (fileType === 'code') && (
+                    <div className="analysis-progress-simple" style={{width: '100%', maxWidth: '550px', marginBottom: '32px'}}>
+                       <div className="progress-steps" style={{display: 'flex', justifyContent: 'space-between', marginBottom: '14px', position: 'relative'}}>
+                          {['Cloning', 'Graphing', 'Architecture', 'Analysis'].map((step, idx) => {
+                             const steps = ['cloning', 'graphing', 'arch', 'details'];
+                             const currentIdx = steps.indexOf(analysisStep);
+                             const isActive = idx === currentIdx;
+                             const isDone = idx < currentIdx;
+                             
+                             return (
+                               <div key={idx} style={{
+                                 color: isActive ? '#fb8c36' : isDone ? '#4ade80' : '#64748b',
+                                 fontSize: '12px',
+                                 fontWeight: isActive ? 600 : 400,
+                                 display: 'flex',
+                                 flexDirection: 'column',
+                                 alignItems: 'center',
+                                 gap: '6px',
+                                 flex: 1,
+                                 transition: 'all 0.3s ease'
+                               }}>
+                                 <div style={{
+                                   width: '20px', 
+                                   height: '20px', 
+                                   borderRadius: '50%', 
+                                   border: `1.5px solid ${isActive ? '#fb8c36' : isDone ? '#4ade80' : '#334155'}`,
+                                   display: 'flex',
+                                   alignItems: 'center',
+                                   justifyContent: 'center',
+                                   fontSize: '10px',
+                                   background: isActive ? 'rgba(251, 140, 54, 0.05)' : 'transparent',
+                                 }}>
+                                   {isDone ? '✓' : isActive ? <Loader2 size={10} className="animate-spin" /> : idx + 1}
+                                 </div>
+                                 <span>{step}</span>
+                               </div>
+                             )
+                          })}
+                       </div>
+                       <div className="progress-bar-bg" style={{height: '4px', background: '#020617', borderRadius: '2px', overflow: 'hidden', border: '1px solid #1e293b'}}>
+                          <div className="progress-bar-fill" style={{
+                            height: '100%', 
+                            background: '#fb8c36', 
+                            width: analysisStep === 'cloning' || analysisStep === 'extracting' ? '15%' : analysisStep === 'graphing' ? '40%' : analysisStep === 'arch' ? '70%' : analysisStep === 'details' ? '90%' : '0%',
+                            transition: 'width 0.8s'
+                          }}></div>
+                       </div>
+                       <p style={{fontSize: '11px', color: '#64748b', marginTop: '10px', textAlign: 'center'}}>{progressMsg}</p>
+                    </div>
+                  )}
+
                   <button 
                     className="continue-btn" 
                     onClick={handleContinue}
                     disabled={loading || (selectedFiles.length === 0 && !(fileType === 'code' && githubUrl.trim().length > 5))}
-                    style={{maxWidth: '200px', padding: '12px'}}
+                    style={{
+                      maxWidth: '220px', 
+                      padding: '12px 24px', 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      justifyContent: 'center', 
+                      gap: '10px',
+                      background: loading ? '#1e293b' : 'var(--brand-orange)',
+                      opacity: loading ? 0.8 : 1,
+                      boxShadow: loading ? 'none' : '0 4px 12px rgba(251, 140, 54, 0.2)'
+                    }}
                   >
-                    {loading ? 'Analyzing...' : 'Run Analysis'}
-                    <ArrowRight size={16} />
+                    {loading ? (
+                      <>
+                        <Loader2 size={16} className="animate-spin" />
+                        <span>Analyzing...</span>
+                      </>
+                    ) : (
+                      <>
+                        <span>Run Analysis</span>
+                        <ArrowRight size={16} />
+                      </>
+                    )}
                   </button>
                 </div>
               </div>
@@ -450,9 +693,18 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
               <div className="analysis-results">
                 <div className="results-header">
                   <h3>Analysis Results</h3>
-                  <button className="xt-upload-btn" onClick={() => { setTextResult(null); setCodeResult(null); setImgResult(null); setImgZipResult(null); setSelectedFiles([]); }}>
-                    Analyze Another File
-                  </button>
+                  <div style={{ display: 'flex', gap: '10px' }}>
+                    <button 
+                      className="xt-tab" 
+                      style={{ background: 'rgba(96, 165, 250, 0.1)', color: '#60a5fa', border: '1px solid rgba(96, 165, 250, 0.2)' }}
+                      onClick={handleDownloadResult}
+                    >
+                      Download JSON
+                    </button>
+                    <button className="xt-upload-btn" onClick={() => { setTextResult(null); setCodeResult(null); setImgResult(null); setImgZipResult(null); setSelectedFiles([]); setShowHistory(false); }}>
+                      Analyze Another File
+                    </button>
+                  </div>
                 </div>
 
                 {textResult && (
@@ -484,6 +736,46 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
 
                 {codeResult && (
                   <div className="code-analysis-view" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                    
+                    {/* Technical Analysis Stats Card */}
+                    {codeResult.metadata && (
+                      <div className="result-card technical-stats-card" style={{ borderLeft: '4px solid #fb8c36', background: 'linear-gradient(145deg, #0f172a 0%, #1e293b 100%)' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
+                          <h4 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '8px', color: '#fb8c36' }}>
+                            <Activity size={18} /> Technical Analysis Insight
+                          </h4>
+                          <span style={{ fontSize: '11px', color: '#94a3b8', background: 'rgba(251, 140, 54, 0.1)', padding: '2px 8px', borderRadius: '4px', border: '1px solid rgba(251, 140, 54, 0.2)' }}>
+                            Execution Trace
+                          </span>
+                        </div>
+                        
+                        <div className="stats-info-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '15px' }}>
+                          <div className="stat-info-item">
+                            <div className="label"><Clock size={12} /> Duration</div>
+                            <div className="value">{(codeResult.metadata.total_duration_sec || 0).toFixed(1)}s</div>
+                          </div>
+                          <div className="stat-info-item">
+                            <div className="label"><Network size={12} /> Graph Complexity</div>
+                            <div className="value">{codeResult.metadata.nodes_count} Nodes / {codeResult.metadata.edges_count} Edges</div>
+                          </div>
+                          <div className="stat-info-item">
+                            <div className="label"><Zap size={12} /> LLM Tokens</div>
+                            <div className="value">{codeResult.metadata.total_tokens.toLocaleString()}</div>
+                            <div className="sub-value" style={{ fontSize: '9px', opacity: 0.6 }}>
+                              {codeResult.metadata.input_tokens.toLocaleString()} in / {codeResult.metadata.output_tokens.toLocaleString()} out
+                            </div>
+                          </div>
+                          <div className="stat-info-item">
+                            <div className="label"><Cpu size={12} /> Primary Engine</div>
+                            <div className="value" style={{ fontSize: '12px' }}>{codeResult.metadata.arch_model?.replace('llama-3.3-70b-versatile', 'Llama 3.3 (70B)') || 'Groq Llama 3'}</div>
+                            <div className="sub-value" style={{ fontSize: '9px', opacity: 0.6 }}>
+                              {codeResult.metadata.detail_model ? 'Multi-pass detailing active' : 'Single-pass analysis'}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
                     <div className="viz-row">
                         <div className="result-card" style={{ flex: 1 }}>
                           <div className="summary-section">
@@ -582,6 +874,36 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
                             </div>
                           ))}
                         </div>
+                      </div>
+                    )}
+
+                    {((codeResult.details.tech_debt && codeResult.details.tech_debt.length > 0) || 
+                      (codeResult.details.security_risks && codeResult.details.security_risks.length > 0)) && (
+                      <div className="viz-row" style={{ marginTop: '0px' }}>
+                        {codeResult.details.tech_debt && codeResult.details.tech_debt.length > 0 && (
+                          <div className="result-card" style={{ flex: 1, border: '1px solid rgba(244, 114, 182, 0.3)' }}>
+                            <h4 style={{ color: '#f472b6', marginTop: 0, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                               Technical Debt
+                            </h4>
+                            <ul style={{ margin: '15px 0 0', paddingLeft: '20px', color: '#cbd5e1', fontSize: '12px', lineHeight: 1.6 }}>
+                              {codeResult.details.tech_debt.map((dt, i) => (
+                                <li key={i}>{dt}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                        {codeResult.details.security_risks && codeResult.details.security_risks.length > 0 && (
+                          <div className="result-card" style={{ flex: 1, border: '1px solid rgba(239, 68, 68, 0.3)' }}>
+                            <h4 style={{ color: '#f87171', marginTop: 0, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                               Security Risks
+                            </h4>
+                            <ul style={{ margin: '15px 0 0', paddingLeft: '20px', color: '#cbd5e1', fontSize: '12px', lineHeight: 1.6 }}>
+                              {codeResult.details.security_risks.map((sr, i) => (
+                                <li key={i}>{sr}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
@@ -888,6 +1210,30 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
         .detections { display: flex; flex-wrap: wrap; gap: 4px; }
         .det-tag { background: #334155; color: #cbd5e1; font-size: 9px; padding: 2px 6px; border-radius: 4px; }
         .viz-desc { font-size: 12px; color: #94a3b8; margin-bottom: 10px; }
+        
+        .technical-stats-card {
+          margin-bottom: 10px;
+          border-left: 4px solid #fb8c36 !important;
+        }
+        .stat-info-item {
+          display: flex;
+          flex-direction: column;
+          gap: 4px;
+        }
+        .stat-info-item .label {
+          font-size: 10px;
+          color: #94a3b8;
+          display: flex;
+          align-items: center;
+          gap: 4px;
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
+        }
+        .stat-info-item .value {
+          font-size: 14px;
+          font-weight: 600;
+          color: #f1f5f9;
+        }
       `}</style>
     </div>
   );
