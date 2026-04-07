@@ -171,3 +171,25 @@ class ImageAnalysisResponse(BaseModel):
     status: str = "success"
     processed_count: int
     result: ZipPipelineResult
+
+# ──────────────────────────────────────────────
+#  Audio Analysis Models (Multimodal Pipeline)
+# ──────────────────────────────────────────────
+
+class SpeakerSegment(BaseModel):
+    start: float
+    end: float
+    speaker: str
+    text: str
+
+class AudioAnalysisResult(BaseModel):
+    duration: float
+    segments: list[SpeakerSegment]
+    transcript_text: str
+    text_analysis: TextAnalysisResult | None = None
+
+class AudioAnalysisResponse(BaseModel):
+    status: str = "success"
+    filename: str
+    content_type: str
+    result: AudioAnalysisResult

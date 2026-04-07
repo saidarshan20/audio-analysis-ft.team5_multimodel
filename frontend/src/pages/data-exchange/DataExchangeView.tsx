@@ -1,7 +1,7 @@
-﻿import { useState } from 'react';
+import { useState } from 'react';
 import {
   FileText, Sparkles, ScanLine, BarChart2, Lock, ArrowRight,
-  TrendingUp, Activity, Star, Users, ChevronRight, Database, Download,
+  TrendingUp, Activity, Star, Users, ChevronRight, Database, Download, Mic,
 } from 'lucide-react';
 import './DataExchangeView.css';
 import OcrPage               from './tools/OcrPage';
@@ -56,6 +56,7 @@ const dataTools = [
   { id: 'feat', icon: <Sparkles size={32} />,  title: 'Feature Engineering', iconBoxType: 'dark',   description: 'Transform and optimize your dataset features. Apply advanced techniques to create meaningful features that improve model performance and accuracy.' },
   { id: 'anon', icon: <Lock size={32} />,      title: 'Data Anonymization',  iconBoxType: 'dark',   description: 'Protect sensitive information with robust anonymization techniques. Ensure data privacy and compliance while maintaining data utility for analysis.' },
 ];
+
 
 // ─── DataExchangeView ────────────────────────────────────────────────────────
 const DataExchangeView = () => {

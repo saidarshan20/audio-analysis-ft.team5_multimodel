@@ -11,6 +11,7 @@ ENV/
 
 # Secrets
 .env
+stuff/
 
 # OS-specific
 .DS_Store

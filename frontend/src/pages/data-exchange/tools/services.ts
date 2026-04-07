@@ -113,6 +113,28 @@ export interface ImageZipAnalysisResponse {
   };
 }
 
+export interface SpeakerSegment {
+  start: number;
+  end: number;
+  speaker: string;
+  text: string;
+}
+
+export interface AudioAnalysisResult {
+  duration: number;
+  segments: SpeakerSegment[];
+  transcript_text: string;
+  text_analysis: TextAnalysisResult | null;
+}
+
+export interface AudioAnalysisResponse {
+  status: string;
+  filename: string;
+  content_type: string;
+  result: AudioAnalysisResult;
+}
+
+
 /**
  * Uploads a .txt or .pdf file for multi-modal text analysis
  */
@@ -256,6 +278,26 @@ export async function analyzeImagesZip(file: File): Promise<ImageZipAnalysisResp
   if (!response.ok) {
     const err = await response.json().catch(() => ({ detail: 'Unknown error' }));
     throw new Error(err.detail || `ZIP Image analysis failed with status ${response.status}`);
+  }
+
+  return response.json();
+}
+
+/**
+ * Uploads an audio file for speaker diarization and text analysis
+ */
+export async function analyzeAudio(file: File): Promise<AudioAnalysisResponse> {
+  const formData = new FormData();
+  formData.append('file', file);
+
+  const response = await fetch(`${BASE_URL}/team5/analyze-audio`, {
+    method: 'POST',
+    body: formData,
+  });
+
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({ detail: 'Unknown error' }));
+    throw new Error(err.detail || `Audio analysis failed with status ${response.status}`);
   }
 
   return response.json();

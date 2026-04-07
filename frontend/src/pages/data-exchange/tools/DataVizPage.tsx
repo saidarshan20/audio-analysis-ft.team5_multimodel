@@ -1,9 +1,10 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { 
   ArrowLeft, BarChart2, Database, Upload, Search, Loader2, FileText, Code2, 
   Sparkles, Image as ImageIcon, FileSpreadsheet, Music, Video, ArrowRight,
-  Activity, Clock, Zap, Cpu, Network
+  Activity, Clock, Zap, Cpu, Network, Play, Pause, Hash, MapPin
 } from 'lucide-react';
+import WaveSurfer from 'wavesurfer.js';
 import { toast } from 'sonner';
 import './ToolPage.css';
 import {
@@ -12,19 +13,21 @@ import {
   analyzeGithubRepo,
   analyzeImages,
   analyzeImagesZip,
+  analyzeAudio,
   TextAnalysisResult,
   CodeAnalysisResult,
   MultiImageAnalysisResponse,
-  ImageZipAnalysisResponse
+  ImageZipAnalysisResponse,
+  AudioAnalysisResult
 } from './services';
 import MermaidDiagram from '../../../components/MermaidDiagram';
 
 type HistoryItem = {
   id: string;
-  type: FileType | 'github';
+  type: FileType | 'github' | 'music';
   label: string;
   timestamp: number;
-  data: TextAnalysisResult | CodeAnalysisResult | MultiImageAnalysisResponse;
+  data: TextAnalysisResult | CodeAnalysisResult | MultiImageAnalysisResponse | AudioAnalysisResult;
 };
 
 const generateMermaidGraph = (arch: any) => {
@@ -143,6 +146,7 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
   const [codeResult, setCodeResult] = useState<CodeAnalysisResult | null>(null);
   const [imgResult, setImgResult] = useState<MultiImageAnalysisResponse | null>(null);
   const [imgZipResult, setImgZipResult] = useState<ImageZipAnalysisResponse | null>(null);
+  const [audioResult, setAudioResult] = useState<AudioAnalysisResult | null>(null);
   const [selectedClusterPoint, setSelectedClusterPoint] = useState<any | null>(null);
   const [history, setHistory] = useState<HistoryItem[]>(() => {
     const saved = localStorage.getItem('kosh_analysis_history');
@@ -183,6 +187,8 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
       setCodeResult(item.data as CodeAnalysisResult);
     } else if (item.type === 'images') {
       setImgResult(item.data as MultiImageAnalysisResponse);
+    } else if (item.type === 'music') {
+      setAudioResult(item.data as AudioAnalysisResult);
     } else {
       setTextResult(item.data as TextAnalysisResult);
     }
@@ -198,7 +204,7 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
   };
 
   const handleDownloadResult = () => {
-    const activeData = textResult || codeResult || imgResult;
+    const activeData = textResult || codeResult || imgResult || audioResult;
     if (!activeData) return;
 
     const blob = new Blob([JSON.stringify(activeData, null, 2)], { type: 'application/json' });
@@ -332,6 +338,7 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
     setCodeResult(null);
     setImgResult(null);
     setImgZipResult(null);
+    setAudioResult(null);
     setSelectedClusterPoint(null);
 
     const onProgress = (step: string, msg: string) => {
@@ -386,6 +393,12 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
         setImgResult(res);
         saveToHistory('images', res, `Gallery: ${files.length} images`);
         toast.success('Image analysis complete!', { id: 'analysis' });
+      } else if (fileType === 'music' && files.length === 1 && files[0].type.startsWith('audio/')) {
+        toast.loading(`Processing Audio Pipeline...`, { id: 'analysis' });
+        const res = await analyzeAudio(files[0]);
+        setAudioResult(res.result);
+        saveToHistory('music', res.result, files[0].name);
+        toast.success('Audio analysis complete!', { id: 'analysis' });
       } else {
         toast.error('Unsupported file combo.', { id: 'analysis' });
       }
@@ -467,7 +480,7 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
           <div className="view-animate-in" style={{ position: 'relative' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
               <div />
-              {history.length > 0 && !textResult && !codeResult && !imgResult && !imgZipResult && (
+              {history.length > 0 && !textResult && !codeResult && !imgResult && !imgZipResult && !audioResult && (
                 <button 
                   className="xt-tab" 
                   style={{ background: 'rgba(96, 165, 250, 0.1)', color: '#60a5fa', border: '1px solid rgba(96, 165, 250, 0.2)' }}
@@ -516,7 +529,7 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
               </div>
             )}
 
-            {!textResult && !codeResult && !imgResult && !imgZipResult ? (
+            {!textResult && !codeResult && !imgResult && !imgZipResult && !audioResult ? (
               <div className="wizard-container" style={{boxShadow: 'none', border: 'none', background: 'transparent', padding: '0px 0'}}>
                 {/* Step 1: Type Selection */}
                 <div className="wizard-header" style={{textAlign: 'left', marginBottom: '20px'}}>
@@ -558,7 +571,7 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
                       onChange={onFilesSelected}
                       style={{ display: 'none' }}
                       multiple
-                      accept=".txt,.pdf,.zip,image/*"
+                      accept=".txt,.pdf,.zip,image/*,audio/*"
                     />
                     <div className="action-icon" style={{marginBottom: '12px', color: loading && selectedFiles.length > 0 ? '#fb8c36' : 'inherit'}}>
                       {loading && selectedFiles.length > 0 ? <Loader2 size={32} className="animate-spin" /> : <Upload size={32} />}
@@ -701,7 +714,7 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
                     >
                       Download JSON
                     </button>
-                    <button className="xt-upload-btn" onClick={() => { setTextResult(null); setCodeResult(null); setImgResult(null); setImgZipResult(null); setSelectedFiles([]); setShowHistory(false); }}>
+                    <button className="xt-upload-btn" onClick={() => { setTextResult(null); setCodeResult(null); setImgResult(null); setImgZipResult(null); setAudioResult(null); setSelectedFiles([]); setShowHistory(false); }}>
                       Analyze Another File
                     </button>
                   </div>
@@ -1101,6 +1114,11 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
                     </div>
                   </div>
                 )}
+
+                {audioResult && (
+                  <AudioResultView result={audioResult} file={selectedFiles[0]} />
+                )}
+
               </div>
             )}
           </div>
@@ -1240,3 +1258,148 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
 };
 
 export default DataVizPage;
+
+const AudioResultView = ({ result, file }: { result: AudioAnalysisResult, file?: File }) => {
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
+  const waveformRef = useRef<HTMLDivElement>(null);
+  const wavesurfer = useRef<WaveSurfer | null>(null);
+
+  const getSpeakerColor = (speaker: string) => {
+    const hash = speaker.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+    const colors = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'];
+    return colors[hash % colors.length];
+  };
+
+  useEffect(() => {
+    if (file && waveformRef.current) {
+      wavesurfer.current = WaveSurfer.create({
+        container: waveformRef.current,
+        waveColor: '#4f46e5',
+        progressColor: '#818cf8',
+        cursorColor: '#c7d2fe',
+        barWidth: 2,
+        barGap: 1,
+        barRadius: 2,
+        height: 80,
+      });
+
+      const url = URL.createObjectURL(file);
+      wavesurfer.current.load(url);
+
+      wavesurfer.current.on('play', () => setIsPlaying(true));
+      wavesurfer.current.on('pause', () => setIsPlaying(false));
+      wavesurfer.current.on('timeupdate', (time) => setCurrentTime(time));
+
+      return () => {
+        wavesurfer.current?.destroy();
+      };
+    }
+  }, [file]);
+
+  const togglePlay = () => wavesurfer.current?.playPause();
+  const seekTo = (time: number) => {
+    if (wavesurfer.current) {
+       wavesurfer.current.setTime(time);
+       wavesurfer.current.play();
+    }
+  };
+
+  const formatTime = (seconds: number) => {
+    const m = Math.floor(seconds / 60);
+    const s = Math.floor(seconds % 60);
+    return `${m}:${s.toString().padStart(2, '0')}`;
+  };
+
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 2fr) minmax(0, 1fr)', gap: '1.5rem', marginTop: '1.5rem' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+        {file && (
+          <div style={{ background: 'white', borderRadius: '12px', padding: '1.5rem', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1rem' }}>
+              <button 
+                onClick={togglePlay}
+                style={{ width: '48px', height: '48px', borderRadius: '50%', background: '#4f46e5', color: 'white', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+              >
+                {isPlaying ? <Pause size={20} /> : <Play size={20} style={{ marginLeft: '4px' }} />}
+              </button>
+              <div style={{ flex: 1 }} ref={waveformRef}></div>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', color: '#6b7280' }}>
+              <span>{formatTime(currentTime)}</span>
+              <span>{formatTime(result.duration)}</span>
+            </div>
+          </div>
+        )}
+
+        <div style={{ background: 'white', borderRadius: '12px', padding: '1.5rem', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
+           <h3 style={{ fontSize: '1.1rem', fontWeight: 600, marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#4f46e5' }}>
+             <FileText size={18} /> Transcript
+           </h3>
+           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', maxHeight: '400px', overflowY: 'auto', paddingRight: '0.5rem' }}>
+             {result.segments.map((seg, i) => {
+               const isCurrent = currentTime >= seg.start && currentTime <= seg.end;
+               return (
+                 <div 
+                   key={i} 
+                   onClick={() => seekTo(seg.start)}
+                   style={{ display: 'flex', gap: '1rem', padding: '0.75rem', borderRadius: '8px', cursor: 'pointer', background: isCurrent ? '#eff6ff' : 'transparent', transition: 'background 0.2s', borderLeft: `4px solid ${getSpeakerColor(seg.speaker)}` }}
+                 >
+                    <div style={{ flexShrink: 0, width: '45px', fontSize: '0.75rem', color: '#6b7280', paddingTop: '2px' }}>
+                      {formatTime(seg.start)}
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '0.8rem', fontWeight: 600, color: getSpeakerColor(seg.speaker), marginBottom: '0.2rem' }}>
+                        {seg.speaker}
+                      </div>
+                      <div style={{ fontSize: '0.95rem', color: '#1f2937', lineHeight: 1.5 }}>
+                        {seg.text}
+                      </div>
+                    </div>
+                 </div>
+               )
+             })}
+           </div>
+        </div>
+      </div>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+         {result.text_analysis && (
+           <>
+             <div style={{ background: 'white', borderRadius: '12px', padding: '1.5rem', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
+                <div style={{ marginBottom: '1.5rem' }}>
+                  <h4 style={{ fontSize: '0.85rem', textTransform: 'uppercase', color: '#6b7280', fontWeight: 600, marginBottom: '0.5rem' }}>Executive Summary</h4>
+                  <p style={{ fontSize: '0.95rem', color: '#374151', lineHeight: 1.5 }}>{result.text_analysis.summary}</p>
+                </div>
+                <div>
+                  <h4 style={{ fontSize: '0.85rem', textTransform: 'uppercase', color: '#6b7280', fontWeight: 600, marginBottom: '0.75rem' }}>Sentiment Tracking</h4>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                    <span style={{ padding: '0.2rem 0.6rem', borderRadius: '99px', fontSize: '0.8rem', fontWeight: 600, background: result.text_analysis.sentiment.overall_label === 'positive' ? '#dcfce7' : result.text_analysis.sentiment.overall_label === 'negative' ? '#fee2e2' : '#f3f4f6', color: result.text_analysis.sentiment.overall_label === 'positive' ? '#166534' : result.text_analysis.sentiment.overall_label === 'negative' ? '#991b1b' : '#374151', textTransform: 'capitalize' }}>
+                      {result.text_analysis.sentiment.overall_label} View
+                    </span>
+                  </div>
+                  <div style={{ height: '8px', width: '100%', display: 'flex', borderRadius: '4px', overflow: 'hidden' }}>
+                     <div style={{ width: `${result.text_analysis.sentiment.positive * 100}%`, background: '#22c55e' }} title="Positive"></div>
+                     <div style={{ width: `${result.text_analysis.sentiment.neutral * 100}%`, background: '#9ca3af' }} title="Neutral"></div>
+                     <div style={{ width: `${result.text_analysis.sentiment.negative * 100}%`, background: '#ef4444' }} title="Negative"></div>
+                  </div>
+                </div>
+             </div>
+             
+             <div style={{ background: 'white', borderRadius: '12px', padding: '1.5rem', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
+                <h4 style={{ fontSize: '0.85rem', textTransform: 'uppercase', color: '#6b7280', fontWeight: 600, marginBottom: '1rem' }}>Extracted Knowledge</h4>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+                   {result.text_analysis.entities.slice(0, 15).map((e: any) => (
+                     <span key={e.id} style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.8rem', padding: '0.3rem 0.6rem', background: '#f3f4f6', borderRadius: '6px', border: '1px solid #e5e7eb' }}>
+                       {e.type === 'Person' ? <Hash size={12}/> : e.type === 'Place' ? <MapPin size={12}/> : <BarChart2 size={12}/>}
+                       {e.label}
+                     </span>
+                   ))}
+                </div>
+             </div>
+           </>
+         )}
+      </div>
+    </div>
+  );
+};
