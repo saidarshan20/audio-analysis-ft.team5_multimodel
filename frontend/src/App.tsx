@@ -1,12 +1,12 @@
-import { useState, useEffect, useRef } from 'react';
-import { Routes, Route, Navigate, useNavigate, useParams } from 'react-router-dom';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { Routes, Route, Navigate, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from 'sonner';
 import Navbar from './layouts/Navbar';
 import LoginPage from './pages/LoginPage';
 import HomeView from './pages/home/HomeView';
 import DataExchangeView from './pages/data-exchange/DataExchangeView';
-import AutoMLWizard from './pages/model-exchange/tools/AutoMLWizard';
+import AutoMLWizard from './pages/model-exchange/tools/automl-wizard/AutoMLWizard';
 import ChatButton from './layouts/ChatButton';
 import { AuthContext, getStoredAuth, clearStoredAuth } from './auth/authContext';
 import './App.css';
@@ -29,8 +29,40 @@ const ZOOM_KEY  = 'ui-zoom';
 // ─── Inner app (runs only after auth) ────────────────────────────────────────
 function AppShell() {
   const { section } = useParams<{ section: string }>();
+  const location = useLocation();
   const navigate = useNavigate();
   const user = getStoredAuth()!;
+
+  useEffect(() => {
+    const previous = window.history.scrollRestoration;
+    window.history.scrollRestoration = 'manual';
+    return () => {
+      window.history.scrollRestoration = previous;
+    };
+  }, []);
+
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [location.pathname]);
+
+  // ── Zoom ────────────────────────────────────────────────────────────────────
+  // ── Theme ────────────────────────────────────────────────────────────────────
+  const [theme, setTheme] = useState<'dark'|'light'>(() =>
+    (localStorage.getItem('ui-theme') as 'dark'|'light') || 'dark'
+  );
+
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme === 'light' ? 'light' : '';
+    localStorage.setItem('ui-theme', theme);
+  }, [theme]);
+
+  const toggleTheme = useCallback(() =>
+    setTheme(t => t === 'dark' ? 'light' : 'dark'), []
+  );
+
+  // ── Page loading splash ───────────────────────────────────────────────────────
+  const [splashDone, setSplashDone] = useState(false);
+  useEffect(() => { const t = setTimeout(() => setSplashDone(true), 700); return () => clearTimeout(t); }, []);
 
   // ── Zoom ────────────────────────────────────────────────────────────────────
   const [zoom, setZoomState] = useState<number>(() => {
@@ -43,12 +75,16 @@ function AppShell() {
     const c = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, next));
     zoomRef.current = c;
     document.documentElement.style.zoom = String(c);
+    document.documentElement.style.setProperty('--ui-zoom', String(c));
     localStorage.setItem(ZOOM_KEY, String(c));
     setZoomState(c);
   };
 
   // Restore on mount
-  useEffect(() => { document.documentElement.style.zoom = String(zoomRef.current); }, []);
+  useEffect(() => {
+    document.documentElement.style.zoom = String(zoomRef.current);
+    document.documentElement.style.setProperty('--ui-zoom', String(zoomRef.current));
+  }, []);
 
   // Ctrl + Wheel → cursor-anchored zoom (Figma/Maps style)
   useEffect(() => {
@@ -99,11 +135,18 @@ function AppShell() {
 
   return (
     <AuthContext.Provider value={{ user, logout: handleLogout }}>
-      <div className="app-container card-pattern">
+      {!splashDone && (
+        <div className="page-splash">
+          <div className="page-splash-ring" />
+        </div>
+      )}
+      <div className="app-container">
         <Navbar
           showBack={section !== 'home' && section !== undefined}
           onBack={() => navigate('/aisphere/home')}
           onLogout={handleLogout}
+          theme={theme}
+          onToggleTheme={toggleTheme}
         />
         <main className="main-content">
           {renderSection()}

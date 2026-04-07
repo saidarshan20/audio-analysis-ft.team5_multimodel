@@ -347,3 +347,113 @@
   .aw-stepper-card { padding: 20px 24px; overflow-x: auto; }
   .aw-page { padding: 20px 16px 60px; }
 }
+
+/* ── Theme mapping (dark mode) ──────────────────────────────────────────── */
+:root:not([data-theme="light"]) .aw-page {
+  background: transparent;
+  color: var(--t-primary, #eef1ff);
+}
+
+:root:not([data-theme="light"]) .aw-back-btn {
+  color: var(--t-secondary, #9fb0ca);
+}
+
+:root:not([data-theme="light"]) .aw-back-btn:hover {
+  color: var(--brand, #fb8c36);
+}
+
+:root:not([data-theme="light"]) .aw-title,
+:root:not([data-theme="light"]) .aw-sidebar-title,
+:root:not([data-theme="light"]) .aw-dataset-name,
+:root:not([data-theme="light"]) .aw-count strong {
+  color: var(--t-primary, #eef1ff);
+}
+
+:root:not([data-theme="light"]) .aw-subtitle,
+:root:not([data-theme="light"]) .aw-step-label,
+:root:not([data-theme="light"]) .aw-count,
+:root:not([data-theme="light"]) .aw-dataset-desc,
+:root:not([data-theme="light"]) .aw-sidebar-item,
+:root:not([data-theme="light"]) .aw-placeholder-panel {
+  color: var(--t-secondary, #9fb0ca);
+}
+
+:root:not([data-theme="light"]) .aw-stepper-card,
+:root:not([data-theme="light"]) .aw-main-panel,
+:root:not([data-theme="light"]) .aw-sidebar,
+:root:not([data-theme="light"]) .aw-placeholder-panel,
+:root:not([data-theme="light"]) .aw-dataset-list,
+:root:not([data-theme="light"]) .aw-upload-zone {
+  background: linear-gradient(165deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.015));
+  border-color: var(--border-mid, rgba(255,255,255,0.09));
+  box-shadow: var(--shadow-md, 0 8px 32px rgba(0,0,0,0.5));
+}
+
+:root:not([data-theme="light"]) .aw-chevron {
+  color: var(--t-muted, #7e8ca8);
+}
+
+:root:not([data-theme="light"]) .aw-step-circle {
+  background: rgba(255,255,255,0.05);
+  border-color: var(--border-mid, rgba(255,255,255,0.09));
+  color: var(--t-muted, #7e8ca8);
+}
+
+:root:not([data-theme="light"]) .aw-step-label.active,
+:root:not([data-theme="light"]) .aw-chevron.done {
+  color: #fbbf5a;
+}
+
+:root:not([data-theme="light"]) .aw-tabs {
+  background: rgba(255,255,255,0.05);
+}
+
+:root:not([data-theme="light"]) .aw-tab {
+  color: var(--t-secondary, #9fb0ca);
+}
+
+:root:not([data-theme="light"]) .aw-tab.active {
+  background: rgba(255,255,255,0.1);
+  color: var(--t-primary, #eef1ff);
+  box-shadow: none;
+}
+
+:root:not([data-theme="light"]) .aw-search-icon {
+  color: var(--t-muted, #7e8ca8);
+}
+
+:root:not([data-theme="light"]) .aw-search-input {
+  background: rgba(255,255,255,0.04);
+  border-color: var(--border-mid, rgba(255,255,255,0.09));
+  color: var(--t-primary, #eef1ff);
+}
+
+:root:not([data-theme="light"]) .aw-search-input::placeholder {
+  color: var(--t-muted, #7e8ca8);
+}
+
+:root:not([data-theme="light"]) .aw-search-input:focus {
+  border-color: rgba(251,140,54,0.7);
+}
+
+:root:not([data-theme="light"]) .aw-dataset-row {
+  border-bottom-color: rgba(255,255,255,0.06);
+}
+
+:root:not([data-theme="light"]) .aw-dataset-row:hover {
+  background: rgba(255,255,255,0.06);
+}
+
+:root:not([data-theme="light"]) .aw-dataset-row.selected {
+  background: rgba(251,140,54,0.14);
+}
+
+:root:not([data-theme="light"]) .aw-dataset-badge {
+  background: rgba(251,140,54,0.14);
+  color: #fbbf5a;
+  border-color: rgba(251,140,54,0.42);
+}
+
+:root:not([data-theme="light"]) .aw-upload-hint {
+  color: var(--t-muted, #7e8ca8);
+}

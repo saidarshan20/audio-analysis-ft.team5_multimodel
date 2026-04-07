@@ -5,7 +5,7 @@ import {
   Activity, Clock, Zap, Cpu, Network
 } from 'lucide-react';
 import { toast } from 'sonner';
-import './ToolPage.css';
+import '../ToolPage.css';
 import {
   analyzeTextFile,
   analyzeCodebase,
@@ -17,7 +17,7 @@ import {
   MultiImageAnalysisResponse,
   ImageZipAnalysisResponse
 } from './services';
-import MermaidDiagram from '../../../components/MermaidDiagram';
+import MermaidDiagram from "../../../../components/MermaidDiagram";
 
 type HistoryItem = {
   id: string;

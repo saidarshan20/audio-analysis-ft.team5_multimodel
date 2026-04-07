@@ -2,10 +2,13 @@ import { useState } from 'react';
 import {
   ArrowLeft, Shield, Upload, Lock, Download, Database, Search,
 } from 'lucide-react';
-import './ToolPage.css';
+import '../ToolPage.css';
 
 type AnonStep = 'input' | 'classification' | 'techniques' | 'export';
 type DatasetTab = 'catalog' | 'upload';
+
+const ANON_API_BASE = (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? 'http://localhost:8000';
+const ANON_BACKEND_ENABLED = false;
 
 const ANON_STEPS: { id: AnonStep; label: string; Icon: React.ElementType }[] = [
   { id: 'input',          label: 'Data Input',       Icon: Upload   },
@@ -57,6 +60,39 @@ const DataAnonymizationPage = ({ onBack }: { onBack: () => void }) => {
   const [search,     setSearch]     = useState('');
   const [selected,   setSelected]   = useState<string | null>(null);
 
+  const postAnonPlaceholder = async (path: string, payload: Record<string, unknown>) => {
+    if (!ANON_BACKEND_ENABLED) return;
+    try {
+      await fetch(`${ANON_API_BASE}${path}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+    } catch {
+      // Placeholder intentionally ignores network failures until backend is connected.
+    }
+  };
+
+  const handleStepChange = (step: AnonStep) => {
+    setActiveStep(step);
+    void postAnonPlaceholder('/anonymization/step', { step });
+  };
+
+  const handleTabChange = (tab: DatasetTab) => {
+    setActiveTab(tab);
+    void postAnonPlaceholder('/anonymization/tab', { tab });
+  };
+
+  const handleSearchChange = (value: string) => {
+    setSearch(value);
+    void postAnonPlaceholder('/anonymization/search', { query: value });
+  };
+
+  const handleDatasetSelect = (datasetName: string) => {
+    setSelected(datasetName);
+    void postAnonPlaceholder('/anonymization/dataset/select', { datasetName });
+  };
+
   const activeIdx = ANON_STEPS.findIndex(s => s.id === activeStep);
   const filtered  = DATASETS.filter(d =>
     d.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -74,7 +110,7 @@ const DataAnonymizationPage = ({ onBack }: { onBack: () => void }) => {
       );
     }
     stepperNodes.push(
-      <div key={step.id} className="xt-step" onClick={() => setActiveStep(step.id)}>
+      <div key={step.id} className="xt-step" onClick={() => handleStepChange(step.id)}>
         <div className={`xt-step-circle${isActive ? ' active' : isDone ? ' done' : ''}`}>
           <step.Icon size={20} />
         </div>
@@ -127,13 +163,13 @@ const DataAnonymizationPage = ({ onBack }: { onBack: () => void }) => {
             <div className="xt-tabs">
               <button
                 className={`xt-tab${activeTab === 'catalog' ? ' active' : ''}`}
-                onClick={() => setActiveTab('catalog')}
+                onClick={() => handleTabChange('catalog')}
               >
                 <Database size={15} /> Catalog
               </button>
               <button
                 className={`xt-tab${activeTab === 'upload' ? ' active' : ''}`}
-                onClick={() => setActiveTab('upload')}
+                onClick={() => handleTabChange('upload')}
               >
                 <Upload size={15} /> Upload Dataset
               </button>
@@ -151,7 +187,7 @@ const DataAnonymizationPage = ({ onBack }: { onBack: () => void }) => {
                     className="xt-search-input"
                     placeholder="Search datasets by keyword..."
                     value={search}
-                    onChange={e => setSearch(e.target.value)}
+                    onChange={e => handleSearchChange(e.target.value)}
                   />
                 </div>
                 <div className="xt-dataset-list">
@@ -159,7 +195,7 @@ const DataAnonymizationPage = ({ onBack }: { onBack: () => void }) => {
                     <div
                       key={d.name}
                       className={`xt-dataset-row${selected === d.name ? ' selected' : ''}`}
-                      onClick={() => setSelected(d.name)}
+                      onClick={() => handleDatasetSelect(d.name)}
                     >
                       <div className="xt-dataset-info">
                         <span className="xt-dataset-name">{d.name}</span>

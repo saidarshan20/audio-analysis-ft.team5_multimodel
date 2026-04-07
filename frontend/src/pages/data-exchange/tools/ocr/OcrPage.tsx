@@ -1,8 +1,11 @@
 import { useState } from 'react';
 import { ArrowLeft, Upload, Play, FileText, ScanLine, File, FileImage } from 'lucide-react';
-import './ToolPage.css';
+import '../ToolPage.css';
 
 type OcrStep = 'upload' | 'processing' | 'results';
+
+const OCR_API_BASE = (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? 'http://localhost:8000';
+const OCR_BACKEND_ENABLED = false;
 
 const OCR_STEPS: { id: OcrStep; label: string; Icon: React.ElementType }[] = [
   { id: 'upload',     label: 'Upload',     Icon: Upload   },
@@ -13,6 +16,24 @@ const OCR_STEPS: { id: OcrStep; label: string; Icon: React.ElementType }[] = [
 const OcrPage = ({ onBack }: { onBack: () => void }) => {
   const [activeStep, setActiveStep] = useState<OcrStep>('upload');
   const activeIdx = OCR_STEPS.findIndex(s => s.id === activeStep);
+
+  const syncOcrStepToBackend = async (step: OcrStep) => {
+    if (!OCR_BACKEND_ENABLED) return;
+    try {
+      await fetch(`${OCR_API_BASE}/ocr/step`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ step }),
+      });
+    } catch {
+      // Placeholder intentionally ignores network failures until backend is connected.
+    }
+  };
+
+  const handleStepChange = (step: OcrStep) => {
+    setActiveStep(step);
+    void syncOcrStepToBackend(step);
+  };
 
   // Build stepper elements as flat array to avoid Fragment-key issues
   const stepperNodes: React.ReactNode[] = [];
@@ -25,7 +46,7 @@ const OcrPage = ({ onBack }: { onBack: () => void }) => {
       );
     }
     stepperNodes.push(
-      <div key={step.id} className="xt-step" onClick={() => setActiveStep(step.id)}>
+      <div key={step.id} className="xt-step" onClick={() => handleStepChange(step.id)}>
         <div className={`xt-step-circle${isActive ? ' active' : isDone ? ' done' : ''}`}>
           <step.Icon size={20} />
         </div>

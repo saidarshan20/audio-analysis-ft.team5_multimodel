@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   ArrowLeft, Upload, Database, SlidersHorizontal,
   Play, BarChart2, Search, ChevronRight,
@@ -8,6 +8,9 @@ import './AutoMLWizard.css';
 // ─── Types ───────────────────────────────────────────────────────────────────
 type WizardStep = 'dataset' | 'configure' | 'configuration' | 'training' | 'results';
 type DatasetTab = 'catalog' | 'upload';
+
+const AUTOML_API_BASE = (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? 'http://localhost:8000';
+const AUTOML_BACKEND_ENABLED = false;
 
 // ─── Step definitions ─────────────────────────────────────────────────────────
 const WIZARD_STEPS: { id: WizardStep; label: string; Icon: React.ElementType }[] = [
@@ -74,6 +77,43 @@ const AutoMLWizard = ({ onBack }: { onBack: () => void }) => {
   const [search,     setSearch]     = useState('');
   const [selected,   setSelected]   = useState<string | null>(null);
 
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, []);
+
+  const postAutoMlPlaceholder = async (path: string, payload: Record<string, unknown>) => {
+    if (!AUTOML_BACKEND_ENABLED) return;
+    try {
+      await fetch(`${AUTOML_API_BASE}${path}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+    } catch {
+      // Placeholder intentionally ignores network failures until backend is connected.
+    }
+  };
+
+  const handleStepChange = (step: WizardStep) => {
+    setActiveStep(step);
+    void postAutoMlPlaceholder('/automl/step', { step });
+  };
+
+  const handleTabChange = (tab: DatasetTab) => {
+    setActiveTab(tab);
+    void postAutoMlPlaceholder('/automl/tab', { tab });
+  };
+
+  const handleSearchChange = (value: string) => {
+    setSearch(value);
+    void postAutoMlPlaceholder('/automl/search', { query: value });
+  };
+
+  const handleDatasetSelect = (datasetName: string) => {
+    setSelected(datasetName);
+    void postAutoMlPlaceholder('/automl/dataset/select', { datasetName });
+  };
+
   const activeIdx = WIZARD_STEPS.findIndex(s => s.id === activeStep);
   const filtered  = DATASETS.filter(d =>
     d.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -113,7 +153,7 @@ const AutoMLWizard = ({ onBack }: { onBack: () => void }) => {
               )}
               <div
                 className="aw-step"
-                onClick={() => setActiveStep(step.id)}
+                onClick={() => handleStepChange(step.id)}
               >
                 <div
                   className={`aw-step-circle${isActive ? ' active' : isDone ? ' done' : ''}`}
@@ -139,13 +179,13 @@ const AutoMLWizard = ({ onBack }: { onBack: () => void }) => {
             <div className="aw-tabs">
               <button
                 className={`aw-tab${activeTab === 'catalog' ? ' active' : ''}`}
-                onClick={() => setActiveTab('catalog')}
+                onClick={() => handleTabChange('catalog')}
               >
                 <Database size={15} /> Catalog
               </button>
               <button
                 className={`aw-tab${activeTab === 'upload' ? ' active' : ''}`}
-                onClick={() => setActiveTab('upload')}
+                onClick={() => handleTabChange('upload')}
               >
                 <Upload size={15} /> Upload Dataset
               </button>
@@ -160,7 +200,7 @@ const AutoMLWizard = ({ onBack }: { onBack: () => void }) => {
                     className="aw-search-input"
                     placeholder="Search datasets..."
                     value={search}
-                    onChange={e => setSearch(e.target.value)}
+                    onChange={e => handleSearchChange(e.target.value)}
                   />
                 </div>
                 <p className="aw-count">
@@ -173,7 +213,7 @@ const AutoMLWizard = ({ onBack }: { onBack: () => void }) => {
                     <div
                       key={d.name}
                       className={`aw-dataset-row${selected === d.name ? ' selected' : ''}`}
-                      onClick={() => setSelected(d.name)}
+                      onClick={() => handleDatasetSelect(d.name)}
                     >
                       <div className="aw-dataset-info">
                         <span className="aw-dataset-name">{d.name}</span>

@@ -24,3 +24,20 @@ shared_workspace/1_raw_uploads/*
 shared_workspace/2_processed_data/*
 shared_workspace/3_models/*
 !shared_workspace/**/.gitkeep
+
+# Frontend dependencies & builds
+node_modules/
+frontend/node_modules/
+dist/
+frontend/dist/
+.DS_Store
+
+# Logs & temp folders
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Development files
+.ipynb_checkpoints/
