@@ -19,7 +19,15 @@ from modules.team5_multimodal.code_analysis_service import CodeAnalysisService
 from modules.team5_multimodal.image_analysis_service import ImageAnalysisService as TeammateImageAnalysisService
 from modules.team5_multimodal.image_services import ImageAnalysisService as ZipImageAnalysisService
 from modules.team5_multimodal.audio_analysis_service import AudioAnalysisService
-from modules.team5_multimodal.models import AudioAnalysisResponse
+from modules.team5_multimodal.audio_feature_extractor import AudioFeatureExtractor
+from modules.team5_multimodal.models import (
+    AudioAnalysisResponse,
+    AudioFeaturesResponse,
+    AudioFeatures,
+    WaveformData,
+    SpectrogramData,
+    EnergyData,
+)
 
 
 logger = logging.getLogger(__name__)
@@ -233,4 +241,53 @@ async def analyze_audio(file: UploadFile = File(...)):
         raise HTTPException(status_code=400, detail=str(val_err))
     except Exception as exc:
         logger.exception("Audio analysis failed")
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+# ──────────────────────────────────────────────
+#  TASK 1 + 2: Lightweight Audio Features Endpoint
+#  No Whisper, no diarization, no HF token required.
+#  Extracts waveform, spectrogram, RMS energy from any audio file.
+#  Great for demos and machines where heavy deps may not be installed.
+# ──────────────────────────────────────────────
+@router.post("/audio-features", response_model=AudioFeaturesResponse)
+async def extract_audio_features(file: UploadFile = File(...)):
+    """
+    Lightweight acoustic feature extraction endpoint.
+    Accepts any audio file (.wav, .mp3, .m4a, .ogg, .flac).
+    Returns: waveform, STFT spectrogram (128x100 downsampled), RMS energy timeline.
+    No Whisper/diarization executed — suitable for visualization demos.
+    """
+    raw_bytes = await file.read()
+    if not raw_bytes:
+        raise HTTPException(status_code=400, detail="Uploaded file is empty.")
+
+    from modules.team5_multimodal.config import get_settings
+    settings = get_settings()
+    extractor = AudioFeatureExtractor(
+        ffmpeg_exe=settings.ffmpeg_path or "",
+        ffprobe_exe=settings.ffprobe_path or "",
+    )
+
+    try:
+        loop = asyncio.get_running_loop()
+        raw_features = await loop.run_in_executor(
+            None,
+            lambda: extractor.extract(
+                raw_bytes,
+                file.filename or "audio.wav",
+                include_mfcc=False,
+            ),
+        )
+        pydantic_features = AudioFeatures.model_validate(raw_features, from_attributes=True)
+
+        return AudioFeaturesResponse(
+            filename=file.filename or "unknown",
+            content_type=file.content_type or "audio/wav",
+            result=pydantic_features,
+        )
+    except ValueError as val_err:
+        raise HTTPException(status_code=400, detail=str(val_err))
+    except Exception as exc:
+        logger.exception("Audio feature extraction failed")
         raise HTTPException(status_code=500, detail=str(exc)) from exc

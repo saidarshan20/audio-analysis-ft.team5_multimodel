@@ -27,6 +27,10 @@ class Team5Settings(BaseSettings):
     # --- Azure AI Vision (Optional Defaults) ---
     azure_vision_key: str = ""
     azure_vision_endpoint: str = ""
+    
+    # --- Audio Tooling (Optional, needed for pydub) ---
+    ffmpeg_path: str = ""
+    ffprobe_path: str = ""
 
     # --- CORS (for run_local.py standalone testing) ---
     cors_origins: list[str] = ["http://localhost:3000", "http://localhost:5173"]
@@ -46,4 +50,9 @@ def get_settings() -> Team5Settings:
     # Set global environment variable for libraries like transformers/sentence-transformers
     if settings.hf_token:
         os.environ["HF_TOKEN"] = settings.hf_token
+    # Make ffmpeg paths visible to libraries that read only process env vars
+    if settings.ffmpeg_path:
+        os.environ["FFMPEG_PATH"] = settings.ffmpeg_path
+    if settings.ffprobe_path:
+        os.environ["FFPROBE_PATH"] = settings.ffprobe_path
     return settings

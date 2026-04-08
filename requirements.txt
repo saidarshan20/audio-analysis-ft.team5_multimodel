@@ -47,3 +47,21 @@ langchain-openai>=0.2.0
 langchain-core>=0.3.0
 langgraph>=0.2.0
 certifi
+
+# --- Audio Pipeline (Team 5 – Audio Dept) ---
+# Task 1: Ingestion, preprocessing & acoustic feature extraction
+librosa>=0.10.0               # STFT spectrogram, RMS energy, MFCC, waveform
+soundfile>=0.12.0             # Fast WAV read/write, used by pyannote & librosa
+pydub>=0.25.1                 # Format conversion (MP3/M4A → WAV) via ffmpeg
+scipy>=1.10.0                 # Signal processing utilities used by librosa
+openai-whisper>=20231117      # Speech-to-text (open-source Whisper base model)
+# pyannote.audio requires accepting usage terms on HuggingFace BEFORE installing:
+#   1. Visit https://huggingface.co/pyannote/speaker-diarization-3.1  → Accept
+#   2. Visit https://huggingface.co/pyannote/segmentation-3.0          → Accept
+#   3. Set HF_TOKEN in .env with a token that has accepted those terms
+#   4. pip install pyannote.audio
+pyannote.audio>=3.1.0         # Speaker diarization (gated model, needs HF_TOKEN)
+# NOTE: ffmpeg must be installed separately (system package or winget install Gyan.FFmpeg)
+# On a new machine: winget install Gyan.FFmpeg  OR  choco install ffmpeg
+# Then either add ffmpeg to PATH, or set FFMPEG_PATH and FFPROBE_PATH in .env
+
