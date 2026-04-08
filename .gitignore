@@ -23,10 +23,10 @@ Thumbs.db
 *.db
 
 # Shared workspace data (local only)
-shared_workspace/1_raw_uploads/*
-shared_workspace/2_processed_data/*
-shared_workspace/3_models/*
-!shared_workspace/**/.gitkeep
+# shared_workspace/1_raw_uploads/*
+# shared_workspace/2_processed_data/*
+# shared_workspace/3_models/*
+# !shared_workspace/**/.gitkeep
 
 # Python tooling caches
 .pytest_cache/
