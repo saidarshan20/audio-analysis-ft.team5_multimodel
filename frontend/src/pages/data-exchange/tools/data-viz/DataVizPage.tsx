@@ -2,7 +2,7 @@ import { useState, useRef } from 'react';
 import { 
   ArrowLeft, BarChart2, Database, Upload, Search, Loader2, FileText, Code2, 
   Sparkles, Image as ImageIcon, FileSpreadsheet, Music, Video, ArrowRight,
-  Activity, Clock, Zap, Cpu, Network
+  Activity, Clock, Zap, Cpu, Network, MessageCircle, SearchCheck, Send, Layers
 } from 'lucide-react';
 import { toast } from 'sonner';
 import '../ToolPage.css';
@@ -12,10 +12,14 @@ import {
   analyzeGithubRepo,
   analyzeImages,
   analyzeImagesZip,
+  askAboutImage,
+  searchImages,
   TextAnalysisResult,
   CodeAnalysisResult,
   MultiImageAnalysisResponse,
-  ImageZipAnalysisResponse
+  ImageZipAnalysisResponse,
+  ImageQAResponse,
+  ImageSearchResult
 } from './services';
 import MermaidDiagram from "../../../../components/MermaidDiagram";
 
@@ -144,6 +148,7 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
   const [imgResult, setImgResult] = useState<MultiImageAnalysisResponse | null>(null);
   const [imgZipResult, setImgZipResult] = useState<ImageZipAnalysisResponse | null>(null);
   const [selectedClusterPoint, setSelectedClusterPoint] = useState<any | null>(null);
+  const [selectedCategory, setSelectedCategory] = useState<number | null>(null);
   const [history, setHistory] = useState<HistoryItem[]>(() => {
     const saved = localStorage.getItem('kosh_analysis_history');
     if (saved) {
@@ -158,6 +163,60 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
   });
   const [showHistory, setShowHistory] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // ── NEW: Image Q&A State ──
+  const [qaFile, setQaFile] = useState<File | null>(null);
+  const [qaQuestion, setQaQuestion] = useState('');
+  const [qaLoading, setQaLoading] = useState(false);
+  const [qaAnswer, setQaAnswer] = useState<ImageQAResponse | null>(null);
+  const qaFileRef = useRef<HTMLInputElement>(null);
+
+  // ── NEW: Image Search State ──
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [searchResults, setSearchResults] = useState<ImageSearchResult[]>([]);
+  const [showSearchResults, setShowSearchResults] = useState(false);
+
+  const handleImageQA = async () => {
+    if (!qaFile || !qaQuestion.trim()) return;
+    setQaLoading(true);
+    try {
+      const res = await askAboutImage(qaFile, qaQuestion.trim());
+      setQaAnswer(res);
+      toast.success('AI answered your question!');
+    } catch (err: any) {
+      toast.error(err.message || 'Q&A failed');
+    } finally {
+      setQaLoading(false);
+    }
+  };
+
+  const handleImageSearch = async () => {
+    if (!searchQuery.trim()) return;
+    setSearchLoading(true);
+    try {
+      let captions: Array<{ filename: string; caption: string }> = [];
+      if (imgResult) {
+        captions = imgResult.results.map(r => ({ filename: r.filename, caption: r.caption }));
+      } else if (imgZipResult) {
+        captions = imgZipResult.result.clusters.map(c => ({ filename: c.filename, caption: c.description || "" }));
+      }
+
+      if (captions.length === 0) {
+        toast.error("No image metadata available to search");
+        return;
+      }
+
+      const res = await searchImages(searchQuery.trim(), captions);
+      setSearchResults(res.results);
+      setShowSearchResults(true);
+      toast.success(`Found ${res.results.length} matching images`);
+    } catch (err: any) {
+      toast.error(err.message || 'Search failed');
+    } finally {
+      setSearchLoading(false);
+    }
+  };
 
   const saveToHistory = (type: HistoryItem['type'], data: any, label: string) => {
     const newItem: HistoryItem = {
@@ -992,22 +1051,82 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
                         <h4 style={{ fontSize: '18px', fontWeight: 700 }}>Cluster Insights</h4>
                         <p className="viz-desc">Aggregated statistics from the processed ZIP batch ({imgZipResult.processed_count} total images).</p>
                         <div className="cluster-list">
-                          {imgZipResult.result?.clusters?.map((c, idx) => (
+                          {imgZipResult.result?.cluster_summaries?.map((c, idx) => (
                             <div key={idx} className="cluster-item" style={{ alignItems: 'flex-start' }}>
                               <span className="cluster-dot" style={{ background: `var(--cluster-${c.cluster_id % 5})`, display: 'inline-block', marginTop: '6px' }}></span>
                               <div style={{ width: '100%' }}>
                                 <strong style={{ color: '#fb8c36', display: 'block', fontSize: '14px', marginBottom: '4px' }}>{c.description}</strong>
                                 <span style={{ color: '#94a3b8', margin: '8px 0 4px', display: 'block', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Detected Contexts:</span>
                                 <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                                  {c.objects?.slice(0, 4).map((obj, i) => (
+                                  {imgZipResult.result?.clusters?.filter(p => p.cluster_id === c.cluster_id).slice(0, 1).map(p => (
+                                    p.objects?.slice(0, 4).map((obj, i) => (
                                       <span key={i} className="chip" style={{ fontSize: '9px', background: 'rgba(255, 255, 255, 0.05)', color: '#cbd5e1' }}>{obj.label}</span>
+                                    ))
                                   ))}
-                                  {c.objects && c.objects.length > 4 && <span className="chip" style={{ fontSize: '9px', opacity: 0.7 }}>+{c.objects.length - 4}</span>}
                                 </div>
                               </div>
                             </div>
                           ))}
                         </div>
+                      </div>
+                    </div>
+
+                    {/* 5th Thing: Semantic Category Explorer */}
+                    <div style={{ padding: '40px 0 0' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+                        <div>
+                          <h3 style={{ margin: 0, fontSize: '20px', fontWeight: 800, color: '#f8fafc', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                            <Layers size={24} color="#f59e0b" /> Semantic Category Explorer
+                          </h3>
+                          <p style={{ color: '#94a3b8', fontSize: '13px', marginTop: '4px' }}>AI-organized content themes. Click to filter the gallery below.</p>
+                        </div>
+                        {selectedCategory !== null && (
+                          <button 
+                            className="qa-send-btn" 
+                            style={{ background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', border: '1px solid rgba(239, 68, 68, 0.2)', padding: '6px 12px', height: 'auto', fontSize: '12px' }}
+                            onClick={() => setSelectedCategory(null)}
+                          >
+                            Clear Filter
+                          </button>
+                        )}
+                      </div>
+
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '20px' }}>
+                        {imgZipResult.result?.cluster_summaries?.map((sum, i) => (
+                          <div 
+                            key={i} 
+                            className={`ai-intel-card ${selectedCategory === sum.cluster_id ? 'active-category' : ''}`}
+                            style={{ 
+                              cursor: 'pointer', 
+                              transition: 'all 0.3s ease',
+                              border: selectedCategory === sum.cluster_id ? '2px solid #fb8c36' : '1px solid #1e293b',
+                              background: selectedCategory === sum.cluster_id ? 'rgba(251, 140, 54, 0.05)' : '#0f172a'
+                            }}
+                            onClick={() => setSelectedCategory(sum.cluster_id)}
+                          >
+                            <div style={{ padding: '20px' }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
+                                <div style={{ 
+                                  width: '40px', 
+                                  height: '40px', 
+                                  borderRadius: '12px', 
+                                  background: `var(--cluster-${sum.cluster_id % 5})`,
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  boxShadow: '0 4px 12px rgba(0,0,0,0.3)'
+                                }}>
+                                  <ImageIcon size={20} color="#fff" />
+                                </div>
+                                <span style={{ fontSize: '11px', color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase' }}>{sum.count} Items</span>
+                              </div>
+                              <h4 style={{ margin: 0, fontSize: '16px', color: '#f8fafc', fontWeight: 800 }}>{sum.description}</h4>
+                              <div style={{ marginTop: '12px', height: '4px', background: '#1e293b', borderRadius: '2px', overflow: 'hidden' }}>
+                                <div style={{ height: '100%', width: `${Math.min(100, (sum.count / imgZipResult.processed_count) * 100)}%`, background: `var(--cluster-${sum.cluster_id % 5})` }} />
+                              </div>
+                            </div>
+                          </div>
+                        ))}
                       </div>
                     </div>
 
@@ -1017,7 +1136,7 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
                       </h3>
                       
                       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '24px' }}>
-                        {imgZipResult.result?.clusters?.map((c, i) => (
+                        {imgZipResult.result?.clusters?.filter(c => selectedCategory === null || c.cluster_id === selectedCategory).map((c, i) => (
                           <div key={i} className="premium-gallery-card" onClick={() => setSelectedClusterPoint(c)} style={{ cursor: 'pointer' }}>
                             <div style={{ overflow: 'hidden', position: 'relative' }}>
                               {c.annotated_image_path ? (
@@ -1035,9 +1154,10 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
                                   color: '#fff', 
                                   background: `var(--cluster-${c.cluster_id % 5})`,
                                   border: `1px solid rgba(255,255,255,0.3)`,
-                                  backdropFilter: 'blur(4px)'
+                                  backdropFilter: 'blur(4px)',
+                                  fontSize: '10px'
                                 }}>
-                                  #{c.cluster_id}
+                                  {imgZipResult.result?.cluster_summaries?.find(s => s.cluster_id === c.cluster_id)?.description || `Group ${c.cluster_id}`}
                                 </span>
                               </div>
                             </div>
@@ -1058,6 +1178,153 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
                             </div>
                           </div>
                         ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {(imgResult || imgZipResult) && (
+                  <div className="ai-intelligence-section">
+                    <h3 style={{ fontSize: '22px', fontWeight: 800, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
+                      <Sparkles size={24} color="#fb8c36" /> AI Image Intelligence
+                    </h3>
+                    <p style={{ color: '#94a3b8', fontSize: '14px', marginBottom: '28px' }}>Powered by Groq Vision AI — Ask questions about images or search across your analyzed collection.</p>
+
+                    <div className="ai-intel-grid">
+                      {/* ── Image Q&A Card ── */}
+                      <div className="ai-intel-card">
+                        <div className="ai-intel-card-header">
+                          <div className="ai-intel-icon qa-icon">
+                            <MessageCircle size={20} />
+                          </div>
+                          <div>
+                            <h4>Image Q&A</h4>
+                            <p>Upload an image and ask any question about it</p>
+                          </div>
+                        </div>
+
+                        <div className="ai-intel-body">
+                          <div className="qa-upload-zone" onClick={() => qaFileRef.current?.click()}>
+                            <input
+                              type="file"
+                              ref={qaFileRef}
+                              onChange={(e) => {
+                                const f = e.target.files?.[0];
+                                if (f) { setQaFile(f); setQaAnswer(null); toast.success(`Selected: ${f.name}`); }
+                              }}
+                              style={{ display: 'none' }}
+                              accept="image/*"
+                            />
+                            {qaFile ? (
+                              <div className="qa-file-selected">
+                                <ImageIcon size={16} color="#fb8c36" />
+                                <span>{qaFile.name}</span>
+                              </div>
+                            ) : (
+                              <>
+                                <Upload size={18} color="#94a3b8" />
+                                <span style={{ color: '#94a3b8', fontSize: '13px' }}>Click to select an image</span>
+                              </>
+                            )}
+                          </div>
+
+                          <div className="qa-input-row">
+                            <input
+                              type="text"
+                              className="qa-question-input"
+                              placeholder="Ask anything... e.g. 'Is there a safety violation?'"
+                              value={qaQuestion}
+                              onChange={(e) => setQaQuestion(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter' && qaFile && qaQuestion.trim()) {
+                                  e.preventDefault();
+                                  handleImageQA();
+                                }
+                              }}
+                            />
+                            <button
+                              className="qa-send-btn"
+                              disabled={!qaFile || !qaQuestion.trim() || qaLoading}
+                              onClick={handleImageQA}
+                            >
+                              {qaLoading ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
+                            </button>
+                          </div>
+
+                          {qaAnswer && (
+                            <div className="qa-answer-box">
+                              <div className="qa-answer-label">
+                                <Sparkles size={12} color="#fb8c36" />
+                                AI Response
+                              </div>
+                              <p>{qaAnswer.answer}</p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* ── Smart Search Card ── */}
+                      <div className="ai-intel-card">
+                        <div className="ai-intel-card-header">
+                          <div className="ai-intel-icon search-icon">
+                            <SearchCheck size={20} />
+                          </div>
+                          <div>
+                            <h4>Smart Image Search</h4>
+                            <p>Search your analyzed images with natural language</p>
+                          </div>
+                        </div>
+
+                        <div className="ai-intel-body">
+                          <div className="qa-input-row">
+                            <input
+                              type="text"
+                              className="qa-question-input"
+                              placeholder="e.g. 'sunset with a bridge' or 'most industrial photos'"
+                              value={searchQuery}
+                              onChange={(e) => setSearchQuery(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter' && searchQuery.trim() && (imgResult || imgZipResult)) {
+                                  e.preventDefault();
+                                  handleImageSearch();
+                                }
+                              }}
+                            />
+                            <button
+                              className="qa-send-btn search-btn"
+                              disabled={!searchQuery.trim() || searchLoading || (!imgResult && !imgZipResult)}
+                              onClick={handleImageSearch}
+                            >
+                              {searchLoading ? <Loader2 size={16} className="animate-spin" /> : <Search size={16} />}
+                            </button>
+                          </div>
+
+                          {showSearchResults && searchResults.length > 0 && (
+                            <div className="search-results-list">
+                              {searchResults.map((sr, idx) => (
+                                <div key={idx} className="search-result-item">
+                                  <div className="search-result-rank">
+                                    <span className="search-rank-num">#{idx + 1}</span>
+                                    <div className="search-score-bar">
+                                      <div className="search-score-fill" style={{ width: `${sr.relevance_score * 10}%` }} />
+                                    </div>
+                                    <span className="search-score-label">{sr.relevance_score}/10</span>
+                                  </div>
+                                  <div className="search-result-info">
+                                    <strong>{sr.filename}</strong>
+                                    <span className="search-result-reason">{sr.reason}</span>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+
+                          {showSearchResults && searchResults.length === 0 && (
+                            <p style={{ color: '#94a3b8', fontSize: '13px', textAlign: 'center', marginTop: '16px' }}>
+                              No images matched your query.
+                            </p>
+                          )}
+                        </div>
                       </div>
                     </div>
                   </div>

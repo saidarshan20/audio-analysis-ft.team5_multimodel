@@ -23,6 +23,7 @@ import torch
 from transformers import CLIPProcessor, CLIPModel, BlipProcessor, BlipForConditionalGeneration
 from sklearn.cluster import KMeans
 import umap
+from groq import Groq
 
 # Azure SDK
 from azure.cognitiveservices.vision.computervision import ComputerVisionClient
@@ -30,12 +31,14 @@ from msrest.authentication import CognitiveServicesCredentials
 
 from modules.team5_multimodal.config import get_settings
 from modules.team5_multimodal.models import (
-    DetectedObject, ClusterPoint, ZipPipelineResult
+    DetectedObject, ClusterPoint, ZipPipelineResult, ClusterInfo
 )
 
 logger = logging.getLogger(__name__)
 
 # Pre-load models so they aren't painfully loaded every API call
+_groq_client = None
+
 try:
     _yolo_model = YOLO("yolov8n.pt")  # Use nano for speed
 except Exception as e:
@@ -62,6 +65,10 @@ except Exception as e:
 class ImageAnalysisService:
     def __init__(self):
         self.settings = get_settings()
+        global _groq_client
+        if _groq_client is None:
+            _groq_client = Groq(api_key=self.settings.groq_api_key)
+
         # Ensure workspace directories exist
         self.base_dir = Path(__file__).resolve().parent.parent.parent
         self.raw_dir = self.base_dir / "shared_workspace" / "1_raw_uploads"
@@ -96,6 +103,34 @@ class ImageAnalysisService:
             logger.error(f"BLIP Captioning Error on {img_path}: {e}")
         return None
 
+    def _name_clusters(self, labels: np.ndarray, metadata: list[dict], n_clusters: int) -> list[ClusterInfo]:
+        """Use Groq to name these clusters semantically."""
+        cluster_info_list = []
+        for c_id in range(n_clusters):
+            indices = [i for i, lbl in enumerate(labels) if lbl == c_id]
+            count = len(indices)
+            # Take representative captions
+            samples = [metadata[i]["description"] for i in indices[:5] if metadata[i]["description"]]
+            caption_text = "\n".join(f"- {s}" for s in samples)
+            
+            try:
+                response = _groq_client.chat.completions.create(
+                    model=self.settings.groq_model,
+                    messages=[
+                        {"role": "system", "content": "You are a categorical classification expert. Provide a 2-3 word name for a group of images based on their descriptions."},
+                        {"role": "user", "content": f"Descriptions:\n{caption_text}\n\nSmart Group Name:"}
+                    ],
+                    max_tokens=20,
+                    temperature=0.4
+                )
+                smart_name = response.choices[0].message.content.strip().strip("\"'")
+            except Exception as e:
+                logger.warning(f"Groq failed to name cluster {c_id}: {e}")
+                smart_name = f"Group {c_id + 1}"
+            
+            cluster_info_list.append(ClusterInfo(cluster_id=c_id, description=smart_name, count=count))
+        return cluster_info_list
+
     def process_images(self, extract_dir: str) -> ZipPipelineResult:
         root = Path(extract_dir)
         valid_exts = {".jpg", ".jpeg", ".png", ".bmp", ".webp"}
@@ -126,7 +161,7 @@ class ImageAnalysisService:
             objs = []
             rel_annotated_path = None
             if _yolo_model:
-                results = _yolo_model(str_path, verbose=False)
+                results = _yolo_model(str_path, verbose=False, iou=0.3, conf=0.4)
                 if len(results) > 0:
                     r = results[0]
                     boxes = r.boxes
@@ -174,9 +209,10 @@ class ImageAnalysisService:
                 "annotated_path": rel_annotated_path
             })
 
-        # 2. KMeans Clustering
+        # 2. KMeans Clustering - Dynamic n_clusters based on variety
         X = np.array(embeddings)
-        n_clusters = min(3, len(X))  # Dynamic clusters based on size
+        # Increase granularity: Use N/2 clusters, capped between 2 and 6
+        n_clusters = max(2, min(int(len(X) / 2), 6)) if len(X) > 1 else 1
         kmeans = KMeans(n_clusters=n_clusters, random_state=42, n_init="auto")
         labels = kmeans.fit_predict(X)
 
@@ -205,12 +241,16 @@ class ImageAnalysisService:
                 )
             )
 
-        # 4. Matplotlib Output
+        # 4. Smart Cluster Naming (New Team 5 Feature)
+        cluster_summaries = self._name_clusters(labels, metadata_list, n_clusters)
+
+        # 5. Matplotlib Output
         plot_path = self.proc_dir / f"cluster_plot_{uuid.uuid4().hex[:8]}.png"
         self._generate_plot(coords, labels, plot_path)
 
         return ZipPipelineResult(
             clusters=cluster_points,
+            cluster_summaries=cluster_summaries,
             plot_file_path=str(plot_path.relative_to(self.base_dir))
         )
 
@@ -225,4 +265,3 @@ class ImageAnalysisService:
         plt.grid(True, linestyle='--', alpha=0.6)
         plt.savefig(out_path, bbox_inches='tight')
         plt.close()
-

@@ -1014,3 +1014,183 @@
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
+
+/* ── AI Intelligence Section ── */
+.ai-intelligence-section {
+  margin-top: 60px;
+  padding-top: 40px;
+  border-top: 1px solid rgba(251, 140, 54, 0.15);
+  animation: slideUpFade 0.6s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.ai-intel-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+  gap: 32px;
+}
+
+.ai-intel-card {
+  background: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 20px;
+  padding: 32px;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.04);
+  display: flex;
+  flex-direction: column;
+  transition: all 0.3s;
+}
+
+.ai-intel-card:hover { border-color: #fb8c36; transform: translateY(-4px); }
+
+.ai-intel-card-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.ai-intel-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+}
+
+.qa-icon { background: linear-gradient(135deg, #fb8c36 0%, #ff5c00 100%); }
+.search-icon { background: linear-gradient(135deg, #60a5fa 0%, #3b82f6 100%); }
+
+.ai-intel-card-header h4 { font-size: 18px; font-weight: 700; color: #1e293b; margin: 0; }
+.ai-intel-card-header p { font-size: 13px; color: #94a3b8; margin: 4px 0 0; }
+
+.ai-intel-body { display: flex; flex-direction: column; gap: 20px; }
+
+/* Q&A specific */
+.qa-upload-zone {
+  border: 2px dashed #e2e8f0;
+  border-radius: 14px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  cursor: pointer;
+  background: #f8fafc;
+  transition: all 0.2s;
+}
+.qa-upload-zone:hover { background: #fff7ed; border-color: #fb8c36; }
+
+.qa-file-selected {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #1e293b;
+}
+
+.qa-input-row { display: flex; gap: 10px; }
+.qa-question-input {
+  flex: 1;
+  padding: 12px 16px;
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  font-size: 14px;
+  outline: none;
+  transition: all 0.2s;
+}
+.qa-question-input:focus { border-color: #fb8c36; background: white; box-shadow: 0 0 0 3px rgba(251, 140, 54, 0.1); }
+
+.qa-send-btn {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  background: #fb8c36;
+  color: white;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.qa-send-btn:hover:not(:disabled) { transform: scale(1.05); opacity: 0.9; }
+.qa-send-btn:disabled { background: #e2e8f0; color: #94a3b8; cursor: not-allowed; }
+.qa-send-btn.search-btn { background: #3b82f6; }
+
+.qa-answer-box {
+  background: #f0f9ff;
+  border: 1px solid #bae6fd;
+  border-radius: 14px;
+  padding: 16px;
+  animation: fadeIn 0.4s ease;
+}
+.qa-answer-label { font-size: 11px; font-weight: 800; text-transform: uppercase; color: #0284c7; display: flex; align-items: center; gap: 6px; margin-bottom: 8px; }
+.qa-answer-box p { font-size: 14px; line-height: 1.6; color: #0c4a6e; margin: 0; }
+
+/* Search Results */
+.search-results-list { display: flex; flex-direction: column; gap: 12px; margin-top: 10px; max-height: 300px; overflow-y: auto; padding-right: 8px; }
+.search-result-item {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  transition: all 0.2s;
+  animation: slideInRight 0.3s ease forwards;
+}
+.search-result-item:hover { border-color: #60a5fa; background: white; transform: translateX(4px); }
+
+.search-result-rank { display: flex; align-items: center; gap: 12px; }
+.search-rank-num { font-size: 11px; font-weight: 800; color: #64748b; }
+.search-score-bar { flex: 1; height: 4px; background: #e2e8f0; border-radius: 2px; overflow: hidden; }
+.search-score-fill { height: 100%; background: #60a5fa; border-radius: 2px; }
+.search-score-label { font-size: 11px; font-weight: 700; color: #3b82f6; }
+
+.search-result-info strong { display: block; font-size: 14px; color: #1e293b; margin-bottom: 4px; }
+.search-result-reason { font-size: 12px; color: #64748b; font-style: italic; display: block; }
+
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes slideInRight { from { opacity: 0; transform: translateX(-10px); } to { opacity: 1; transform: translateX(0); } }
+
+/* Dark Mode Intelligence */
+:root:not([data-theme="light"]) .ai-intel-card { background: rgba(15, 23, 42, 0.4); border-color: rgba(255, 255, 255, 0.05); }
+:root:not([data-theme="light"]) .ai-intel-card-header h4 { color: #f8fafc; }
+:root:not([data-theme="light"]) .qa-upload-zone { background: rgba(15, 23, 42, 0.6); border-color: rgba(255, 255, 255, 0.1); }
+:root:not([data-theme="light"]) .qa-upload-zone:hover { background: rgba(251, 140, 54, 0.1); }
+:root:not([data-theme="light"]) .qa-file-selected { color: #f8fafc; }
+:root:not([data-theme="light"]) .qa-question-input { background: rgba(30, 41, 59, 0.8); border-color: rgba(255, 255, 255, 0.1); color: #f8fafc; }
+:root:not([data-theme="light"]) .qa-answer-box { background: rgba(2, 132, 199, 0.1); border-color: rgba(2, 132, 199, 0.3); }
+:root:not([data-theme="light"]) .qa-answer-box p { color: #bae6fd; }
+:root:not([data-theme="light"]) .search-result-item { background: rgba(15, 23, 42, 0.6); border-color: rgba(255, 255, 255, 0.1); }
+:root:not([data-theme="light"]) .search-result-item:hover { border-color: #60a5fa; background: rgba(15, 23, 42, 1); }
+:root:not([data-theme="light"]) .search-result-info strong { color: #f8fafc; }
+:root:not([data-theme="light"]) .search-result-reason { color: #94a3b8; }
+:root:not([data-theme="light"]) .ai-intelligence-section h3 { color: #f8fafc; }
+
+/* Category Explorer Styles */
+.active-category {
+  background: rgba(251, 140, 54, 0.1) !important;
+  border-color: #fb8c36 !important;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.4), 0 0 15px rgba(251, 140, 54, 0.15) !important;
+}
+
+.ai-intel-card:hover {
+  transform: translateY(-4px);
+  border-color: rgba(251, 140, 54, 0.4);
+}
+
+.premium-cluster-badge {
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-weight: 700;
+  white-space: nowrap;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+}
+

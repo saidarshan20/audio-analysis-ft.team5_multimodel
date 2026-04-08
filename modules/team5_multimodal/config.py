@@ -17,6 +17,7 @@ class Team5Settings(BaseSettings):
     
     # --- Models ---
     groq_model: str = "llama-3.3-70b-versatile"
+    groq_vision_model: str = "meta-llama/llama-4-scout-17b-16e-instruct"
     nvidia_model: str = "meta/llama-3.3-70b-instruct"
 
     # --- Image Analysis (Local Models) ---
@@ -43,7 +44,6 @@ class Team5Settings(BaseSettings):
 @lru_cache
 def get_settings() -> Team5Settings:
     settings = Team5Settings()
-    # Set global environment variable for libraries like transformers/sentence-transformers
     if settings.hf_token:
         os.environ["HF_TOKEN"] = settings.hf_token
     return settings

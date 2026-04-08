@@ -109,6 +109,11 @@ export interface ImageZipAnalysisResponse {
       description: string | null;
       annotated_image_path: string | null;
     }>;
+    cluster_summaries: Array<{
+      cluster_id: number;
+      description: string;
+      count: number;
+    }>;
     plot_file_path: string;
   };
 }
@@ -256,6 +261,73 @@ export async function analyzeImagesZip(file: File): Promise<ImageZipAnalysisResp
   if (!response.ok) {
     const err = await response.json().catch(() => ({ detail: 'Unknown error' }));
     throw new Error(err.detail || `ZIP Image analysis failed with status ${response.status}`);
+  }
+
+  return response.json();
+}
+
+// ──────────────────────────────────────────────
+//  NEW: Groq-powered Image Intelligence APIs
+// ──────────────────────────────────────────────
+
+export interface ImageQAResponse {
+  status: string;
+  filename: string;
+  question: string;
+  answer: string;
+}
+
+export interface ImageSearchResult {
+  filename: string;
+  caption: string;
+  relevance_score: number;
+  reason: string;
+}
+
+export interface ImageSearchResponse {
+  status: string;
+  query: string;
+  total_searched: number;
+  results: ImageSearchResult[];
+}
+
+/**
+ * Ask a question about an image using Groq Vision AI
+ */
+export async function askAboutImage(file: File, question: string): Promise<ImageQAResponse> {
+  const formData = new FormData();
+  formData.append('file', file);
+  formData.append('question', question);
+
+  const response = await fetch(`${BASE_URL}/team5/image-ask`, {
+    method: 'POST',
+    body: formData,
+  });
+
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({ detail: 'Unknown error' }));
+    throw new Error(err.detail || `Image Q&A failed with status ${response.status}`);
+  }
+
+  return response.json();
+}
+
+/**
+ * Search images using natural language query powered by Groq
+ */
+export async function searchImages(
+  query: string,
+  captions: Array<{ filename: string; caption: string }>
+): Promise<ImageSearchResponse> {
+  const response = await fetch(`${BASE_URL}/team5/image-search`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ query, captions }),
+  });
+
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({ detail: 'Unknown error' }));
+    throw new Error(err.detail || `Image search failed with status ${response.status}`);
   }
 
   return response.json();

@@ -1,13 +1,16 @@
 """
 router.py  –  MANDATORY router for Team 5 (Multimodal).
 Contains only API endpoints; business logic lives in services.py.
+
+Updated: Added 2 new endpoints for Image Q&A and Advanced Search.
 """
 
 import logging
 import os
 
-from fastapi import APIRouter, HTTPException, UploadFile, File
+from fastapi import APIRouter, HTTPException, UploadFile, File, Form
 from fastapi.responses import StreamingResponse
+from pydantic import BaseModel
 import json
 import asyncio
 
@@ -38,7 +41,6 @@ async def analyze_text(file: UploadFile = File(...)):
 
     service = TextAnalysisService()
 
-    # Route: PDF → pdfplumber local extraction; otherwise treat as plain text
     if file.content_type in PDF_CONTENT_TYPES or (
         file.filename and file.filename.lower().endswith(".pdf")
     ):
@@ -62,7 +64,6 @@ async def analyze_text(file: UploadFile = File(...)):
         result=result,
     )
 
-from pydantic import BaseModel
 
 class GithubAnalysisRequest(BaseModel):
     repo_url: str
@@ -110,7 +111,7 @@ async def analyze_code_github(payload: GithubAnalysisRequest):
 
 @router.post("/analyze-images", response_model=MultiImageAnalysisResponse)
 async def analyze_images_teammate(files: list[UploadFile] = File(...)):
-    """Accept multiple images and return object detection, captions, and UMAP clusters."""
+    """Accept multiple images. Now with smart cluster naming via Groq."""
     if not files:
         raise HTTPException(status_code=400, detail="No files uploaded.")
 
@@ -121,7 +122,6 @@ async def analyze_images_teammate(files: list[UploadFile] = File(...)):
 
     try:
         for file in files:
-            # Basic type check
             if not file.content_type.startswith("image/"):
                 logger.warning("Skipping non-image file: %s", file.filename)
                 continue
@@ -130,14 +130,13 @@ async def analyze_images_teammate(files: list[UploadFile] = File(...)):
             if not raw_bytes:
                 continue
 
-            # Run detection, captioning, embedding
             res, embed = service.analyze_image(raw_bytes, file.filename or "unknown")
             results.append(res)
             embeddings.append(embed)
             filenames.append(file.filename or "unknown")
 
-        # Perform clustering and 2D projection
-        projection, clusters = service.perform_clustering(embeddings, filenames)
+        # Pass results for smart cluster naming (Point 1)
+        projection, clusters = service.perform_clustering(embeddings, filenames, results=results)
 
         return MultiImageAnalysisResponse(
             results=results,
@@ -150,20 +149,9 @@ async def analyze_images_teammate(files: list[UploadFile] = File(...)):
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 
-# ──────────────────────────────────────────────
-#  NEW INTEGRATION: Multimodal Image Analysis Pipeline
-#  Added image processing endpoint bridging YOLO, CLIP, and UMAP.
-# ──────────────────────────────────────────────
 @router.post("/image-analyze-zip", response_model=ImageAnalysisResponse)
 async def analyze_images_zip(file: UploadFile = File(...)):
-    """
-    Accepts a ZIP file containing raw images and processes them via the ImageAnalysisService.
-    - YOLOv8 extracts bounding boxes.
-    - OpenAI CLIP generates semantic embeddings.
-    - Scikit-Learn KMeans clusters the embeddings.
-    - UMAP reduces dimensions for 2D graphing.
-    - Matplotlib generates a final scatter plot in the shared_workspace.
-    """
+    """Accepts a ZIP file containing raw images and processes them."""
     if not file.filename or not file.filename.lower().endswith(".zip"):
         raise HTTPException(status_code=400, detail="Only ZIP files are supported.")
 
@@ -174,10 +162,7 @@ async def analyze_images_zip(file: UploadFile = File(...)):
     service = ZipImageAnalysisService()
 
     try:
-        # Extract images from ZIP
         extract_dir = service.extract_zip(zip_bytes)
-        
-        # Run ML Pipeline
         analysis_result = service.process_images(extract_dir)
 
         return ImageAnalysisResponse(
@@ -190,4 +175,74 @@ async def analyze_images_zip(file: UploadFile = File(...)):
         raise HTTPException(status_code=400, detail=str(val_err))
     except Exception as exc:
         logger.exception("Image analysis pipeline failed")
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+# ──────────────────────────────────────────────
+#  NEW ENDPOINTS (Groq-powered)
+# ──────────────────────────────────────────────
+
+@router.post("/image-ask")
+async def ask_about_image(
+    file: UploadFile = File(...),
+    question: str = Form(...)
+):
+    """
+    Point 2 - Contextual Image Q&A:
+    Upload an image + ask any question. Groq Vision answers intelligently.
+    """
+    if not file.content_type or not file.content_type.startswith("image/"):
+        raise HTTPException(status_code=400, detail="Only image files are accepted.")
+
+    if not question or not question.strip():
+        raise HTTPException(status_code=400, detail="Question cannot be empty.")
+
+    image_bytes = await file.read()
+    if not image_bytes:
+        raise HTTPException(status_code=400, detail="Uploaded image is empty.")
+
+    service = TeammateImageAnalysisService()
+
+    try:
+        answer = service.ask_about_image(image_bytes, question.strip())
+        return {
+            "status": "success",
+            "filename": file.filename,
+            "question": question.strip(),
+            "answer": answer
+        }
+    except Exception as exc:
+        logger.exception("Image Q&A failed")
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+class ImageSearchRequest(BaseModel):
+    query: str
+    captions: list[dict]
+
+
+@router.post("/image-search")
+async def search_images(payload: ImageSearchRequest):
+    """
+    Point 3 - Advanced Search Intelligence:
+    Search images using complex natural language queries powered by Groq.
+    """
+    if not payload.query or not payload.query.strip():
+        raise HTTPException(status_code=400, detail="Search query cannot be empty.")
+
+    if not payload.captions:
+        raise HTTPException(status_code=400, detail="No image captions provided.")
+
+    service = TeammateImageAnalysisService()
+
+    try:
+        ranked_results = service.search_images(payload.query.strip(), payload.captions)
+        return {
+            "status": "success",
+            "query": payload.query.strip(),
+            "total_searched": len(payload.captions),
+            "results": ranked_results
+        }
+    except Exception as exc:
+        logger.exception("Image search failed")
         raise HTTPException(status_code=500, detail=str(exc)) from exc

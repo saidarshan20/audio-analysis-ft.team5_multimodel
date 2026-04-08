@@ -165,6 +165,7 @@ class ClusterPoint(BaseModel):
 
 class ZipPipelineResult(BaseModel):
     clusters: list[ClusterPoint]
+    cluster_summaries: list[ClusterInfo] = Field(default_factory=list)
     plot_file_path: str
 
 class ImageAnalysisResponse(BaseModel):
