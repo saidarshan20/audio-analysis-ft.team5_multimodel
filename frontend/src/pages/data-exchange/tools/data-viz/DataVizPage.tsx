@@ -31,55 +31,100 @@ type HistoryItem = {
   data: TextAnalysisResult | CodeAnalysisResult | MultiImageAnalysisResponse;
 };
 
-const generateMermaidGraph = (arch: any) => {
-  if (!arch || !arch.components || !arch.connections) return '';
-  let mermaidStr = 'flowchart TB\n'; // Use TB (Top-Bottom) for layered view
-  
-  // Group components by layer
-  const layers: Record<string, any[]> = {};
-  arch.components.forEach((c: any) => {
-    const layer = c.layer || 'other';
-    if (!layers[layer]) layers[layer] = [];
-    layers[layer].push(c);
+// ── Mermaid compiler (gitdiagram-style) ──────────────────────────────────────
+
+const MID_PREFIX = 'nd_';
+const safeId = (id: string) => MID_PREFIX + id.replace(/[^a-zA-Z0-9]/g, '_');
+
+// 6-tone dark-theme palette cycling by group
+const GROUP_TONES = ['toneBlue','toneAmber','toneMint','toneRose','toneIndigo','toneTeal'];
+
+const SHAPE_DELIMITERS: Record<string, [string, string]> = {
+  database: ['[("', '")]'],
+  circle:   ['(("', '"))'],
+  hexagon:  ['{{\"', '"}}'],
+  queue:    ['[/"', '"/]'],
+  document: ['["', '"]'],
+  box:      ['["', '"]'],
+};
+
+function mermaidNode(n: any, indent: string): string {
+  const id = safeId(n.id);
+  const label = (n.label ?? '').replace(/"/g, "'");
+  const typeHint = n.type && n.type !== n.label ? `<br/><small>${n.type.replace(/"/g, "'")}</small>` : '';
+  const [s, e] = SHAPE_DELIMITERS[n.shape] ?? SHAPE_DELIMITERS.box;
+  return `${indent}${id}${s}${label}${typeHint}${e}\n`;
+}
+
+const generateMermaidGraph = (arch: any): string => {
+  if (!arch) return '';
+  const nodes: any[] = arch.nodes ?? [];
+  const groups: any[] = arch.groups ?? [];
+  const edges: any[] = arch.edges ?? [];
+  if (nodes.length === 0) return '';
+
+  // group → tone class
+  const groupTone: Record<string, string> = {};
+  groups.forEach((g, i) => { groupTone[g.id] = GROUP_TONES[i % GROUP_TONES.length]; });
+
+  // bucket nodes by group
+  const byGroup: Record<string, any[]> = {};
+  const ungrouped: any[] = [];
+  nodes.forEach(n => {
+    if (n.group_id && groups.find(g => g.id === n.group_id)) {
+      (byGroup[n.group_id] ??= []).push(n);
+    } else {
+      ungrouped.push(n);
+    }
   });
 
-  // Create Subgraphs for Layers
-  Object.entries(layers).forEach(([layerName, comps]) => {
-    mermaidStr += `  subgraph ${layerName} ["${layerName.toUpperCase()} LAYER"]\n`;
-    comps.forEach(c => {
-      let shapeStart = '["';
-      let shapeEnd = '"]';
-      const t = c.type.toLowerCase();
-      if (t.includes('database') || t.includes('storage') || t.includes('cache')) {
-        shapeStart = '[("'; shapeEnd = '")]';
-      } else if (t.includes('api') || t.includes('endpoint') || t.includes('interface')) {
-        shapeStart = '{{"'; shapeEnd = '"}}';
-      } else if (t.includes('queue') || t.includes('stream') || t.includes('event')) {
-        shapeStart = '>("'; shapeEnd = '")';
-      } else if (t.includes('function') || t.includes('lambda')) {
-        shapeStart = '(("'; shapeEnd = '"))';
-      }
-      mermaidStr += `    node_${c.id}${shapeStart}${c.name}${shapeEnd}\n`;
-    });
-    mermaidStr += `  end\n`;
-  });
-  
-  // Create edges (Connections)
-  arch.connections.forEach((conn: any) => {
-    const src = `node_${conn.source}`;
-    const tgt = `node_${conn.target}`;
-    const label = conn.description.replace(/"/g, "'");
-    mermaidStr += `  ${src} -->|"${label}"| ${tgt}\n`;
+  let chart = 'flowchart TD\n';
+
+  // subgraphs for groups
+  groups.forEach(g => {
+    const members = byGroup[g.id] ?? [];
+    if (members.length === 0) return;
+    const sgId = safeId(g.id);
+    chart += `  subgraph ${sgId} ["${g.label.replace(/"/g, "'")}"]\n`;
+    members.forEach(n => { chart += mermaidNode(n, '    '); });
+    chart += `  end\n`;
   });
 
-  mermaidStr += `  linkStyle default stroke:#fb8c36,stroke-width:1.5px,color:white
-  classDef default fill:#1e293b,stroke:#fb8c36,stroke-width:2px,color:#f8fafc,rx:8px,ry:8px
-  style presentation fill:#0f172a,stroke:#60a5fa,stroke-dasharray: 5 5
-  style application fill:#0f172a,stroke:#a78bfa,stroke-dasharray: 5 5
-  style domain fill:#0f172a,stroke:#4ade80,stroke-dasharray: 5 5
-  style infrastructure fill:#0f172a,stroke:#f472b6,stroke-dasharray: 5 5`;
+  // ungrouped nodes
+  ungrouped.forEach(n => { chart += mermaidNode(n, '  '); });
 
-  return mermaidStr;
+  // edges
+  edges.forEach(e => {
+    const src = safeId(e.source);
+    const tgt = safeId(e.target);
+    const lbl = e.label ? `|"${(e.label ?? '').replace(/"/g, "'")}"| ` : '';
+    const arrow = e.style === 'dashed' ? '-.->': '-->';
+    chart += `  ${src} ${arrow}${lbl}${tgt}\n`;
+  });
+
+  // class definitions (dark-theme palette)
+  chart += `
+  classDef toneBlue   fill:#1e3a5f,stroke:#3b82f6,color:#bfdbfe,stroke-width:2px
+  classDef toneAmber  fill:#451a03,stroke:#f59e0b,color:#fde68a,stroke-width:2px
+  classDef toneMint   fill:#064e3b,stroke:#10b981,color:#a7f3d0,stroke-width:2px
+  classDef toneRose   fill:#4c0519,stroke:#f43f5e,color:#fecdd3,stroke-width:2px
+  classDef toneIndigo fill:#1e1b4b,stroke:#6366f1,color:#c7d2fe,stroke-width:2px
+  classDef toneTeal   fill:#042f2e,stroke:#14b8a6,color:#99f6e4,stroke-width:2px
+  classDef toneGray   fill:#1e293b,stroke:#64748b,color:#cbd5e1,stroke-width:2px
+  classDef default    fill:#1e293b,stroke:#fb8c36,color:#f8fafc,stroke-width:2px\n`;
+
+  // apply tones to nodes
+  nodes.forEach(n => {
+    const tone = n.group_id && groupTone[n.group_id] ? groupTone[n.group_id] : 'toneGray';
+    chart += `  class ${safeId(n.id)} ${tone}\n`;
+  });
+
+  // style subgraphs
+  groups.forEach(g => {
+    chart += `  style ${safeId(g.id)} fill:#0a0f1a,stroke:#334155,stroke-dasharray:5 5,color:#94a3b8\n`;
+  });
+
+  return chart;
 };
 
 type DatasetTab = 'catalog' | 'upload';
@@ -307,36 +352,60 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
     filename: 'sample_ecommerce.zip',
     file_count: 42,
     architecture: {
-      title: 'E-commerce Microservices',
-      summary: 'A distributed system architecture using Node.js for services and React for the storefront. The backend exposes REST APIs consumed by the frontend component.',
-      detected_patterns: ['Microservices', 'RESTful API', 'JWT Authentication', 'Provider Pattern'],
-      components: [
-        { id: '1', name: 'Auth Service', type: 'Backend', layer: 'infrastructure', description: 'Handles user authentication and JWT management.', files: ['auth/src/index.js', 'auth/src/jwt.js'] },
-        { id: '2', name: 'Catalog Service', type: 'Backend', layer: 'domain', description: 'Manages product listings and inventory.', files: ['catalog/db.js', 'catalog/routes.js'] },
-        { id: '3', name: 'Web Storefront', type: 'Frontend', layer: 'presentation', description: 'Responsive React-based user interface.', files: ['store/App.jsx', 'store/Cart.jsx'] },
+      title: 'E-commerce Microservices Platform',
+      summary: 'A distributed system built with Node.js microservices and a React storefront. Services communicate via REST APIs with JWT-based authentication. Uses PostgreSQL for persistence and Redis for session caching.',
+      tech_stack: ['Node.js', 'React', 'PostgreSQL', 'Redis', 'Docker'],
+      detected_patterns: ['Microservices', 'RESTful API', 'JWT Authentication', 'Repository Pattern'],
+      groups: [
+        { id: 'frontend', label: 'Frontend' },
+        { id: 'api', label: 'API Services' },
+        { id: 'data', label: 'Data Layer' },
       ],
-      connections: [
-        { source: '3', target: '1', type: 'api_call', description: 'Web storefront requests tokens' },
-        { source: '3', target: '2', type: 'api_call', description: 'Fetches product data' }
-      ]
+      nodes: [
+        { id: 'storefront', label: 'Web Storefront', type: 'React SPA', description: 'Responsive React-based user interface with cart and checkout.', group_id: 'frontend', path: 'store/App.jsx', shape: 'box' },
+        { id: 'auth-svc', label: 'Auth Service', type: 'Node.js service', description: 'Handles user login, JWT issuance and verification.', group_id: 'api', path: 'auth/src/index.js', shape: 'box' },
+        { id: 'catalog-svc', label: 'Catalog Service', type: 'Node.js service', description: 'Manages product listings and inventory via REST.', group_id: 'api', path: 'catalog/routes.js', shape: 'box' },
+        { id: 'order-svc', label: 'Order Service', type: 'Node.js service', description: 'Processes orders and triggers payment flow.', group_id: 'api', shape: 'box' },
+        { id: 'postgres', label: 'PostgreSQL', type: 'Relational DB', description: 'Primary persistent store for users, products, orders.', group_id: 'data', shape: 'database' },
+        { id: 'redis', label: 'Redis Cache', type: 'In-memory store', description: 'Session cache and rate limiting.', group_id: 'data', shape: 'database' },
+        { id: 'stripe-api', label: 'Stripe API', type: 'External payment API', description: 'Processes card payments and refunds.', group_id: '', shape: 'hexagon' },
+      ],
+      edges: [
+        { source: 'storefront', target: 'auth-svc', label: 'login / token', style: 'solid' },
+        { source: 'storefront', target: 'catalog-svc', label: 'browse products', style: 'solid' },
+        { source: 'storefront', target: 'order-svc', label: 'place order', style: 'solid' },
+        { source: 'auth-svc', target: 'redis', label: 'session cache', style: 'solid' },
+        { source: 'auth-svc', target: 'postgres', label: 'user lookup', style: 'solid' },
+        { source: 'catalog-svc', target: 'postgres', label: 'SQL query', style: 'solid' },
+        { source: 'order-svc', target: 'postgres', label: 'write order', style: 'solid' },
+        { source: 'order-svc', target: 'stripe-api', label: 'charge card', style: 'dashed' },
+      ],
     },
-    details: { 
+    details: {
       key_files: [
-        { file_path: 'auth/src/index.js', summary: 'Entry point for auth middleware', key_functions: ['verifyToken: validates JWT', 'login: user auth endpoint'] },
-        { file_path: 'catalog/routes.js', summary: 'Defines REST endpoints for querying inventory', key_functions: ['listProducts: returns array of available items'] }
+        { file_path: 'auth/src/index.js', component: 'Auth Service', summary: 'Entry point for JWT auth middleware. Exposes /login and /verify routes.', key_functions: ['verifyToken: validates JWT signature and expiry', 'login: validates credentials and issues signed JWT'] },
+        { file_path: 'catalog/routes.js', component: 'Catalog Service', summary: 'Defines REST endpoints for product queries and inventory management.', key_functions: ['listProducts: paginated product listing with filters', 'getProduct: single product fetch with inventory check'] }
       ],
       flow: [
-        { step: 1, description: 'User visits the Web Storefront.' },
-        { step: 2, description: 'Web Storefront requests authentication via Auth Service.' },
-        { step: 3, description: 'User navigates catalog, triggering API calls to Catalog Service.' }
+        { step: 1, description: 'Browser loads Web Storefront (React SPA via CDN).' },
+        { step: 2, description: 'User submits credentials → POST /login → Auth Service → validates against PostgreSQL → returns signed JWT.' },
+        { step: 3, description: 'Storefront stores JWT in memory, attaches as Authorization header on subsequent API calls.' },
+        { step: 4, description: 'Browse products → GET /products → Catalog Service → SQL query PostgreSQL → paginated JSON response.' },
+        { step: 5, description: 'Checkout → POST /orders → Order Service → writes order to PostgreSQL → calls Stripe API async → returns order ID.' }
       ],
       tech_debt: [
-        'Auth tokens lack automatic rotation and granular scopes, creating a maintenance burden.',
-        'Catalog REST routes are missing pagination, leading to possible memory bloat on large queries.'
+        'auth/src/jwt.js: JWT secret loaded from process.env without validation — app silently uses empty string if unset.',
+        'catalog/routes.js: listProducts lacks pagination — full table scan on large datasets.',
+        'No inter-service authentication — any internal service can call any other without credentials.'
       ],
       security_risks: [
-        'SQL Injection vulnerability in catalog search query execution.',
-        'Hardcoded JWT secret keys scattered within the auth module.'
+        'catalog/routes.js: search query built with string interpolation — SQL injection vector.',
+        'auth/src/index.js: JWT tokens never blacklisted on logout — stolen tokens remain valid until expiry.'
+      ],
+      recommendations: [
+        'Add input validation with Joi or Zod on all API routes before business logic.',
+        'Implement token blacklist (Redis set) on logout to invalidate stolen tokens.',
+        'Add inter-service mTLS or shared secret headers to prevent unauthorized internal calls.'
       ]
     }
   };
@@ -358,11 +427,7 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
     setLoading(true);
     setTimeout(() => {
       setLoading(false);
-      if (fileType === 'images') {
-        setImgResult(MOCK_IMG_RESULT);
-        saveToHistory('images', MOCK_IMG_RESULT, 'Sample: Images');
-        toast.success("Loaded Image Sample");
-      } else if (fileType === 'code') {
+      if (fileType === 'code') {
         setCodeResult(MOCK_CODE_RESULT);
         saveToHistory('code', MOCK_CODE_RESULT, 'Sample: Codebase');
         toast.success("Loaded Codebase Sample");
@@ -797,42 +862,69 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
                 {/* Code Analysis Result */}
                 {codeResult && (
                   <div className="code-analysis-view">
-                    {/* Technical Analysis Stats Card */}
-                    {codeResult.metadata && (
-                      <div className="result-card technical-stats-card">
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-                          <h4 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '10px', color: '#fb8c36', fontSize: '18px' }}>
-                            <Activity size={20} /> Technical Analysis Insight
+                    {/* ── Analysis run stats strip ── */}
+                    <div style={{ display: 'flex', gap: '10px', alignItems: 'stretch', flexWrap: 'wrap' }}>
+                      {[
+                        {
+                          icon: <Clock size={13} />,
+                          label: 'Analysis time',
+                          value: `${(codeResult.metadata?.total_duration_sec || 0).toFixed(1)}s`,
+                          sub: '3-pass pipeline',
+                        },
+                        {
+                          icon: <FileText size={13} />,
+                          label: 'Files scanned',
+                          value: codeResult.file_count.toLocaleString(),
+                          sub: `${codeResult.metadata?.nodes_count ?? 0} source files parsed`,
+                        },
+                        {
+                          icon: <Network size={13} />,
+                          label: 'Diagram',
+                          value: `${codeResult.architecture?.nodes?.length ?? 0} nodes`,
+                          sub: `${codeResult.architecture?.groups?.length ?? 0} groups · ${codeResult.architecture?.edges?.length ?? 0} edges`,
+                        },
+                        {
+                          icon: <Zap size={13} />,
+                          label: 'LLM tokens used',
+                          value: (codeResult.metadata?.total_tokens ?? 0).toLocaleString(),
+                          sub: `${(codeResult.metadata?.input_tokens ?? 0).toLocaleString()} in / ${(codeResult.metadata?.output_tokens ?? 0).toLocaleString()} out`,
+                        },
+                        {
+                          icon: <Cpu size={13} />,
+                          label: 'Model',
+                          value: (codeResult.metadata?.arch_model ?? 'Groq Llama 3').replace('llama-3.3-70b-versatile', 'Llama 3.3 70B'),
+                          sub: 'via Groq',
+                        },
+                      ].map((s, i) => (
+                        <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '10px', padding: '8px 12px', flex: '1 1 130px', minWidth: 0 }}>
+                          <span style={{ color: '#fb8c36', flexShrink: 0, opacity: 0.8 }}>{s.icon}</span>
+                          <div style={{ minWidth: 0 }}>
+                            <div style={{ fontSize: '9px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '1px' }}>{s.label}</div>
+                            <div style={{ fontSize: '12px', fontWeight: 700, color: '#f1f5f9', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{s.value}</div>
+                            <div style={{ fontSize: '9px', color: '#475569', marginTop: '1px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{s.sub}</div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* ── Architecture Map: full-width, zoomable, right after metrics ── */}
+                    {(codeResult.architecture?.nodes?.length ?? 0) > 0 && (
+                      <div className="result-card" style={{ padding: 0, overflow: 'hidden' }}>
+                        <div style={{ padding: '20px 24px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid #1e293b' }}>
+                          <h4 style={{ margin: 0, color: '#fb8c36', fontSize: '16px', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <Network size={18} /> System Architecture Map
                           </h4>
-                          <span className="premium-cluster-badge" style={{ background: 'rgba(251, 140, 54, 0.1)', color: '#fb8c36', border: '1px solid rgba(251, 140, 54, 0.2)' }}>
-                            Execution Trace
+                          <span style={{ fontSize: 11, color: '#475569' }}>
+                            {codeResult.architecture.groups?.length ?? 0} groups · {codeResult.architecture.nodes.length} nodes · {codeResult.architecture.edges?.length ?? 0} edges
                           </span>
                         </div>
-                        
-                        <div className="stats-info-grid">
-                          <div className="stat-info-item">
-                            <div className="label"><Clock size={12} /> Duration</div>
-                            <div className="value">{(codeResult.metadata.total_duration_sec || 0).toFixed(1)}s</div>
-                          </div>
-                          <div className="stat-info-item">
-                            <div className="label"><Network size={12} /> Graph Complexity</div>
-                            <div className="value">{codeResult.metadata.nodes_count} Nodes / {codeResult.metadata.edges_count} Edges</div>
-                          </div>
-                          <div className="stat-info-item">
-                            <div className="label"><Zap size={12} /> LLM Tokens</div>
-                            <div className="value">{codeResult.metadata.total_tokens.toLocaleString()}</div>
-                            <div className="sub-value" style={{ fontSize: '10px', opacity: 0.6, marginTop: '2px' }}>
-                              {codeResult.metadata.input_tokens.toLocaleString()} in / {codeResult.metadata.output_tokens.toLocaleString()} out
-                            </div>
-                          </div>
-                          <div className="stat-info-item">
-                            <div className="label"><Cpu size={12} /> Primary Engine</div>
-                            <div className="value" style={{ fontSize: '14px' }}>{codeResult.metadata.arch_model?.replace('llama-3.3-70b-versatile', 'Llama 3.3 (70B)') || 'Groq Llama 3'}</div>
-                          </div>
+                        <div style={{ height: 540, background: '#020617' }}>
+                          <MermaidDiagram chart={generateMermaidGraph(codeResult.architecture)} />
                         </div>
                       </div>
                     )}
 
+                    {/* ── Summary + Patterns + Tech stack | Process Flow ── */}
                     <div className="viz-row">
                         <div className="result-card" style={{ flex: 1 }}>
                           <div className="summary-section">
@@ -840,93 +932,196 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
                             <p>{codeResult.architecture?.summary}</p>
                           </div>
 
+                          {/* Tech stack chips */}
+                          {(codeResult.architecture?.tech_stack?.length ?? 0) > 0 && (
+                            <div style={{ marginTop: '16px', display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                              {codeResult.architecture.tech_stack.map((t, i) => (
+                                <span key={i} className="chip" style={{ background: 'rgba(99,102,241,0.1)', color: '#a5b4fc', borderColor: 'rgba(99,102,241,0.3)', padding: '4px 10px', fontSize: '11px' }}>
+                                  {t}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+
                           {codeResult.architecture?.detected_patterns && codeResult.architecture.detected_patterns.length > 0 && (
-                            <div style={{ marginTop: '24px' }}>
-                              <h4 style={{ color: '#fb8c36', fontSize: '14px', fontWeight: 700, marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Detected Design Patterns</h4>
+                            <div style={{ marginTop: '16px' }}>
                               <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                                 {codeResult.architecture.detected_patterns.map((p, i) => (
-                                  <span key={i} className="chip" style={{ background: 'rgba(251, 140, 54, 0.1)', color: '#fb8c36', borderColor: 'rgba(251, 140, 54, 0.3)', padding: '6px 12px' }}>
-                                    <Sparkles size={12} /> {p}
+                                  <span key={i} className="chip" style={{ background: 'rgba(251, 140, 54, 0.1)', color: '#fb8c36', borderColor: 'rgba(251, 140, 54, 0.3)', padding: '4px 10px', fontSize: '11px' }}>
+                                    <Sparkles size={10} /> {p}
                                   </span>
                                 ))}
                               </div>
                             </div>
                           )}
                           
-                          <h4 style={{ color: '#fb8c36', marginTop: '32px', marginBottom: '16px', fontSize: '16px', fontWeight: 700 }}>Architecture Components</h4>
-                          <div className="components-grid">
-                            {codeResult.architecture?.components?.map(c => (
-                              <div key={c.id} className="comp-item">
-                                <strong>{c.name}</strong>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                                  <span style={{ fontSize: '10px', color: '#94a3b8', fontWeight: 700 }}>{c.type}</span>
-                                  <span style={{ color: '#60a5fa', fontSize: '10px', fontWeight: 700 }}>{c.layer}</span>
-                                </div>
-                                <p>{c.description}</p>
-                                {c.files && c.files.length > 0 && (
-                                  <div style={{ marginTop: '12px', display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                                    {c.files.slice(0, 5).map((f: any, i: number) => <span key={i} className="chip" style={{ fontSize: '10px', padding: '2px 8px' }}>{f.split('/').pop()}</span>)}
-                                    {c.files.length > 5 && <span className="chip" style={{ background: 'rgba(255,255,255,0.05)', color: '#94a3b8', fontSize: '10px', padding: '2px 8px' }}>+{c.files.length - 5}</span>}
-                                  </div>
-                                )}
-                              </div>
-                            ))}
-                          </div>
+                          {/* Node cards grouped by group */}
+                          {(() => {
+                            const nodes = codeResult.architecture?.nodes ?? [];
+                            const groups = codeResult.architecture?.groups ?? [];
+                            if (nodes.length === 0) return null;
+                            const groupMap = Object.fromEntries(groups.map(g => [g.id, g.label]));
+                            const TONE_COLORS: Record<string, string> = {
+                              toneBlue: '#3b82f6', toneAmber: '#f59e0b', toneMint: '#10b981',
+                              toneRose: '#f43f5e', toneIndigo: '#6366f1', toneTeal: '#14b8a6',
+                            };
+                            const groupColor = (gid: string) => {
+                              const idx = groups.findIndex(g => g.id === gid);
+                              return Object.values(TONE_COLORS)[idx % 6] ?? '#64748b';
+                            };
+                            // group nodes by group_id
+                            const sections: { label: string; color: string; nodes: any[] }[] = [];
+                            groups.forEach(g => {
+                              const members = nodes.filter(n => n.group_id === g.id);
+                              if (members.length) sections.push({ label: g.label, color: groupColor(g.id), nodes: members });
+                            });
+                            const ungrouped = nodes.filter(n => !n.group_id || !groupMap[n.group_id]);
+                            if (ungrouped.length) sections.push({ label: 'Other', color: '#64748b', nodes: ungrouped });
 
-                          {codeResult.architecture?.connections && codeResult.architecture.connections.length > 0 && (
-                            <>
-                              <h4 style={{ color: '#fb8c36', marginTop: '32px', marginBottom: '16px', fontSize: '16px', fontWeight: 700 }}>Interactive Legend</h4>
-                              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                                {codeResult.architecture.connections.map((conn, idx) => {
-                                  const src = codeResult.architecture.components.find(c => c.id === conn.source)?.name || conn.source;
-                                  const tgt = codeResult.architecture.components.find(c => c.id === conn.target)?.name || conn.target;
-                                  return (
-                                    <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: '13px', background: 'rgba(255,255,255,0.02)', padding: '12px 16px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
-                                      <span style={{ color: '#60a5fa', fontWeight: 'bold' }}>{src}</span>
-                                      <ArrowRight size={14} color="#94a3b8" />
-                                      <span style={{ color: '#4ade80', fontWeight: 'bold' }}>{tgt}</span>
-                                      <span style={{ color: '#94a3b8', fontStyle: 'italic', marginLeft: 'auto', fontSize: '12px' }}>{conn.description}</span>
+                            return sections.map(sec => (
+                              <div key={sec.label} style={{ marginTop: '24px' }}>
+                                <h4 style={{ color: sec.color, fontSize: '13px', fontWeight: 700, marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                  <span style={{ width: '10px', height: '10px', borderRadius: '2px', background: sec.color, display: 'inline-block' }} />
+                                  {sec.label}
+                                </h4>
+                                <div className="components-grid">
+                                  {sec.nodes.map(n => (
+                                    <div key={n.id} className="comp-item" style={{ borderColor: sec.color + '33' }}>
+                                      <strong style={{ color: '#f1f5f9' }}>{n.label}</strong>
+                                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '6px 0 8px' }}>
+                                        <span style={{ fontSize: '10px', color: '#94a3b8', fontWeight: 700 }}>{n.type}</span>
+                                        {n.shape && n.shape !== 'box' && <span style={{ color: sec.color, fontSize: '10px', fontWeight: 700 }}>{n.shape}</span>}
+                                      </div>
+                                      <p style={{ color: '#94a3b8', fontSize: '12px', margin: 0 }}>{n.description}</p>
+                                      {n.path && (
+                                        <div style={{ marginTop: '10px' }}>
+                                          <span className="chip" style={{ fontSize: '10px', padding: '2px 8px', color: sec.color, borderColor: sec.color + '44' }}>{n.path.split('/').pop()}</span>
+                                        </div>
+                                      )}
                                     </div>
-                                  )
-                                })}
+                                  ))}
+                                </div>
                               </div>
+                            ));
+                          })()}
 
-                              <h4 style={{ color: '#fb8c36', marginTop: '32px', marginBottom: '16px', fontSize: '16px', fontWeight: 700 }}>System Architecture Map</h4>
-                              <div style={{ background: '#020617', padding: '24px', borderRadius: '16px', border: '1px solid #1e293b', boxShadow: 'inset 0 2px 10px rgba(0,0,0,0.5)' }}>
-                                <MermaidDiagram chart={generateMermaidGraph(codeResult.architecture)} />
-                              </div>
-                            </>
-                          )}
                         </div>
 
-                        <div className="result-card" style={{ width: '320px' }}>
-                          <h4 style={{ color: '#fb8c36', marginTop: 0, fontSize: '18px', fontWeight: 700 }}>Process Flow</h4>
+                        {/* Process Flow — alongside summary */}
+                        <div className="result-card" style={{ width: '300px', flexShrink: 0 }}>
+                          <h4 style={{ color: '#fb8c36', marginTop: 0, fontSize: '16px', fontWeight: 700 }}>Process Flow</h4>
                           <div className="timeline-list">
                             {codeResult.details?.flow?.map(f => (
                               <div key={f.step} className="timeline-item" style={{ border: 'none', background: 'transparent', paddingLeft: 0 }}>
                                 <span className="date" style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '1px' }}>Step {f.step}</span>
-                                <span className="desc" style={{ display: 'block', marginTop: '6px', lineHeight: 1.5, color: '#94a3b8' }}>{f.description}</span>
+                                <span className="desc" style={{ display: 'block', marginTop: '4px', lineHeight: 1.5, color: '#94a3b8', fontSize: '12px' }}>{f.description}</span>
                               </div>
                             ))}
                           </div>
                         </div>
                     </div>
+
+                    {/* ── Components full-width ── */}
+                    {(codeResult.architecture?.nodes?.length ?? 0) > 0 && (() => {
+                      const nodes = codeResult.architecture.nodes;
+                      const groups = codeResult.architecture.groups ?? [];
+                      const groupMap = Object.fromEntries(groups.map(g => [g.id, g.label]));
+                      const TONE_COLORS: Record<string, string> = {
+                        toneBlue: '#3b82f6', toneAmber: '#f59e0b', toneMint: '#10b981',
+                        toneRose: '#f43f5e', toneIndigo: '#6366f1', toneTeal: '#14b8a6',
+                      };
+                      const groupColor = (gid: string) => Object.values(TONE_COLORS)[groups.findIndex(g => g.id === gid) % 6] ?? '#64748b';
+                      const sections: { label: string; color: string; nodes: any[] }[] = [];
+                      groups.forEach(g => {
+                        const members = nodes.filter(n => n.group_id === g.id);
+                        if (members.length) sections.push({ label: g.label, color: groupColor(g.id), nodes: members });
+                      });
+                      const ungrouped = nodes.filter(n => !n.group_id || !groupMap[n.group_id]);
+                      if (ungrouped.length) sections.push({ label: 'Other', color: '#64748b', nodes: ungrouped });
+
+                      return (
+                        <div className="result-card">
+                          <h4 style={{ color: '#fb8c36', marginTop: 0, marginBottom: '20px', fontSize: '16px', fontWeight: 700 }}>Architecture Components</h4>
+                          {sections.map(sec => (
+                            <div key={sec.label} style={{ marginBottom: '20px' }}>
+                              <div style={{ fontSize: '11px', fontWeight: 700, color: sec.color, textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: 6 }}>
+                                <span style={{ width: 8, height: 8, borderRadius: 2, background: sec.color, display: 'inline-block' }} />
+                                {sec.label}
+                              </div>
+                              <div className="components-grid">
+                                {sec.nodes.map(n => (
+                                  <div key={n.id} className="comp-item" style={{ borderColor: sec.color + '33' }}>
+                                    <strong style={{ color: '#f1f5f9', fontSize: '13px' }}>{n.label}</strong>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '4px 0 6px' }}>
+                                      <span style={{ fontSize: '10px', color: '#94a3b8' }}>{n.type}</span>
+                                      {n.shape && n.shape !== 'box' && <span style={{ color: sec.color, fontSize: '10px', fontWeight: 700 }}>{n.shape}</span>}
+                                    </div>
+                                    <p style={{ color: '#94a3b8', fontSize: '12px', margin: 0 }}>{n.description}</p>
+                                    {n.path && <span className="chip" style={{ marginTop: 8, fontSize: '10px', padding: '2px 8px', color: sec.color, borderColor: sec.color + '44', display: 'inline-block' }}>{n.path.split('/').pop()}</span>}
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      );
+                    })()}
+
+                    {/* ── Data flows + Debt + Risks in one row ── */}
+                    <div className="viz-row">
+                      {(codeResult.architecture?.edges?.length ?? 0) > 0 && (
+                        <div className="result-card" style={{ flex: 1 }}>
+                          <h4 style={{ color: '#fb8c36', marginTop: 0, marginBottom: '14px', fontSize: '15px', fontWeight: 700 }}>Data Flows</h4>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                            {codeResult.architecture.edges.map((e, idx) => {
+                              const srcNode = codeResult.architecture.nodes.find(n => n.id === e.source);
+                              const tgtNode = codeResult.architecture.nodes.find(n => n.id === e.target);
+                              return (
+                                <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', background: 'rgba(255,255,255,0.02)', padding: '8px 12px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                                  <span style={{ color: '#60a5fa', fontWeight: 600 }}>{srcNode?.label ?? e.source}</span>
+                                  <ArrowRight size={11} color={e.style === 'dashed' ? '#64748b' : '#fb8c36'} />
+                                  <span style={{ color: '#4ade80', fontWeight: 600 }}>{tgtNode?.label ?? e.target}</span>
+                                  {e.label && <span style={{ color: '#64748b', fontStyle: 'italic', marginLeft: 'auto', fontSize: '10px' }}>{e.label}</span>}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+                      {codeResult.details?.tech_debt && codeResult.details.tech_debt.length > 0 && (
+                        <div className="result-card" style={{ flex: 1, border: '1px solid rgba(244,114,182,0.3)' }}>
+                          <h4 style={{ color: '#f472b6', marginTop: 0, fontSize: '15px', fontWeight: 700 }}>Technical Debt</h4>
+                          <ul style={{ margin: '10px 0 0', paddingLeft: '18px', color: '#cbd5e1', fontSize: '12px', lineHeight: 1.6 }}>
+                            {codeResult.details.tech_debt.map((dt, i) => <li key={i}>{dt}</li>)}
+                          </ul>
+                        </div>
+                      )}
+                      {codeResult.details?.security_risks && codeResult.details.security_risks.length > 0 && (
+                        <div className="result-card" style={{ flex: 1, border: '1px solid rgba(239,68,68,0.3)' }}>
+                          <h4 style={{ color: '#f87171', marginTop: 0, fontSize: '15px', fontWeight: 700 }}>Security Risks</h4>
+                          <ul style={{ margin: '10px 0 0', paddingLeft: '18px', color: '#cbd5e1', fontSize: '12px', lineHeight: 1.6 }}>
+                            {codeResult.details.security_risks.map((sr, i) => <li key={i}>{sr}</li>)}
+                          </ul>
+                        </div>
+                      )}
+                    </div>
                     
+                    {/* ── Key files ── */}
                     {codeResult.details?.key_files && codeResult.details.key_files.length > 0 && (
                       <div className="result-card">
-                        <h4 style={{ color: '#fb8c36', marginTop: 0, marginBottom: '24px', fontSize: '18px', fontWeight: 700 }}>Deep Analysis: Core Modules</h4>
+                        <h4 style={{ color: '#fb8c36', marginTop: 0, marginBottom: '20px', fontSize: '16px', fontWeight: 700 }}>Deep Analysis: Core Modules</h4>
                         <div className="key-files-grid">
                           {codeResult.details.key_files.map((kf, i) => (
                             <div key={i} className="key-file-card">
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
-                                <FileText size={16} color="#fb8c36" />
-                                <div style={{ fontWeight: '700', color: '#f1f5f9', fontSize: '14px' }}>{kf.file_path}</div>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
+                                <FileText size={14} color="#fb8c36" />
+                                <div style={{ fontWeight: '700', color: '#f1f5f9', fontSize: '13px' }}>{kf.file_path}</div>
                               </div>
-                              <p style={{ color: '#94a3b8', fontSize: '13px', marginBottom: '16px', lineHeight: 1.6 }}>{kf.summary}</p>
+                              <p style={{ color: '#94a3b8', fontSize: '12px', marginBottom: '12px', lineHeight: 1.5 }}>{kf.summary}</p>
                               {kf.key_functions && kf.key_functions.length > 0 && (
-                                <div style={{ background: 'rgba(0,0,0,0.2)', padding: '12px', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.03)' }}>
-                                  <div style={{ fontSize: '10px', color: '#fb8c36', textTransform: 'uppercase', marginBottom: '8px', letterSpacing: '1px', fontWeight: 800 }}>Primary Methods</div>
-                                  <ul style={{ margin: 0, paddingLeft: '16px', color: '#cbd5e1', fontSize: '12px', lineHeight: 1.6 }}>
+                                <div style={{ background: 'rgba(0,0,0,0.2)', padding: '10px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.03)' }}>
+                                  <div style={{ fontSize: '10px', color: '#fb8c36', textTransform: 'uppercase', marginBottom: '6px', letterSpacing: '1px', fontWeight: 800 }}>Methods</div>
+                                  <ul style={{ margin: 0, paddingLeft: '14px', color: '#cbd5e1', fontSize: '11px', lineHeight: 1.5 }}>
                                     {kf.key_functions.map((func, j) => <li key={j}>{func}</li>)}
                                   </ul>
                                 </div>
@@ -934,36 +1129,6 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
                             </div>
                           ))}
                         </div>
-                      </div>
-                    )}
-
-                    {((codeResult.details?.tech_debt && codeResult.details.tech_debt.length > 0) || 
-                      (codeResult.details?.security_risks && codeResult.details.security_risks.length > 0)) && (
-                      <div className="viz-row" style={{ marginTop: '0px' }}>
-                        {codeResult.details?.tech_debt && codeResult.details.tech_debt.length > 0 && (
-                          <div className="result-card" style={{ flex: 1, border: '1px solid rgba(244, 114, 182, 0.3)' }}>
-                            <h4 style={{ color: '#f472b6', marginTop: 0, display: 'flex', alignItems: 'center', gap: '6px' }}>
-                               Technical Debt
-                            </h4>
-                            <ul style={{ margin: '15px 0 0', paddingLeft: '20px', color: '#cbd5e1', fontSize: '12px', lineHeight: 1.6 }}>
-                              {codeResult.details.tech_debt.map((dt: any, i: number) => (
-                                <li key={i}>{dt}</li>
-                              ))}
-                            </ul>
-                          </div>
-                        )}
-                        {codeResult.details?.security_risks && codeResult.details.security_risks.length > 0 && (
-                          <div className="result-card" style={{ flex: 1, border: '1px solid rgba(239, 68, 68, 0.3)' }}>
-                            <h4 style={{ color: '#f87171', marginTop: 0, display: 'flex', alignItems: 'center', gap: '6px' }}>
-                               Security Risks
-                            </h4>
-                            <ul style={{ margin: '15px 0 0', paddingLeft: '20px', color: '#cbd5e1', fontSize: '12px', lineHeight: 1.6 }}>
-                              {codeResult.details.security_risks.map((sr: any, i: number) => (
-                                <li key={i}>{sr}</li>
-                              ))}
-                            </ul>
-                          </div>
-                        )}
                       </div>
                     )}
                   </div>

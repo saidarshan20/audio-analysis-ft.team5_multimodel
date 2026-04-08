@@ -20,31 +20,44 @@ export interface TextAnalysisResult {
   locations: Array<{ name: string; lat: number; lng: number }>;
 }
 
+export interface DiagramGroup {
+  id: string;
+  label: string;
+}
+
+export interface DiagramNode {
+  id: string;
+  label: string;
+  type: string;
+  description: string;
+  group_id: string;
+  path?: string;
+  shape: 'box' | 'database' | 'queue' | 'document' | 'circle' | 'hexagon';
+}
+
+export interface DiagramEdge {
+  source: string;
+  target: string;
+  label: string;
+  style: 'solid' | 'dashed';
+}
+
 export interface CodeAnalysisResult {
   filename: string;
   file_count: number;
   architecture: {
     title: string;
     summary: string;
+    tech_stack: string[];
     detected_patterns: string[];
-    components: Array<{
-      id: string;
-      name: string;
-      type: string;
-      layer: string; // presentation | application | domain | infrastructure | other
-      description: string;
-      files: string[];
-    }>;
-    connections: Array<{
-      source: string;
-      target: string;
-      type: string;
-      description: string;
-    }>;
+    groups: DiagramGroup[];
+    nodes: DiagramNode[];
+    edges: DiagramEdge[];
   };
   details: {
     key_files: Array<{
       file_path: string;
+      component: string;
       summary: string;
       key_functions: string[];
     }>;
@@ -54,6 +67,7 @@ export interface CodeAnalysisResult {
     }>;
     tech_debt?: string[];
     security_risks?: string[];
+    recommendations?: string[];
   };
   metadata?: {
     nodes_count: number;

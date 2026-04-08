@@ -57,32 +57,41 @@ class TextAnalysisResponse(BaseModel):
 #  Code Analysis Models
 # ──────────────────────────────────────────────
 
-class Component(BaseModel):
+class DiagramGroup(BaseModel):
     id: str
-    name: str
-    type: str  # frontend | backend | api | database | service | config | other
-    layer: str = "other"  # presentation | application | domain | infrastructure | other
-    description: str
-    files: list[str]
+    label: str
 
 
-class Connection(BaseModel):
-    source: str  # component id
-    target: str  # component id
-    type: str  # import | api_call | data_flow | config
-    description: str
+class DiagramNode(BaseModel):
+    id: str
+    label: str
+    type: str = ""
+    description: str = ""
+    group_id: str = ""
+    path: str = ""
+    shape: str = "box"  # box | database | queue | document | circle | hexagon
+
+
+class DiagramEdge(BaseModel):
+    source: str
+    target: str
+    label: str = ""
+    style: str = "solid"  # solid | dashed
 
 
 class CodeArchResult(BaseModel):
     title: str
     summary: str
+    tech_stack: list[str] = Field(default_factory=list)
     detected_patterns: list[str] = Field(default_factory=list)
-    components: list[Component]
-    connections: list[Connection]
+    groups: list[DiagramGroup] = Field(default_factory=list)
+    nodes: list[DiagramNode] = Field(default_factory=list)
+    edges: list[DiagramEdge] = Field(default_factory=list)
 
 
 class KeyFile(BaseModel):
     file_path: str
+    component: str = ""
     summary: str
     key_functions: list[str]
 
@@ -97,6 +106,7 @@ class CodeDetailResult(BaseModel):
     flow: list[FlowStep]
     tech_debt: list[str] = Field(default_factory=list)
     security_risks: list[str] = Field(default_factory=list)
+    recommendations: list[str] = Field(default_factory=list)
 
 
 class CodeAnalysisResponse(BaseModel):

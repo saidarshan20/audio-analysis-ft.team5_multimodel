@@ -53,82 +53,117 @@ CONFIG_FILES = {
     "tsconfig.json", "vite.config.ts", "next.config.js", "cargo.toml",
 }
 
-MAX_FILE_LINES = 250        # cap per file for Pass 2 (NVIDIA benefit)
-MAX_IMPORTANT_FILES = 15     # how many files to send in Pass 2 (NVIDIA benefit)
-MAX_FILE_SIZE_BYTES = 25_000  # allow slightly larger files
+MAX_FILE_LINES = 350        # cap per file for Pass 2
+MAX_IMPORTANT_FILES = 20     # how many files to send in Pass 2
+MAX_FILE_SIZE_BYTES = 30_000  # allow slightly larger files
 
 
 # ─────────────────── Prompts ───────────────────
 
-ARCH_SYSTEM_PROMPT = """You are a senior software architect.
+EXPLANATION_SYSTEM_PROMPT = """You are a principal software engineer analyzing a codebase from its file dependency graph.
 
-Your task is to analyze an AST DEPENDENCY GRAPH representing codebase files and functions to produce a clean, semantic architectural map.
+You will receive file paths organized with their local imports, exported functions, and classes.
 
-IMPORTANT RULES:
-- **Avoid Vague Containers**: Do NOT name a component "Presentation Layer". Instead, identify the actual physical entities (e.g., "Web Storefront", "Auth Controller", "Prisma Database", "FastAPI Server").
-- **Physical Mapping**: Map related files to their corresponding logical component. If multiple files (e.g., `user_routes.py`, `user_schema.py`) form a feature, group them into a single component like "User Management Service".
-- **Detect entry points**: Use the provided `entry_points` and `top_central_files` to anchor the diagram.
-- **Layers**: Assign these components to one of the following architectural layers (but name the component specifically):
-  - **Presentation**: UI components, API routes, Controllers.
-  - **Application**: Business services, Orchestrators, Use cases.
-  - **Domain**: Core models, Entities, Pure logic.
-  - **Infrastructure**: Database clients, External API wrappers, Middleware.
-- **Design Patterns**: Note any patterns (e.g., Factory, Singleton, Observer, Middleware).
-- Return ONLY valid JSON.
+Write a concise architectural explanation covering:
+1. What is the purpose of this system?
+2. What are the 3-6 main subsystems and their responsibilities? Reference actual directory names and file names.
+3. What are the key data flows (e.g. HTTP request → route handler → service → DB → response)?
+4. What tech stack is visible from file names, imports, and config files?
+5. Any notable architectural patterns (REST API, layered architecture, event-driven, etc.)?
+
+Rules:
+- 8-14 short, concrete paragraphs
+- Reference actual file names and directories — be specific to this repo
+- Do NOT output Mermaid, JSON, or code blocks
+- Do NOT list every single file — identify logical groupings only
+"""
+
+ARCH_SYSTEM_PROMPT = """You are a repository-to-graph planner. You will receive a plain-English explanation of the codebase and a list of actual file paths.
+
+Produce an opinionated, high-signal architecture graph — not an inventory dump.
+
+STRICT CONSTRAINTS:
+- groups: 2-8 (logical subsystems, e.g. "Frontend", "API Routes", "Core Services", "Data Layer")
+- nodes: 14-24 (architecturally significant components only — skip tests, lock files, trivial utils)
+- edges: 10-30 (meaningful flows: data, control, imports, API calls)
+- Node labels: 1-4 words, specific (e.g. "JWT Auth Service", "SQLite Store", "UMAP Clusterer")
+- Edge labels: 1-4 words (e.g. "REST call", "imports", "SQL query", "streams to")
+
+SHAPES (use sparingly, only where semantically meaningful):
+- "database" — persistent storage, DB access layer
+- "queue" — async queues, event buses, background workers
+- "hexagon" — external third-party APIs (OpenAI, Stripe, GitHub API, etc.)
+- "circle" — central orchestrators or entry points
+- "box" — default for everything else
+
+PATH RULE: Only set "path" if a single specific file maps cleanly to this node AND that path appears in the file list provided. Leave path empty otherwise.
+STYLE RULE: "dashed" edges for optional/async/event flows; "solid" for direct imports and API calls.
+
+Return ONLY valid JSON. No markdown, no comments, no explanation outside the JSON.
 
 SCHEMA:
 {
-  "title": "string",
-  "summary": "2-3 sentence high-level description",
-  "detected_patterns": ["Pattern Name 1"],
-  "components": [
+  "title": "string — specific project name or purpose",
+  "summary": "3-4 sentence technical description covering purpose, tech, and architectural style",
+  "tech_stack": ["FastAPI", "React", "LangChain"],
+  "detected_patterns": ["Router Pattern", "JWT Auth", "Repository Pattern"],
+  "groups": [
+    {"id": "kebab-case-id", "label": "Human Readable Group Name"}
+  ],
+  "nodes": [
     {
-      "id": "string",
-      "name": "Specific Name (e.g. Auth Service)",
-      "type": "frontend | backend | api | database | service | config | other",
-      "layer": "presentation | application | domain | infrastructure | other",
-      "description": " technical role",
-      "files": ["file_path"]
+      "id": "kebab-case-unique-id",
+      "label": "Short Node Name",
+      "type": "concise type (e.g. FastAPI router, SQLite store, React page)",
+      "description": "1 sentence role",
+      "group_id": "group-id-or-empty-string",
+      "path": "relative/file/path.py",
+      "shape": "box"
     }
   ],
-  "connections": [
+  "edges": [
     {
-      "source": "component_id",
-      "target": "component_id",
-      "type": "import | api_call | data_flow | config",
-      "description": "how they interact"
+      "source": "node-id",
+      "target": "node-id",
+      "label": "short label",
+      "style": "solid"
     }
   ]
 }"""
 
-DETAIL_SYSTEM_PROMPT = """You are a lead engineer explaining a codebase to a new architect.
+DETAIL_SYSTEM_PROMPT = """You are a lead engineer doing a deep technical review of a codebase for a new architect.
 
-Your task is to analyze the provided code snippets and the architecture context to explain HOW components interact and WHY specific logic exists.
+You receive: (1) an architecture map with components and connections, (2) annotated source files showing which component each file belongs to.
 
-IMPORTANT RULES:
-- Focus on **Critical Paths**: Explain the lifecycle of a request or the core data transformation.
-- Highlight **Technical Debt**, hardcodes, or missing abstractions.
-- Flag **Security Vulnerabilities** like N+1 queries, unvalidated inputs, or missing auth layers.
-- Explain component **Collaboration**: How does Component A use Component B?
-- Keep output concise and strictly JSON.
+YOUR TASK:
+- Trace the **primary request lifecycle** end-to-end (e.g., HTTP request → route → service → DB → response).
+- For each key file, explain its **concrete role** — what it owns, what it delegates, and why.
+- List **key_functions** with their actual function names and what they do technically.
+- Flag **tech_debt**: hardcoded values, missing abstractions, duplicated logic, synchronous blocking in async code.
+- Flag **security_risks**: missing auth checks, unvalidated inputs, weak hashing, token storage issues, SQL injection vectors.
+- Add **recommendations**: concrete, prioritized improvements (e.g., "Replace SHA-256 with bcrypt for password hashing").
+- Be specific — reference actual function names, file paths, and line-level details where visible.
+- Return ONLY valid JSON — no markdown, no prose.
 
 SCHEMA:
 {
   "key_files": [
     {
-      "file_path": "string",
-      "summary": "Deep insight into this file's role",
-      "key_functions": ["func_name: detailed technical purpose"]
+      "file_path": "relative/path.py",
+      "component": "component name from architecture",
+      "summary": "2-3 sentence concrete explanation of this file's role",
+      "key_functions": ["function_name: what it does and why it matters"]
     }
   ],
   "flow": [
     {
-      "step": int,
-      "description": "High-detail technical step (e.g., 'API Route validates JWT via AuthMiddleware before hitting Service layer')"
+      "step": 1,
+      "description": "Specific technical step referencing actual functions/files (e.g., 'POST /auth/login → login() in auth_router.py → verify_password() in auth_utils.py → create_access_token() returns JWT')"
     }
   ],
-  "tech_debt": ["List item 1 of discovered tech debt"],
-  "security_risks": ["List item 1 of discovered security risks"]
+  "tech_debt": ["Specific item with file reference (e.g., 'auth_utils.py uses SHA-256 without salt — vulnerable to rainbow tables')"],
+  "security_risks": ["Specific risk with file reference and impact"],
+  "recommendations": ["Prioritized, actionable improvement with rationale"]
 }"""
 
 
@@ -152,6 +187,7 @@ class AnalysisState(TypedDict):
     repo_name: Optional[str]
     file_count: int
     graph_data: Optional[Dict[str, Any]]
+    explanation: Optional[str]
     architecture: Optional[Dict[str, Any]]
     details: Optional[Dict[str, Any]]
     status_message: str
@@ -186,8 +222,8 @@ def _get_langchain_model(force_groq: bool = True) -> ChatOpenAI:
             model=s.groq_model,
             openai_api_key=s.groq_api_key,
             openai_api_base="https://api.groq.com/openai/v1",
-            temperature=0.1,
-            timeout=60,
+            temperature=0,
+            timeout=90,
             max_retries=2
         )
     elif s.nvidia_api_key:
@@ -195,8 +231,8 @@ def _get_langchain_model(force_groq: bool = True) -> ChatOpenAI:
             model=s.nvidia_model,
             openai_api_key=s.nvidia_api_key,
             openai_api_base="https://integrate.api.nvidia.com/v1",
-            temperature=0.1,
-            timeout=60,
+            temperature=0,
+            timeout=90,
             max_retries=2
         )
     else:
@@ -205,8 +241,8 @@ def _get_langchain_model(force_groq: bool = True) -> ChatOpenAI:
             model=s.groq_model,
             openai_api_key=s.groq_api_key,
             openai_api_base="https://api.groq.com/openai/v1",
-            temperature=0.1,
-            timeout=60
+            temperature=0,
+            timeout=90
         )
 
 
@@ -220,18 +256,18 @@ class CodeAnalysisService:
 
     def _build_workflow(self):
         workflow = StateGraph(AnalysisState)
-        
-        # Add Nodes
+
         workflow.add_node("graphing", self.graphing_node)
+        workflow.add_node("explaining", self.explanation_node)
         workflow.add_node("architecting", self.arch_node)
         workflow.add_node("detailing", self.detail_node)
-        
-        # Define Edges (Linear Flow for MVP)
+
         workflow.set_entry_point("graphing")
-        workflow.add_edge("graphing", "architecting")
+        workflow.add_edge("graphing", "explaining")
+        workflow.add_edge("explaining", "architecting")
         workflow.add_edge("architecting", "detailing")
         workflow.add_edge("detailing", END)
-        
+
         return workflow.compile()
 
     # ─────────────────── LangGraph Nodes ───────────────────
@@ -250,26 +286,68 @@ class CodeAnalysisService:
         for _, _, files in os.walk(root_dir):
             file_count += len(files)
             
-        nodes_count = len(graph_data.get("nodes", []))
-        edges_count = len(graph_data.get("links", []))
-            
+        source_files_count = len(graph_data.get("file_nodes", []))
+        dependency_edges_count = len(graph_data.get("key_dependencies", []))
+
         return {
             "graph_data": graph_data,
             "file_count": file_count,
             "metadata": {
-                "nodes_count": nodes_count,
-                "edges_count": edges_count,
+                "nodes_count": source_files_count,
+                "edges_count": dependency_edges_count,
             },
             "status_message": "Codebase graphed via tree-sitter."
         }
 
-    async def arch_node(self, state: AnalysisState) -> Dict[str, Any]:
-        """Node 2: System-level Architecture Pass."""
-        logger.info("[LangGraph] Node: architecting started")
+    async def explanation_node(self, state: AnalysisState) -> Dict[str, Any]:
+        """Node 1.5: Generate plain-English explanation from file graph (gitdiagram pass 1)."""
+        logger.info("[LangGraph] Node: explaining started")
         graph_data = state["graph_data"]
-        graph_json = json.dumps(graph_data)
-        
-        user_msg = f"AST DEPENDENCY GRAPH (JSON node-link format):\n{graph_json}"
+        file_nodes = graph_data.get("file_nodes", [])
+        entry_points = set(graph_data.get("entry_points", []))
+
+        # Build a human-readable file tree with imports/exports
+        lines = []
+        for fn in file_nodes:
+            path = fn["path"]
+            tag = " [ENTRY POINT]" if path in entry_points else ""
+            line = f"  {path}{tag}"
+            items = []
+            if fn.get("classes"):
+                items.append(f"classes: {', '.join(fn['classes'][:5])}")
+            if fn.get("functions"):
+                items.append(f"fns: {', '.join(fn['functions'][:8])}")
+            if fn.get("imports"):
+                items.append(f"imports: {', '.join(fn['imports'][:5])}")
+            if items:
+                line += f"\n    → {' | '.join(items)}"
+            lines.append(line)
+
+        user_msg = f"FILE DEPENDENCY GRAPH:\n" + "\n".join(lines)
+        model = _get_langchain_model()
+        messages = [
+            SystemMessage(content=EXPLANATION_SYSTEM_PROMPT),
+            HumanMessage(content=user_msg),
+        ]
+        response = await model.ainvoke(messages)
+        explanation = str(response.content).strip()
+        logger.info("[LangGraph] Node: explaining done (%d chars)", len(explanation))
+        return {
+            "explanation": explanation,
+            "status_message": "Codebase architecture understood.",
+        }
+
+    async def arch_node(self, state: AnalysisState) -> Dict[str, Any]:
+        """Node 2: Graph planning pass — produces groups/nodes/edges JSON (gitdiagram pass 2)."""
+        logger.info("[LangGraph] Node: architecting started")
+        explanation = state.get("explanation", "")
+        graph_data = state["graph_data"]
+
+        # Flat file list for path grounding
+        file_nodes = graph_data.get("file_nodes", [])
+        file_list = "\n".join(fn["path"] for fn in file_nodes[:60])
+
+        user_msg = f"EXPLANATION:\n{explanation}\n\nFILE LIST (use these paths only):\n{file_list}"
         model = _get_langchain_model()
         
         messages = [
@@ -312,10 +390,31 @@ class CodeAnalysisService:
         logger.info("[LangGraph] Node: detailing started")
         root_dir = state["root_dir"]
         arch_data = state["architecture"]
-        
-        code_snippets = self.select_important_files(root_dir)
-        context = json.dumps(arch_data, indent=2)
-        user_msg = f"CONTEXT:\n{context}\n\nFILES:\n{code_snippets}"
+
+        # Build a file→node label lookup so the LLM knows which component each file belongs to
+        file_to_component: dict[str, str] = {}
+        for node in (arch_data or {}).get("nodes", []):
+            if node.get("path"):
+                file_to_component[node["path"]] = node["label"]
+
+        code_snippets = self.select_important_files(root_dir, file_to_component)
+
+        # Give the LLM focused architecture context (not full JSON dump)
+        arch_summary = {
+            "title": arch_data.get("title", ""),
+            "tech_stack": arch_data.get("tech_stack", []),
+            "groups": arch_data.get("groups", []),
+            "nodes": [
+                {"label": n["label"], "type": n.get("type", ""), "path": n.get("path", ""), "group_id": n.get("group_id", "")}
+                for n in arch_data.get("nodes", [])
+            ],
+            "edges": [
+                {"source": e["source"], "target": e["target"], "label": e.get("label", "")}
+                for e in arch_data.get("edges", [])
+            ],
+        }
+        context = json.dumps(arch_summary, indent=2)
+        user_msg = f"ARCHITECTURE:\n{context}\n\nSOURCE FILES (annotated with component):\n{code_snippets}"
         
         model = _get_langchain_model()
         messages = [
@@ -353,42 +452,41 @@ class CodeAnalysisService:
                 "repo_name": repo_name,
                 "file_count": 0,
                 "graph_data": None,
+                "explanation": None,
                 "architecture": None,
                 "details": None,
                 "status_message": "Initializing LangGraph workflow...",
                 "metadata": {},
                 "error": None
             }
-            
-            # Step trackers for local accumulation
+
             final_file_count = 0
             final_arch = None
             final_details = None
             final_metadata = {}
-            
-            # Use astream_events (v2) for granular progress (started/finished)
+
             step_map = {
                 "graphing": "graphing",
+                "explaining": "explaining",
                 "architecting": "arch",
-                "detailing": "details"
+                "detailing": "details",
             }
-            
+
             async for event in self._workflow.astream_events(initial_state, version="v2"):
                 kind = event["event"]
                 name = event["name"]
-                
-                # 1. Node Start: Notify user we are beginning work
+
                 if kind == "on_chain_start" and name in step_map:
-                    display_step = step_map[name]
                     messages = {
-                        "graphing": "Building codebase AST dependency graph...",
-                        "architecting": "Architecting system components (LLM reasoning)...",
-                        "detailing": "Performing deep file logic analysis (Pass 2)..."
+                        "graphing":    "Building codebase AST dependency graph...",
+                        "explaining":  "Understanding architecture (Pass 1)...",
+                        "architecting":"Planning architecture graph (Pass 2)...",
+                        "detailing":   "Deep file analysis (Pass 3)...",
                     }
                     yield {
                         "type": "progress",
-                        "step": display_step,
-                        "message": messages.get(name, f"Starting {name}...")
+                        "step": step_map[name],
+                        "message": messages.get(name, f"Starting {name}..."),
                     }
                 
                 # 2. Node Update: Capture state changes (final results for each node)
@@ -499,36 +597,87 @@ class CodeAnalysisService:
         top_files.sort(key=lambda x: x[1], reverse=True)
         top_central_files = [f[0] for f in top_files[:20]]
         
-        graph_data = builder.serialize_graph(max_nodes=100)
-        
         # Identify entry points for context
         entry_points = []
         for node in graph.nodes:
-             if graph.nodes[node].get("type") == "file":
-                 try:
-                     content = Path(root_dir).joinpath(node).read_text(errors="ignore")
-                     # simple check
-                     if any(pat in content for pat in ["if __name__ == '__main__':", "FastAPI(", "app.listen", "express()"]):
-                         entry_points.append(node)
-                 except: pass
+            if graph.nodes[node].get("type") == "file":
+                try:
+                    content = Path(root_dir).joinpath(node).read_text(errors="ignore")
+                    if any(pat in content for pat in [
+                        "if __name__ == '__main__':", "FastAPI(", "app.listen",
+                        "express()", "createApp(", "uvicorn.run("
+                    ]):
+                        entry_points.append(node)
+                except Exception:
+                    pass
+
+        # Build a clean file-level summary (no function/class/import-string nodes)
+        file_nodes = []
+        for node, data in graph.nodes(data=True):
+            if data.get("type") != "file":
+                continue
+            # Functions and classes defined in this file
+            functions = [
+                graph.nodes[s].get("name", s.split("::")[-1])
+                for s in graph.successors(node)
+                if graph.nodes[s].get("type") == "function"
+            ]
+            classes = [
+                graph.nodes[s].get("name", s.split("::")[-1])
+                for s in graph.successors(node)
+                if graph.nodes[s].get("type") == "class"
+            ]
+            # Local file imports (only other file nodes, not raw import strings)
+            local_imports = [
+                t for t in graph.successors(node)
+                if graph.nodes.get(t, {}).get("type") == "file"
+            ]
+            score = (
+                0.5 * in_degree.get(node, 0)
+                + 0.3 * out_degree.get(node, 0)
+                + 0.2 * betweenness.get(node, 0.0) * 100
+            )
+            file_nodes.append({
+                "path": node,
+                "ext": data.get("ext", ""),
+                "importance_score": round(score, 2),
+                "is_entry": node in entry_points,
+                "imports": local_imports[:10],
+                "functions": functions[:15],
+                "classes": classes[:10],
+            })
+
+        file_nodes.sort(key=lambda x: (x["is_entry"], x["importance_score"]), reverse=True)
+        top_file_nodes = file_nodes[:50]
+        top_paths = {f["path"] for f in top_file_nodes}
+
+        # Only edges between file-level nodes in the top set
+        key_dependencies = [
+            {"source": src, "target": tgt}
+            for src, tgt in graph.edges()
+            if src in top_paths
+            and tgt in top_paths
+            and graph.nodes.get(src, {}).get("type") == "file"
+            and graph.nodes.get(tgt, {}).get("type") == "file"
+        ][:80]
 
         enriched_data = {
             "entry_points": entry_points,
-            "top_central_files": top_central_files,
+            "top_central_files": top_central_files[:20],
             "graph_stats": {
-                "total_nodes": len(graph.nodes),
+                "total_file_nodes": len([n for n, d in graph.nodes(data=True) if d.get("type") == "file"]),
                 "total_edges": len(graph.edges),
             },
-            "nodes": graph_data.get("nodes", []),
-            "edges": graph_data.get("links", [])
+            "file_nodes": top_file_nodes,
+            "key_dependencies": key_dependencies,
         }
-        
+
         return json.dumps(enriched_data)
 
     # ── Important file selector ──
 
     @staticmethod
-    def select_important_files(root_dir: str) -> str:
+    def select_important_files(root_dir: str, file_to_component: dict[str, str] | None = None) -> str:
         """Read key source files and return them as a formatted string."""
         root = Path(root_dir)
         selected: list[tuple[str, str]] = []  # (relative_path, content)
@@ -653,10 +802,15 @@ class CodeAnalysisService:
                 content = cand["content"]
             selected.append((cand["path"], content))
 
-        # Format as snippets
+        # Format as snippets, annotated with component if known
+        file_to_component = file_to_component or {}
         parts: list[str] = []
         for rel_path, content in selected:
-            parts.append(f"### {rel_path}\n```\n{content}\n```\n")
+            component_label = file_to_component.get(rel_path, "")
+            header = f"### {rel_path}"
+            if component_label:
+                header += f"  [Component: {component_label}]"
+            parts.append(f"{header}\n```\n{content}\n```\n")
         return "\n".join(parts)
 
     # ── LLM calls ──
