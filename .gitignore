@@ -3,6 +3,10 @@ __pycache__/
 *.py[cod]
 *$py.class
 
+# Ignore FFmpeg binaries
+ffmpeg*
+ffmpeg-*    
+
 # Environments
 .venv/
 env/

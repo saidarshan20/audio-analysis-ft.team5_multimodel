@@ -42,3 +42,14 @@ Each team can run independently:
 cd modules/team5_multimodal
 python run_local.py   # → http://localhost:8005/docs
 ```
+## 🔧 FFmpeg Setup (Required for Audio Processing)
+
+Download FFmpeg from:
+https://www.gyan.dev/ffmpeg/builds/
+
+Extract into project root:
+
+audio-analysis-ft.team5_multimodel/
+└── ffmpeg-8.1-essentials_build/
+
+No need to add to PATH — the app config handles it.
