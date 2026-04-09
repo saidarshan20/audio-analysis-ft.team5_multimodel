@@ -1,8 +1,10 @@
-import { useState, useRef } from 'react';
-import { 
-  ArrowLeft, BarChart2, Database, Upload, Search, Loader2, FileText, Code2, 
+import { useState, useRef, useEffect } from 'react';
+import WaveSurfer from 'wavesurfer.js';
+import {
+  ArrowLeft, BarChart2, Database, Upload, Search, Loader2, FileText, Code2,
   Sparkles, Image as ImageIcon, FileSpreadsheet, Music, Video, ArrowRight,
-  Activity, Clock, Zap, Cpu, Network, MessageCircle, SearchCheck, Send, Layers
+  Activity, Clock, Zap, Cpu, Network, MessageCircle, SearchCheck, Send, Layers,
+  Play, Pause, Hash, MapPin
 } from 'lucide-react';
 import { toast } from 'sonner';
 import '../ToolPage.css';
@@ -14,12 +16,14 @@ import {
   askAboutImage,
   askAboutExistingImage,
   searchImages,
+  analyzeAudio,
   TextAnalysisResult,
   CodeAnalysisResult,
   MultiImageAnalysisResponse,
   ImageZipAnalysisResponse,
   ImageQAResponse,
-  ImageSearchResult
+  ImageSearchResult,
+  AudioAnalysisResponse,
 } from './services';
 import MermaidDiagram from "../../../../components/MermaidDiagram";
 
@@ -221,6 +225,9 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
   const [searchLoading, setSearchLoading] = useState(false);
   const [searchResults, setSearchResults] = useState<ImageSearchResult[]>([]);
   const [showSearchResults, setShowSearchResults] = useState(false);
+
+  // ── Audio State ──
+  const [audioResult, setAudioResult] = useState<AudioAnalysisResponse | null>(null);
 
   const handleImageQA = async () => {
     if (!qaQuestion.trim()) return;
@@ -513,6 +520,11 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
         const res = await analyzeImagesBatch(files);
         setImgZipResult(res);
         toast.success(`Analysis complete! Processed ${res.processed_count} images.`, { id: 'analysis' });
+      } else if (fileType === 'music') {
+        toast.loading('Transcribing & analyzing audio...', { id: 'analysis' });
+        const res = await analyzeAudio(files[0]);
+        setAudioResult(res);
+        toast.success('Audio analysis complete!', { id: 'analysis' });
       } else {
         toast.error('Unsupported file combo.', { id: 'analysis' });
       }
@@ -645,7 +657,7 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
               </div>
             )}
 
-            {!textResult && !codeResult && !imgResult && !imgZipResult ? (
+            {!textResult && !codeResult && !imgResult && !imgZipResult && !audioResult ? (
               <div className="wizard-container" style={{boxShadow: 'none', border: 'none', background: 'transparent', padding: '0px 0'}}>
                 {/* Step 1: Type Selection */}
                 <div className="wizard-header" style={{textAlign: 'left', marginBottom: '24px'}}>
@@ -684,8 +696,12 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
                       ref={fileInputRef}
                       onChange={onFilesSelected}
                       style={{ display: 'none' }}
-                      multiple
-                      accept=".txt,.pdf,.zip,image/*"
+                      multiple={fileType !== 'music'}
+                      accept={
+                        fileType === 'music'
+                          ? '.mp3,.wav,.m4a,.ogg,.flac,audio/*'
+                          : '.txt,.pdf,.zip,image/*'
+                      }
                     />
                     <div className="action-icon">
                       {loading && selectedFiles.length > 0 ? <Loader2 size={32} className="animate-spin" /> : <Upload size={32} />}
@@ -693,7 +709,9 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
                     <div className="action-title">
                       {selectedFiles.length > 0 ? `${selectedFiles.length} file(s) selected` : 'Upload local files'}
                     </div>
-                    <p style={{fontSize: '13px', color: '#94a3b8', marginTop: '4px'}}>Supports .zip, .txt, .pdf, images</p>
+                    <p style={{fontSize: '13px', color: '#94a3b8', marginTop: '4px'}}>
+                      {fileType === 'music' ? 'Supports .mp3, .wav, .m4a, .ogg, .flac' : 'Supports .zip, .txt, .pdf, images'}
+                    </p>
                   </div>
 
                   {fileType === 'code' && (
@@ -828,7 +846,7 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
                     >
                       Download JSON
                     </button>
-                    <button className="xt-upload-btn" onClick={() => { setTextResult(null); setCodeResult(null); setImgResult(null); setImgZipResult(null); setSelectedFiles([]); setShowHistory(false); }}>
+                    <button className="xt-upload-btn" onClick={() => { setTextResult(null); setCodeResult(null); setImgResult(null); setImgZipResult(null); setAudioResult(null); setSelectedFiles([]); setShowHistory(false); }}>
                       Analyze Another File
                     </button>
                   </div>
@@ -1521,6 +1539,11 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
                     </div>
                   </div>
                 )}
+
+                {/* Audio Analysis Result */}
+                {audioResult && (
+                  <AudioResultView result={audioResult.result} file={selectedFiles[0]} />
+                )}
               </div>
             )}
           </div>
@@ -1587,3 +1610,299 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
 };
 
 export default DataVizPage;
+
+// ── AudioResultView ───────────────────────────────────────────────────────────
+const AudioResultView = ({ result, file }: { result: AudioAnalysisResponse['result']; file?: File }) => {
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
+  const waveformRef = useRef<HTMLDivElement>(null);
+  const wavesurfer = useRef<WaveSurfer | null>(null);
+
+  const getSpeakerColor = (speaker: string) => {
+    const hash = speaker.split('').reduce((acc, c) => acc + c.charCodeAt(0), 0);
+    const colors = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'];
+    return colors[hash % colors.length];
+  };
+
+  const formatTime = (s: number) => {
+    const m = Math.floor(s / 60);
+    return `${m}:${Math.floor(s % 60).toString().padStart(2, '0')}`;
+  };
+
+  useEffect(() => {
+    if (file && waveformRef.current) {
+      wavesurfer.current = WaveSurfer.create({
+        container: waveformRef.current,
+        waveColor: '#4f46e5',
+        progressColor: '#818cf8',
+        cursorColor: '#c7d2fe',
+        barWidth: 2,
+        barGap: 1,
+        barRadius: 2,
+        height: 80,
+      });
+      const url = URL.createObjectURL(file);
+      wavesurfer.current.load(url);
+      wavesurfer.current.on('play', () => setIsPlaying(true));
+      wavesurfer.current.on('pause', () => setIsPlaying(false));
+      wavesurfer.current.on('timeupdate', (t: number) => setCurrentTime(t));
+      return () => { wavesurfer.current?.destroy(); };
+    }
+  }, [file]);
+
+  const togglePlay = () => wavesurfer.current?.playPause();
+  const seekTo = (time: number) => { wavesurfer.current?.setTime(time); wavesurfer.current?.play(); };
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', marginTop: '1.5rem' }}>
+
+      {/* Metadata chips */}
+      {result.features && (
+        <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+          {[
+            `🎵 ${result.features.sample_rate.toLocaleString()} Hz`,
+            `⏱ ${formatTime(result.features.duration)}`,
+            result.features.num_channels === 1 ? '🔊 Mono' : '🔊 Stereo',
+          ].map(label => (
+            <span key={label} style={{ background: 'rgba(99,102,241,0.15)', color: '#818cf8', border: '1px solid rgba(99,102,241,0.3)', fontSize: '12px', padding: '5px 12px', borderRadius: '99px' }}>{label}</span>
+          ))}
+          <span style={{ background: 'rgba(74,222,128,0.1)', color: '#4ade80', border: '1px solid rgba(74,222,128,0.25)', fontSize: '12px', padding: '5px 12px', borderRadius: '99px' }}>
+            {result.segments.length} segments
+          </span>
+        </div>
+      )}
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 2fr) minmax(0, 1fr)', gap: '1.5rem' }}>
+
+        {/* LEFT: player + waveform + energy + transcript */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+
+          {file && (
+            <div className="result-card" style={{ padding: '1.25rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '0.75rem' }}>
+                <button onClick={togglePlay} style={{ width: '44px', height: '44px', borderRadius: '50%', background: '#4f46e5', color: 'white', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }}>
+                  {isPlaying ? <Pause size={18} /> : <Play size={18} style={{ marginLeft: '3px' }} />}
+                </button>
+                <div style={{ flex: 1 }} ref={waveformRef} />
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: '#64748b' }}>
+                <span>{formatTime(currentTime)}</span>
+                <span>{formatTime(result.features?.duration ?? result.duration)}</span>
+              </div>
+            </div>
+          )}
+
+          {result.features?.waveform && (
+            <WaveformCanvas waveform={result.features.waveform} currentTime={currentTime} duration={result.features.duration} />
+          )}
+
+          {result.features?.energy && (
+            <EnergyChart energy={result.features.energy} currentTime={currentTime} />
+          )}
+
+          {/* Transcript */}
+          <div className="result-card">
+            <h3 style={{ fontSize: '14px', fontWeight: 600, marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#818cf8', marginTop: 0 }}>
+              <FileText size={16} /> Transcript
+            </h3>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', maxHeight: '380px', overflowY: 'auto' }}>
+              {result.segments.map((seg, i) => {
+                const isCurrent = currentTime >= seg.start && currentTime <= seg.end;
+                return (
+                  <div key={i} onClick={() => seekTo(seg.start)} style={{ display: 'flex', gap: '0.75rem', padding: '0.65rem 0.75rem', borderRadius: '8px', cursor: 'pointer', background: isCurrent ? 'rgba(99,102,241,0.12)' : 'rgba(30,41,59,0.5)', transition: 'background 0.2s', borderLeft: `3px solid ${getSpeakerColor(seg.speaker)}` }}>
+                    <div style={{ flexShrink: 0, width: '40px', fontSize: '11px', color: '#64748b', paddingTop: '2px' }}>{formatTime(seg.start)}</div>
+                    <div>
+                      <div style={{ fontSize: '11px', fontWeight: 600, color: getSpeakerColor(seg.speaker), marginBottom: '2px' }}>{seg.speaker}</div>
+                      <div style={{ fontSize: '13px', color: '#e2e8f0', lineHeight: 1.5 }}>{seg.text}</div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+
+        {/* RIGHT: spectrogram + speakers + NLP */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+
+          {result.features?.spectrogram && (
+            <SpectrogramCanvas spectrogram={result.features.spectrogram} currentTime={currentTime} duration={result.features.duration} />
+          )}
+
+          {/* Speaker legend */}
+          {(() => {
+            const speakers = Array.from(new Set(result.segments.map(s => s.speaker)));
+            return (
+              <div className="result-card" style={{ padding: '1rem' }}>
+                <h4 style={{ fontSize: '12px', textTransform: 'uppercase', color: '#64748b', fontWeight: 600, marginBottom: '0.75rem', marginTop: 0, letterSpacing: '0.5px' }}>Speakers</h4>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {speakers.map(sp => (
+                    <div key={sp} style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px' }}>
+                      <div style={{ width: '10px', height: '10px', borderRadius: '50%', flexShrink: 0, background: getSpeakerColor(sp) }} />
+                      <span style={{ color: '#e2e8f0' }}>{sp}</span>
+                      <span style={{ marginLeft: 'auto', color: '#64748b', fontSize: '11px' }}>{result.segments.filter(s => s.speaker === sp).length} segs</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* NLP analysis */}
+          {result.text_analysis && (
+            <>
+              <div className="result-card" style={{ padding: '1rem' }}>
+                <h4 style={{ fontSize: '12px', textTransform: 'uppercase', color: '#64748b', fontWeight: 600, marginBottom: '0.5rem', marginTop: 0, letterSpacing: '0.5px' }}>Executive Summary</h4>
+                <p style={{ fontSize: '13px', color: '#cbd5e1', lineHeight: 1.6, margin: '0 0 1rem' }}>{result.text_analysis.summary}</p>
+                <h4 style={{ fontSize: '12px', textTransform: 'uppercase', color: '#64748b', fontWeight: 600, marginBottom: '0.75rem', marginTop: 0, letterSpacing: '0.5px' }}>Sentiment</h4>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                  <span style={{ padding: '0.2rem 0.6rem', borderRadius: '99px', fontSize: '11px', fontWeight: 600, textTransform: 'capitalize', background: result.text_analysis.sentiment.overall_label === 'positive' ? 'rgba(34,197,94,0.15)' : result.text_analysis.sentiment.overall_label === 'negative' ? 'rgba(239,68,68,0.15)' : 'rgba(148,163,184,0.1)', color: result.text_analysis.sentiment.overall_label === 'positive' ? '#4ade80' : result.text_analysis.sentiment.overall_label === 'negative' ? '#f87171' : '#94a3b8' }}>
+                    {result.text_analysis.sentiment.overall_label}
+                  </span>
+                </div>
+                <div style={{ height: '8px', width: '100%', display: 'flex', borderRadius: '4px', overflow: 'hidden', background: '#1e293b' }}>
+                  <div style={{ width: `${result.text_analysis.sentiment.positive * 100}%`, background: '#22c55e' }} />
+                  <div style={{ width: `${result.text_analysis.sentiment.neutral * 100}%`, background: '#475569' }} />
+                  <div style={{ width: `${result.text_analysis.sentiment.negative * 100}%`, background: '#ef4444' }} />
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '4px', fontSize: '10px', color: '#64748b' }}>
+                  <span>+{(result.text_analysis.sentiment.positive * 100).toFixed(0)}%</span>
+                  <span>{(result.text_analysis.sentiment.neutral * 100).toFixed(0)}%</span>
+                  <span>-{(result.text_analysis.sentiment.negative * 100).toFixed(0)}%</span>
+                </div>
+              </div>
+
+              {result.text_analysis.entities.length > 0 && (
+                <div className="result-card" style={{ padding: '1rem' }}>
+                  <h4 style={{ fontSize: '12px', textTransform: 'uppercase', color: '#64748b', fontWeight: 600, marginBottom: '0.75rem', marginTop: 0, letterSpacing: '0.5px' }}>Entities</h4>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}>
+                    {result.text_analysis.entities.slice(0, 15).map((e: any) => (
+                      <span key={e.id} style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '11px', padding: '0.25rem 0.5rem', background: '#1e293b', borderRadius: '6px', border: '1px solid #334155', color: '#cbd5e1' }}>
+                        {e.type === 'Person' ? <Hash size={11} /> : e.type === 'Place' ? <MapPin size={11} /> : <Activity size={11} />}
+                        {e.label}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ── WaveformCanvas ────────────────────────────────────────────────────────────
+const WaveformCanvas = ({ waveform, currentTime, duration }: {
+  waveform: import('./services').WaveformData;
+  currentTime: number;
+  duration: number;
+}) => {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas || !waveform) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    const W = canvas.width, H = canvas.height;
+    ctx.clearRect(0, 0, W, H);
+    const n = waveform.amplitudes.length;
+    const midY = H / 2;
+    const barW = Math.max(1, W / n);
+    const progress = duration > 0 ? currentTime / duration : 0;
+    for (let i = 0; i < n; i++) {
+      const amp = Math.abs(waveform.amplitudes[i]);
+      const barH = amp * midY * 0.9;
+      ctx.fillStyle = i / n <= progress ? '#818cf8' : '#334155';
+      ctx.fillRect((i / n) * W, midY - barH, barW - 0.5, barH * 2);
+    }
+  }, [waveform, currentTime, duration]);
+
+  return (
+    <div className="result-card" style={{ padding: '1rem' }}>
+      <h4 style={{ fontSize: '12px', textTransform: 'uppercase', color: '#64748b', fontWeight: 600, marginBottom: '0.75rem', marginTop: 0, letterSpacing: '0.5px' }}>Waveform (normalized)</h4>
+      <canvas ref={canvasRef} width={600} height={80} style={{ width: '100%', height: '80px', borderRadius: '6px', background: '#020617' }} />
+    </div>
+  );
+};
+
+// ── SpectrogramCanvas ─────────────────────────────────────────────────────────
+const SpectrogramCanvas = ({ spectrogram, currentTime, duration }: {
+  spectrogram: import('./services').SpectrogramData;
+  currentTime: number;
+  duration: number;
+}) => {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas || !spectrogram) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    const freqBins = spectrogram.magnitude_db.length;
+    const timeBins = spectrogram.time_bins.length;
+    const W = canvas.width, H = canvas.height;
+    const cellW = W / timeBins, cellH = H / freqBins;
+    for (let f = 0; f < freqBins; f++) {
+      for (let t = 0; t < timeBins; t++) {
+        const intensity = (spectrogram.magnitude_db[f][t] + 80) / 80;
+        const r = Math.round(Math.min(255, intensity * 2 * 255));
+        const g = Math.round(Math.min(255, intensity * 1.5 * 255));
+        const b = Math.round(Math.max(0, (1 - intensity * 2) * 255));
+        ctx.fillStyle = `rgb(${r},${g},${b})`;
+        ctx.fillRect(t * cellW, (freqBins - 1 - f) * cellH, cellW + 0.5, cellH + 0.5);
+      }
+    }
+    if (duration > 0) {
+      const x = (currentTime / duration) * W;
+      ctx.strokeStyle = 'rgba(255,255,255,0.85)';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke();
+    }
+  }, [spectrogram, currentTime, duration]);
+
+  return (
+    <div className="result-card" style={{ padding: '1rem' }}>
+      <h4 style={{ fontSize: '12px', textTransform: 'uppercase', color: '#64748b', fontWeight: 600, marginBottom: '0.75rem', marginTop: 0, letterSpacing: '0.5px' }}>STFT Spectrogram</h4>
+      <canvas ref={canvasRef} width={300} height={160} style={{ width: '100%', height: '160px', borderRadius: '6px', imageRendering: 'pixelated' }} />
+      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', color: '#475569', marginTop: '4px' }}>
+        <span>0 Hz</span><span>8 kHz (frequency axis)</span>
+      </div>
+    </div>
+  );
+};
+
+// ── EnergyChart ───────────────────────────────────────────────────────────────
+const EnergyChart = ({ energy, currentTime }: {
+  energy: import('./services').EnergyData;
+  currentTime: number;
+}) => {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas || !energy) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    const W = canvas.width, H = canvas.height;
+    ctx.clearRect(0, 0, W, H);
+    const n = energy.rms_values.length;
+    const barW = Math.max(1, W / n);
+    for (let i = 0; i < n; i++) {
+      const barH = energy.rms_values[i] * H * 0.9;
+      const played = energy.timestamps[i] <= currentTime;
+      const alpha = 0.4 + energy.rms_values[i] * 0.6;
+      ctx.fillStyle = played ? `rgba(251,140,54,${alpha})` : `rgba(71,85,105,${alpha})`;
+      ctx.fillRect((i / n) * W, H - barH, barW - 0.5, barH);
+    }
+  }, [energy, currentTime]);
+
+  return (
+    <div className="result-card" style={{ padding: '1rem' }}>
+      <h4 style={{ fontSize: '12px', textTransform: 'uppercase', color: '#64748b', fontWeight: 600, marginBottom: '0.75rem', marginTop: 0, letterSpacing: '0.5px' }}>RMS Energy</h4>
+      <canvas ref={canvasRef} width={600} height={60} style={{ width: '100%', height: '60px', borderRadius: '6px', background: '#020617' }} />
+    </div>
+  );
+};

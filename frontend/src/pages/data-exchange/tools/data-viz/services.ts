@@ -366,3 +366,79 @@ export async function searchImages(
 
   return response.json();
 }
+
+// ── Audio Analysis Types ──────────────────────────────────────────────────────
+
+export interface SpeakerSegment {
+  start: number;
+  end: number;
+  speaker: string;
+  text: string;
+}
+
+export interface WaveformData {
+  timestamps: number[];
+  amplitudes: number[];
+}
+
+export interface SpectrogramData {
+  time_bins: number[];
+  freq_bins: number[];
+  magnitude_db: number[][];
+}
+
+export interface EnergyData {
+  timestamps: number[];
+  rms_values: number[];
+}
+
+export interface AudioFeatures {
+  sample_rate: number;
+  duration: number;
+  num_channels: number;
+  waveform: WaveformData;
+  spectrogram: SpectrogramData;
+  energy: EnergyData;
+}
+
+export interface AudioAnalysisResult {
+  duration: number;
+  segments: SpeakerSegment[];
+  transcript_text: string;
+  features?: AudioFeatures;
+  text_analysis: {
+    summary: string;
+    sentiment: { positive: number; negative: number; neutral: number; overall_label: string };
+    entities: Array<{ id: string; label: string; type: string }>;
+    timeline: Array<{ date: string; description: string }>;
+    locations: Array<{ name: string; lat: number; lng: number }>;
+  } | null;
+}
+
+export interface AudioAnalysisResponse {
+  status: string;
+  filename: string;
+  content_type: string;
+  result: AudioAnalysisResult;
+}
+
+/**
+ * Uploads an audio file (.mp3, .wav, .m4a, etc.) for transcription,
+ * speaker diarization, and text analysis.
+ */
+export async function analyzeAudio(file: File): Promise<AudioAnalysisResponse> {
+  const formData = new FormData();
+  formData.append('file', file);
+
+  const response = await fetch(`${BASE_URL}/team5/analyze-audio`, {
+    method: 'POST',
+    body: formData,
+  });
+
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({ detail: 'Unknown error' }));
+    throw new Error(err.detail || `Audio analysis failed with status ${response.status}`);
+  }
+
+  return response.json();
+}
