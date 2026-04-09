@@ -64,3 +64,12 @@ pyannote.audio>=3.1.0         # Speaker diarization (gated model, needs HF_TOKEN
 # NOTE: ffmpeg must be installed separately (system package or winget install Gyan.FFmpeg)
 # On a new machine: winget install Gyan.FFmpeg  OR  choco install ffmpeg
 # Then either add ffmpeg to PATH, or set FFMPEG_PATH and FFPROBE_PATH in .env
+
+# --- Video Analysis Pipeline (Team 5 – Video Dept) ---
+# YOLO object detection + BLIP captioning + CLIP embeddings
+ultralytics>=8.0.0            # YOLOv8 object detection
+opencv-python>=4.8.0          # Frame extraction and video I/O
+# NOTE: BLIP and CLIP are loaded via transformers + torch (already installed via pyannote.audio)
+# transformers>=4.30.0 and torch>=2.0.0 are expected to already be present
+imageio>=2.33.1               # Optional video I/O helper
+imageio-ffmpeg>=0.4.9         # ffmpeg backend for imageio

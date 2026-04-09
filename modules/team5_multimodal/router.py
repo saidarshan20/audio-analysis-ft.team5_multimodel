@@ -9,7 +9,7 @@ import logging
 import os
 
 from fastapi import APIRouter, HTTPException, UploadFile, File, Form
-from fastapi.responses import StreamingResponse
+from fastapi.responses import StreamingResponse, FileResponse
 from pydantic import BaseModel
 import json
 import asyncio
@@ -400,3 +400,96 @@ async def extract_audio_features(file: UploadFile = File(...)):
     except Exception as exc:
         logger.exception("Audio feature extraction failed")
         raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+# ──────────────────────────────────────────────
+#  Video Analysis Pipeline (YOLO + BLIP + CLIP + Whisper)
+# ──────────────────────────────────────────────
+
+_VIDEO_TMP_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "shared_workspace", "1_raw_uploads")
+
+@router.post("/video-analyze")
+async def analyze_video_endpoint(file: UploadFile = File(...)):
+    """
+    Accept a video file and run full multimodal analysis:
+    YOLO object detection + BLIP captioning + CLIP embeddings + Groq summary.
+    Returns JSON with detected objects, frame captions, and summary.
+    """
+    if not file.content_type or not file.content_type.startswith("video/"):
+        raise HTTPException(status_code=400, detail="Only video files are supported.")
+
+    import tempfile as _tmp
+    from modules.team5_multimodal.Video_analysis import analyze_video
+
+    raw_bytes = await file.read()
+    if not raw_bytes:
+        raise HTTPException(status_code=400, detail="Uploaded file is empty.")
+
+    suffix = os.path.splitext(file.filename or "upload.mp4")[1] or ".mp4"
+
+    try:
+        with _tmp.NamedTemporaryFile(suffix=suffix, delete=False) as inp:
+            inp.write(raw_bytes)
+            input_path = inp.name
+
+        with _tmp.NamedTemporaryFile(suffix=".mp4", delete=False) as out:
+            output_path = out.name
+
+        model_path = "yolov8n.pt"
+        result = await asyncio.to_thread(analyze_video, input_path, output_path, model_path, False)
+
+        if result is None:
+            raise HTTPException(status_code=500, detail="Video analysis failed.")
+
+        result.pop("output_video", None)
+        result["video_url"] = f"/team5/stream-temp-video?path={os.path.basename(output_path)}"
+        result["_output_path"] = output_path  # internal — stripped before returning
+        out_path = result.pop("_output_path")
+
+        # Store output path for streaming endpoint
+        import builtins
+        builtins._last_analyzed_video = out_path  # type: ignore[attr-defined]
+
+        return result
+
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.exception("Video analysis failed")
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+    finally:
+        try:
+            os.unlink(input_path)
+        except Exception:
+            pass
+
+
+@router.get("/stream-temp-video")
+async def stream_temp_video():
+    """Stream the most recently analyzed video file."""
+    import builtins
+    video_path = getattr(builtins, "_last_analyzed_video", None)
+    if not video_path or not os.path.exists(video_path):
+        raise HTTPException(status_code=404, detail="No analyzed video available. Run /video-analyze first.")
+    return FileResponse(
+        video_path,
+        media_type="video/mp4",
+        headers={"Accept-Ranges": "bytes", "Cache-Control": "no-cache", "Content-Disposition": "inline"},
+    )
+
+
+@router.get("/demo-video-metadata")
+async def get_demo_video_metadata():
+    """Return pre-computed analysis metadata for the demo video (if available)."""
+    meta_path = os.path.join(os.path.dirname(__file__), "huhu_analyzed_metadata.json")
+    if not os.path.exists(meta_path):
+        return {
+            "groq_summary": "Demo metadata not available.",
+            "detected_objects": {},
+            "frame_captions": [],
+            "clip_scenes": [],
+            "keyframes_analyzed": 0,
+            "duration_seconds": 0,
+        }
+    with open(meta_path, "r") as f:
+        return json.load(f)
