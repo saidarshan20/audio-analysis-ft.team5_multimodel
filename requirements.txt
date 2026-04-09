@@ -64,4 +64,3 @@ pyannote.audio>=3.1.0         # Speaker diarization (gated model, needs HF_TOKEN
 # NOTE: ffmpeg must be installed separately (system package or winget install Gyan.FFmpeg)
 # On a new machine: winget install Gyan.FFmpeg  OR  choco install ffmpeg
 # Then either add ffmpeg to PATH, or set FFMPEG_PATH and FFPROBE_PATH in .env
-

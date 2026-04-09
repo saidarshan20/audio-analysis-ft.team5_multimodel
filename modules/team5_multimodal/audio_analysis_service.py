@@ -31,7 +31,16 @@ except ImportError:
         "Install with: pip install pyannote.audio  (requires HF token)"
     )
 
+FFMPEG_DIR = r"C:\Users\347381\Desktop\audio-analysis-ft.team5_multimodel\ffmpeg-8.1-essentials_build\bin"
+
+os.environ["PATH"] += os.pathsep + FFMPEG_DIR
+os.environ["FFMPEG_BINARY"] = os.path.join(FFMPEG_DIR, "ffmpeg.exe")
+os.environ["FFPROBE_BINARY"] = os.path.join(FFMPEG_DIR, "ffprobe.exe")
+
 from pydub import AudioSegment
+
+AudioSegment.converter = r"C:\Users\347381\Desktop\audio-analysis-ft.team5_multimodel\ffmpeg-8.1-essentials_build\bin\ffmpeg.exe"
+AudioSegment.ffprobe   = r"C:\Users\347381\Desktop\audio-analysis-ft.team5_multimodel\ffmpeg-8.1-essentials_build\bin\ffprobe.exe"
 
 from modules.team5_multimodal.config import get_settings
 from modules.team5_multimodal.models import AudioAnalysisResult, AudioFeatures, SpeakerSegment
