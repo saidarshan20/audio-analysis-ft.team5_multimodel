@@ -442,3 +442,40 @@ export async function analyzeAudio(file: File): Promise<AudioAnalysisResponse> {
 
   return response.json();
 }
+
+// ── Video Analysis Types & API ────────────────────────────────────────────────
+
+export interface ClipScene {
+  second: number;
+  scene: string;
+  score: number;
+}
+
+export interface VideoAnalysisResult {
+  duration_seconds: number;
+  keyframes_analyzed: number;
+  detected_objects: Record<string, number>;
+  video_caption: string;
+  clip_scenes: ClipScene[];
+  groq_summary: string;
+  sentiment_analysis: string;
+  transcript: { full_text: string; segments: Array<{ start: number; end: number; text: string }>; language: string };
+  video_url?: string;
+}
+
+export async function analyzeVideo(file: File): Promise<VideoAnalysisResult> {
+  const formData = new FormData();
+  formData.append('file', file);
+
+  const response = await fetch(`${BASE_URL}/team5/video-analyze`, {
+    method: 'POST',
+    body: formData,
+  });
+
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({ detail: 'Unknown error' }));
+    throw new Error(err.detail || `Video analysis failed with status ${response.status}`);
+  }
+
+  return response.json();
+}

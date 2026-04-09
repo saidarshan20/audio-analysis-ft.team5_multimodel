@@ -17,6 +17,7 @@ import {
   askAboutExistingImage,
   searchImages,
   analyzeAudio,
+  analyzeVideo,
   TextAnalysisResult,
   CodeAnalysisResult,
   MultiImageAnalysisResponse,
@@ -24,6 +25,7 @@ import {
   ImageQAResponse,
   ImageSearchResult,
   AudioAnalysisResponse,
+  VideoAnalysisResult,
 } from './services';
 import MermaidDiagram from "../../../../components/MermaidDiagram";
 
@@ -228,6 +230,9 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
 
   // ── Audio State ──
   const [audioResult, setAudioResult] = useState<AudioAnalysisResponse | null>(null);
+
+  // ── Video State ──
+  const [videoResult, setVideoResult] = useState<VideoAnalysisResult | null>(null);
 
   const handleImageQA = async () => {
     if (!qaQuestion.trim()) return;
@@ -525,6 +530,11 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
         const res = await analyzeAudio(files[0]);
         setAudioResult(res);
         toast.success('Audio analysis complete!', { id: 'analysis' });
+      } else if (fileType === 'videos') {
+        toast.loading('Running video analysis (YOLO + BLIP + CLIP)...', { id: 'analysis' });
+        const res = await analyzeVideo(files[0]);
+        setVideoResult(res);
+        toast.success('Video analysis complete!', { id: 'analysis' });
       } else {
         toast.error('Unsupported file combo.', { id: 'analysis' });
       }
@@ -657,7 +667,7 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
               </div>
             )}
 
-            {!textResult && !codeResult && !imgResult && !imgZipResult && !audioResult ? (
+            {!textResult && !codeResult && !imgResult && !imgZipResult && !audioResult && !videoResult ? (
               <div className="wizard-container" style={{boxShadow: 'none', border: 'none', background: 'transparent', padding: '0px 0'}}>
                 {/* Step 1: Type Selection */}
                 <div className="wizard-header" style={{textAlign: 'left', marginBottom: '24px'}}>
@@ -696,10 +706,12 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
                       ref={fileInputRef}
                       onChange={onFilesSelected}
                       style={{ display: 'none' }}
-                      multiple={fileType !== 'music'}
+                      multiple={fileType !== 'music' && fileType !== 'videos'}
                       accept={
                         fileType === 'music'
                           ? '.mp3,.wav,.m4a,.ogg,.flac,audio/*'
+                          : fileType === 'videos'
+                          ? '.mp4,.mov,.avi,.mkv,.webm,video/*'
                           : '.txt,.pdf,.zip,image/*'
                       }
                     />
@@ -710,7 +722,7 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
                       {selectedFiles.length > 0 ? `${selectedFiles.length} file(s) selected` : 'Upload local files'}
                     </div>
                     <p style={{fontSize: '13px', color: '#94a3b8', marginTop: '4px'}}>
-                      {fileType === 'music' ? 'Supports .mp3, .wav, .m4a, .ogg, .flac' : 'Supports .zip, .txt, .pdf, images'}
+                      {fileType === 'music' ? 'Supports .mp3, .wav, .m4a, .ogg, .flac' : fileType === 'videos' ? 'Supports .mp4, .mov, .avi, .mkv' : 'Supports .zip, .txt, .pdf, images'}
                     </p>
                   </div>
 
@@ -846,7 +858,7 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
                     >
                       Download JSON
                     </button>
-                    <button className="xt-upload-btn" onClick={() => { setTextResult(null); setCodeResult(null); setImgResult(null); setImgZipResult(null); setAudioResult(null); setSelectedFiles([]); setShowHistory(false); }}>
+                    <button className="xt-upload-btn" onClick={() => { setTextResult(null); setCodeResult(null); setImgResult(null); setImgZipResult(null); setAudioResult(null); setVideoResult(null); setSelectedFiles([]); setShowHistory(false); }}>
                       Analyze Another File
                     </button>
                   </div>
@@ -1543,6 +1555,102 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
                 {/* Audio Analysis Result */}
                 {audioResult && (
                   <AudioResultView result={audioResult.result} file={selectedFiles[0]} />
+                )}
+
+                {/* Video Analysis Result */}
+                {videoResult && (
+                  <div className="code-analysis-view">
+                    {/* Header chips */}
+                    <div className="result-card">
+                      <h4><Video size={18} style={{ display: 'inline', marginRight: '8px' }} />Video Analysis — {selectedFiles[0]?.name}</h4>
+                      <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginTop: '10px' }}>
+                        {[
+                          `⏱ ${Math.round(videoResult.duration_seconds)}s`,
+                          `🎞 ${videoResult.keyframes_analyzed} keyframes`,
+                          `🔍 ${Object.keys(videoResult.detected_objects).length} object types`,
+                        ].map(label => (
+                          <span key={label} style={{ background: 'rgba(99,102,241,0.15)', color: '#818cf8', border: '1px solid rgba(99,102,241,0.3)', fontSize: '12px', padding: '4px 12px', borderRadius: '99px' }}>{label}</span>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* AI Summary */}
+                    {videoResult.groq_summary && (
+                      <div className="result-card">
+                        <h4 style={{ marginTop: 0 }}>AI Summary</h4>
+                        <p style={{ color: '#cbd5e1', lineHeight: 1.7, margin: 0 }}>{videoResult.groq_summary}</p>
+                      </div>
+                    )}
+
+                    {/* Caption + transcript fallback */}
+                    {!videoResult.groq_summary && videoResult.video_caption && (
+                      <div className="result-card">
+                        <h4 style={{ marginTop: 0 }}>Scene Description</h4>
+                        <p style={{ color: '#cbd5e1', lineHeight: 1.7, margin: 0 }}>{videoResult.video_caption}</p>
+                      </div>
+                    )}
+
+                    {/* Objects + CLIP scenes */}
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+                      {Object.keys(videoResult.detected_objects).length > 0 && (
+                        <div className="result-card">
+                          <h4 style={{ marginTop: 0 }}>Detected Objects</h4>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '8px' }}>
+                            {Object.entries(videoResult.detected_objects)
+                              .sort(([, a], [, b]) => (b as number) - (a as number))
+                              .slice(0, 12)
+                              .map(([label, count]) => {
+                                const max = Math.max(...Object.values(videoResult.detected_objects) as number[]);
+                                return (
+                                  <div key={label} style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                    <span style={{ color: '#e2e8f0', fontSize: '13px', minWidth: '100px' }}>{label}</span>
+                                    <div style={{ flex: 1, height: '6px', background: '#1e293b', borderRadius: '3px', overflow: 'hidden' }}>
+                                      <div style={{ height: '100%', width: `${((count as number) / max) * 100}%`, background: '#6366f1', borderRadius: '3px' }} />
+                                    </div>
+                                    <span style={{ color: '#64748b', fontSize: '12px', minWidth: '24px', textAlign: 'right' }}>{count as number}</span>
+                                  </div>
+                                );
+                              })}
+                          </div>
+                        </div>
+                      )}
+
+                      {videoResult.clip_scenes?.length > 0 && (
+                        <div className="result-card">
+                          <h4 style={{ marginTop: 0 }}>Scene Classification (CLIP)</h4>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '300px', overflowY: 'auto', marginTop: '8px' }}>
+                            {videoResult.clip_scenes.map((s, i) => (
+                              <div key={i} style={{ display: 'flex', gap: '10px', padding: '6px 10px', background: '#0f172a', borderRadius: '6px', border: '1px solid #1e293b', alignItems: 'center' }}>
+                                <span style={{ color: '#475569', fontSize: '11px', flexShrink: 0, minWidth: '28px' }}>{s.second}s</span>
+                                <span style={{ color: '#cbd5e1', fontSize: '13px', flex: 1 }}>{s.scene}</span>
+                                <span style={{ color: '#6366f1', fontSize: '11px' }}>{(s.score * 100).toFixed(0)}%</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Transcript */}
+                    {videoResult.transcript?.full_text && (
+                      <div className="result-card">
+                        <h4 style={{ marginTop: 0 }}>Audio Transcript</h4>
+                        <p style={{ color: '#cbd5e1', lineHeight: 1.7, margin: 0 }}>{videoResult.transcript.full_text}</p>
+                      </div>
+                    )}
+
+                    {/* Analyzed video player */}
+                    {videoResult.video_url && (
+                      <div className="result-card">
+                        <h4 style={{ marginTop: 0 }}>Annotated Video</h4>
+                        <video
+                          controls
+                          style={{ width: '100%', borderRadius: '8px', marginTop: '8px', background: '#000' }}
+                          src={`${import.meta.env.VITE_API_URL ?? 'http://localhost:8000'}${videoResult.video_url}`}
+                        />
+                      </div>
+                    )}
+                  </div>
                 )}
               </div>
             )}
