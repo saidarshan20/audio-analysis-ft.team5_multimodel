@@ -89,6 +89,18 @@ class ImageAnalysisService:
             zf.extractall(out_dir)
         return str(out_dir)
 
+    def save_files(self, files: list) -> str:
+        """Saves a list of UploadFile objects into shared_workspace/1_raw_uploads/"""
+        session_id = str(uuid.uuid4())[:8]
+        out_dir = self.raw_dir / f"batch_{session_id}"
+        out_dir.mkdir(exist_ok=True)
+        
+        for file in files:
+            file_path = out_dir / file.filename
+            with open(file_path, "wb") as f:
+                f.write(file.file.read())
+        return str(out_dir)
+
     def get_image_description(self, img_path: str) -> str | None:
         """Use Local BLIP Model to describe image"""
         try:
@@ -209,22 +221,39 @@ class ImageAnalysisService:
                 "annotated_path": rel_annotated_path
             })
 
-        # 2. KMeans Clustering - Dynamic n_clusters based on variety
+        # 2. KMeans Clustering - Smart K-Estimation via Silhouette Score
         X = np.array(embeddings)
-        # Increase granularity: Use N/2 clusters, capped between 2 and 6
-        n_clusters = max(2, min(int(len(X) / 2), 6)) if len(X) > 1 else 1
-        kmeans = KMeans(n_clusters=n_clusters, random_state=42, n_init="auto")
-        labels = kmeans.fit_predict(X)
+        n_samples = len(X)
+        
+        if n_samples <= 1:
+            n_clusters = 1
+            labels = np.zeros(n_samples, dtype=int)
+        else:
+            from sklearn.metrics import silhouette_score
+            best_k = 2
+            best_score = -1
+            
+            # Test different K values from 2 to 8 (or N-1)
+            limit = min(8, n_samples - 1) 
+            for k in range(2, limit + 1):
+                km = KMeans(n_clusters=k, random_state=42, n_init="auto")
+                l = km.fit_predict(X)
+                score = silhouette_score(X, l)
+                if score > best_score:
+                    best_score = score
+                    best_k = k
+            
+            n_clusters = best_k
+            kmeans = KMeans(n_clusters=n_clusters, random_state=42, n_init="auto")
+            labels = kmeans.fit_predict(X)
 
         # 3. UMAP Dimensionality Reduction
         # UMAP needs sufficient data for spectral initialization; default to random for small sets
-        if len(X) > 3:
+        if len(X) > 1:
             reducer = umap.UMAP(n_neighbors=min(15, len(X)-1), n_components=2, random_state=42, init="random")
             coords = reducer.fit_transform(X)
         else:
-            # Fallback to simple random coordinates if less than 4 images
-            import random
-            coords = np.array([[random.uniform(-10, 10), random.uniform(-10, 10)] for _ in range(len(X))])
+            coords = np.array([[0.0, 0.0]])
 
         # Construct final ClusterPoint Array
         cluster_points = []
