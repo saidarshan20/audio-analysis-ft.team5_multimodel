@@ -10,9 +10,9 @@ import {
   analyzeTextFile,
   analyzeCodebase,
   analyzeGithubRepo,
-  analyzeImages,
-  analyzeImagesZip,
+  analyzeImagesBatch,
   askAboutImage,
+  askAboutExistingImage,
   searchImages,
   TextAnalysisResult,
   CodeAnalysisResult,
@@ -134,8 +134,7 @@ const FILE_TYPES: { id: FileType; label: string; desc: string; icon: any }[] = [
   { id: 'csv',    label: 'CSV Data',  desc: 'Tabular data & spreadsheets', icon: FileSpreadsheet },
   { id: 'text',   label: 'Text File', desc: 'Plain text & documents',     icon: FileText },
   { id: 'pdf',    label: 'PDF Doc',   desc: 'PDF reports & exports',      icon: Search }, 
-  { id: 'images', label: 'Images',    desc: 'Multi-image analysis',       icon: ImageIcon },
-  { id: 'images-zip', label: 'Image Batch (zip)', desc: 'Batch UMAP clustering pipeline', icon: ImageIcon },
+  { id: 'images-zip', label: 'Visual Intelligence', desc: 'Single image, Batch, or ZIP', icon: ImageIcon },
   { id: 'code',   label: 'Codebase',  desc: 'ZIP repo analysis',          icon: Code2 },
   { id: 'videos', label: 'Videos',    desc: 'Video streams & files',      icon: Video },
   { id: 'music',  label: 'Audio',     desc: 'Voice & sound analysis',     icon: Music },
@@ -180,7 +179,7 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
   const [selected, setSelected] = useState<string | null>(null);
 
   // -- Wizard State --
-  const [fileType, setFileType] = useState<FileType>('images');
+  const [fileType, setFileType] = useState<FileType>('images-zip');
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [githubUrl, setGithubUrl] = useState('');
   
@@ -215,6 +214,7 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
   const [qaLoading, setQaLoading] = useState(false);
   const [qaAnswer, setQaAnswer] = useState<ImageQAResponse | null>(null);
   const qaFileRef = useRef<HTMLInputElement>(null);
+  const [selectedImageForQA, setSelectedImageForQA] = useState<{ path: string, filename: string } | null>(null);
 
   // ── NEW: Image Search State ──
   const [searchQuery, setSearchQuery] = useState('');
@@ -223,10 +223,20 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
   const [showSearchResults, setShowSearchResults] = useState(false);
 
   const handleImageQA = async () => {
-    if (!qaFile || !qaQuestion.trim()) return;
+    if (!qaQuestion.trim()) return;
+    
     setQaLoading(true);
     try {
-      const res = await askAboutImage(qaFile, qaQuestion.trim());
+      let res: ImageQAResponse;
+      if (selectedImageForQA) {
+        res = await askAboutExistingImage(selectedImageForQA.path, qaQuestion.trim());
+      } else if (qaFile) {
+        res = await askAboutImage(qaFile, qaQuestion.trim());
+      } else {
+        toast.error('Please select an image first');
+        setQaLoading(false);
+        return;
+      }
       setQaAnswer(res);
       toast.success('AI answered your question!');
     } catch (err: any) {
@@ -484,7 +494,6 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
     const files = selectedFiles;
     const isZip = files.length === 1 && files[0].name.toLowerCase().endsWith('.zip');
     const isDoc = files.length === 1 && (files[0].name.toLowerCase().endsWith('.pdf') || files[0].name.toLowerCase().endsWith('.txt'));
-    const isImages = files.every(f => f.type.startsWith('image/'));
 
     try {
       if (fileType === 'code' && isZip) {
@@ -499,17 +508,11 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
         setTextResult(res);
         saveToHistory(fileType as any, res, files[0].name);
         toast.success('Document analysis complete!', { id: 'analysis' });
-      } else if (fileType === 'images-zip' && isZip) {
-        toast.loading(`Processing Image ZIP Batch...`, { id: 'analysis' });
-        const res = await analyzeImagesZip(files[0]);
+      } else if (fileType === 'images-zip' && (isZip || files.every(f => f.type.startsWith('image/')))) {
+        toast.loading(`Processing Visual Intel Batch...`, { id: 'analysis' });
+        const res = await analyzeImagesBatch(files);
         setImgZipResult(res);
         toast.success(`Analysis complete! Processed ${res.processed_count} images.`, { id: 'analysis' });
-      } else if (fileType === 'images' && isImages) {
-        toast.loading(`Analyzing ${files.length} images...`, { id: 'analysis' });
-        const res = await analyzeImages(files);
-        setImgResult(res);
-        saveToHistory('images', res, `Gallery: ${files.length} images`);
-        toast.success('Image analysis complete!', { id: 'analysis' });
       } else {
         toast.error('Unsupported file combo.', { id: 'analysis' });
       }
@@ -1201,8 +1204,8 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
                   <div className="img-analysis-view">
                     <div className="viz-row">
                       <div className="scatter-box result-card">
-                        <h4><BarChart2 size={20} /> Batch UMAP Analysis</h4>
-                        <p className="viz-desc">Semantic clustering map generated by the FastAPI backend using Matplotlib.</p>
+                        <h4><BarChart2 size={20} /> Multi-Dimensional Semantic Analysis</h4>
+                        <p className="viz-desc">Visualizing semantic relationships across your image collection using advanced clustering algorithms.</p>
                         <div style={{ marginTop: '20px', background: '#020617', padding: '20px', borderRadius: '16px', border: '1px solid #1e293b', display: 'flex', justifyContent: 'center', boxShadow: 'inset 0 2px 10px rgba(0,0,0,0.5)' }}>
                           <img 
                             src={`${import.meta.env.VITE_API_URL ?? 'http://localhost:8000'}/${imgZipResult.result?.plot_file_path}`} 
@@ -1334,11 +1337,18 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
                                 <span style={{ fontSize: '12px', color: '#94a3b8', display: 'flex', alignItems: 'center', gap: '6px' }}>
                                   <Search size={14} /> {c.objects?.length || 0} Objects
                                 </span>
-                                <div style={{ display: 'flex', gap: '4px' }}>
-                                   {c.objects?.slice(0,2).map((o: any, idx: number) => (
-                                     <span key={idx} style={{ fontSize: '10px', color: '#60a5fa' }}>{o.label}</span>
-                                   ))}
-                                </div>
+                                <button 
+                                  className="qa-send-btn" 
+                                  style={{ height: '28px', width: 'auto', padding: '0 10px', fontSize: '11px', gap: '6px' }}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setSelectedImageForQA({ path: c.annotated_image_path || '', filename: c.filename });
+                                    setQaAnswer(null);
+                                    window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+                                  }}
+                                >
+                                  <MessageCircle size={12} /> Ask AI
+                                </button>
                               </div>
                             </div>
                           </div>
@@ -1351,9 +1361,9 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
                 {(imgResult || imgZipResult) && (
                   <div className="ai-intelligence-section">
                     <h3 style={{ fontSize: '22px', fontWeight: 800, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
-                      <Sparkles size={24} color="#fb8c36" /> AI Image Intelligence
+                      <Sparkles size={24} color="#fb8c36" /> Intelligent Visual Reasoning
                     </h3>
-                    <p style={{ color: '#94a3b8', fontSize: '14px', marginBottom: '28px' }}>Powered by Groq Vision AI — Ask questions about images or search across your analyzed collection.</p>
+                    <p style={{ color: '#94a3b8', fontSize: '14px', marginBottom: '28px' }}>Contextual Multimodal Intelligence — Ask questions about images or perform a semantic lookup across your analyzed collection.</p>
 
                     <div className="ai-intel-grid">
                       {/* ── Image Q&A Card ── */}
@@ -1364,34 +1374,51 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
                           </div>
                           <div>
                             <h4>Image Q&A</h4>
-                            <p>Upload an image and ask any question about it</p>
+                            <p>{selectedImageForQA ? `Querying: ${selectedImageForQA.filename}` : 'Upload an image and ask any question about it'}</p>
                           </div>
                         </div>
 
                         <div className="ai-intel-body">
-                          <div className="qa-upload-zone" onClick={() => qaFileRef.current?.click()}>
-                            <input
-                              type="file"
-                              ref={qaFileRef}
-                              onChange={(e) => {
-                                const f = e.target.files?.[0];
-                                if (f) { setQaFile(f); setQaAnswer(null); toast.success(`Selected: ${f.name}`); }
-                              }}
-                              style={{ display: 'none' }}
-                              accept="image/*"
-                            />
-                            {qaFile ? (
-                              <div className="qa-file-selected">
-                                <ImageIcon size={16} color="#fb8c36" />
-                                <span>{qaFile.name}</span>
+                          {selectedImageForQA && (
+                            <div className="qa-upload-zone" style={{ borderColor: '#60a5fa', background: 'rgba(96, 165, 250, 0.05)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 15px', cursor: 'default' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                <ImageIcon size={18} color="#60a5fa" />
+                                <span style={{ color: '#f8fafc', fontSize: '13px', fontWeight: 600 }}>{selectedImageForQA.filename}</span>
                               </div>
-                            ) : (
-                              <>
-                                <Upload size={18} color="#94a3b8" />
-                                <span style={{ color: '#94a3b8', fontSize: '13px' }}>Click to select an image</span>
-                              </>
-                            )}
-                          </div>
+                              <button 
+                                onClick={() => setSelectedImageForQA(null)}
+                                style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: '11px', textDecoration: 'underline' }}
+                              >
+                                Switch to Upload
+                              </button>
+                            </div>
+                          )}
+
+                          {!selectedImageForQA && (
+                            <div className="qa-upload-zone" onClick={() => qaFileRef.current?.click()}>
+                              <input
+                                type="file"
+                                ref={qaFileRef}
+                                onChange={(e) => {
+                                  const f = e.target.files?.[0];
+                                  if (f) { setQaFile(f); setQaAnswer(null); toast.success(`Selected: ${f.name}`); }
+                                }}
+                                style={{ display: 'none' }}
+                                accept="image/*"
+                              />
+                              {qaFile ? (
+                                <div className="qa-file-selected">
+                                  <ImageIcon size={16} color="#fb8c36" />
+                                  <span>{qaFile.name}</span>
+                                </div>
+                              ) : (
+                                <>
+                                  <Upload size={18} color="#94a3b8" />
+                                  <span style={{ color: '#94a3b8', fontSize: '13px' }}>Click to select an image</span>
+                                </>
+                              )}
+                            </div>
+                          )}
 
                           <div className="qa-input-row">
                             <input
@@ -1401,7 +1428,7 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
                               value={qaQuestion}
                               onChange={(e) => setQaQuestion(e.target.value)}
                               onKeyDown={(e) => {
-                                if (e.key === 'Enter' && qaFile && qaQuestion.trim()) {
+                                if (e.key === 'Enter' && (qaFile || selectedImageForQA) && qaQuestion.trim()) {
                                   e.preventDefault();
                                   handleImageQA();
                                 }
@@ -1409,7 +1436,7 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
                             />
                             <button
                               className="qa-send-btn"
-                              disabled={!qaFile || !qaQuestion.trim() || qaLoading}
+                              disabled={(!qaFile && !selectedImageForQA) || !qaQuestion.trim() || qaLoading}
                               onClick={handleImageQA}
                             >
                               {qaLoading ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}

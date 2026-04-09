@@ -261,20 +261,22 @@ export async function analyzeImages(files: File[]): Promise<MultiImageAnalysisRe
 }
 
 /**
- * Uploads a .zip file for batched multi-modal image analysis
+ * Uploads a .zip file OR multiple images for batched multi-modal visual intelligence
  */
-export async function analyzeImagesZip(file: File): Promise<ImageZipAnalysisResponse> {
+export async function analyzeImagesBatch(files: File[]): Promise<ImageZipAnalysisResponse> {
   const formData = new FormData();
-  formData.append('file', file);
+  
+  // Use 'files' key for both cases to match backend expectation
+  files.forEach(f => formData.append('files', f));
 
-  const response = await fetch(`${BASE_URL}/team5/image-analyze-zip`, {
+  const response = await fetch(`${BASE_URL}/team5/image-analyze-batch`, {
     method: 'POST',
     body: formData,
   });
 
   if (!response.ok) {
     const err = await response.json().catch(() => ({ detail: 'Unknown error' }));
-    throw new Error(err.detail || `ZIP Image analysis failed with status ${response.status}`);
+    throw new Error(err.detail || `Visual analysis failed with status ${response.status}`);
   }
 
   return response.json();
@@ -303,6 +305,24 @@ export interface ImageSearchResponse {
   query: string;
   total_searched: number;
   results: ImageSearchResult[];
+}
+
+/**
+ * Ask a question about an image that was already processed from a ZIP
+ */
+export async function askAboutExistingImage(imagePath: string, question: string): Promise<ImageQAResponse> {
+  const response = await fetch(`${BASE_URL}/team5/image-ask-existing`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ image_path: imagePath, question: question }),
+  });
+
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({ detail: 'Unknown error' }));
+    throw new Error(err.detail || `Existing Image Q&A failed with status ${response.status}`);
+  }
+
+  return response.json();
 }
 
 /**
