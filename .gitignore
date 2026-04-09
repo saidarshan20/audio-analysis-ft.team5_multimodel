@@ -55,3 +55,6 @@ dist/
 node_modules/
 .next/
 coverage/
+
+*.pt
+*.zip
