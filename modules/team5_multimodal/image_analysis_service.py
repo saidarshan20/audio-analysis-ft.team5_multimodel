@@ -175,24 +175,36 @@ class ImageAnalysisService:
         data = np.array(embeddings)
         n_samples = len(data)
 
-        # UMAP — unchanged
-        if n_samples > 5:
+        # Dimensionality Reduction (UMAP)
+        if n_samples > 1:
             n_neighbors = min(n_samples - 1, 15)
-            reducer = umap.UMAP(n_neighbors=n_neighbors, min_dist=0.1, n_components=2, random_state=42)
+            reducer = umap.UMAP(n_neighbors=n_neighbors, min_dist=0.1, n_components=2, random_state=42, init='random')
             projection = reducer.fit_transform(data)
-        elif n_samples > 1:
-            from sklearn.decomposition import PCA
-            projection = PCA(n_components=2).fit_transform(data)
         else:
             projection = np.array([[0.0, 0.0]])
 
-        # KMeans — Dynamic n_clusters based on size
-        n_clusters = max(2, min(int(n_samples / 2), 6)) if n_samples > 1 else 1
-        if n_samples > 1:
+        # 2. KMeans Clustering - Smart K-Estimation via Silhouette Score
+        if n_samples <= 1:
+            n_clusters = 1
+            cluster_labels = np.zeros(n_samples, dtype=int)
+        else:
+            from sklearn.metrics import silhouette_score
+            best_k = 2
+            best_score = -1
+            
+            # Test different K values from 2 to 8 (or N-1)
+            limit = min(8, n_samples - 1) 
+            for k in range(2, limit + 1):
+                km = KMeans(n_clusters=k, random_state=42, n_init="auto")
+                l = km.fit_predict(data)
+                score = silhouette_score(data, l)
+                if score > best_score:
+                    best_score = score
+                    best_k = k
+            
+            n_clusters = best_k
             kmeans = KMeans(n_clusters=n_clusters, random_state=42, n_init='auto')
             cluster_labels = kmeans.fit_predict(data)
-        else:
-            cluster_labels = np.array([0])
 
         # ProjectionPoints — unchanged
         points = [ProjectionPoint(x=float(projection[i, 0]), y=float(projection[i, 1]), cluster=int(cluster_labels[i]), filename=filenames[i]) for i in range(n_samples)]

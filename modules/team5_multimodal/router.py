@@ -149,24 +149,35 @@ async def analyze_images_teammate(files: list[UploadFile] = File(...)):
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 
-@router.post("/image-analyze-zip", response_model=ImageAnalysisResponse)
-async def analyze_images_zip(file: UploadFile = File(...)):
-    """Accepts a ZIP file containing raw images and processes them."""
-    if not file.filename or not file.filename.lower().endswith(".zip"):
-        raise HTTPException(status_code=400, detail="Only ZIP files are supported.")
-
-    zip_bytes = await file.read()
-    if not zip_bytes:
-        raise HTTPException(status_code=400, detail="Uploaded file is empty.")
+@router.post("/image-analyze-batch", response_model=ImageAnalysisResponse)
+async def analyze_images_batch(files: list[UploadFile] = File(...)):
+    """Accepts a ZIP file OR a list of individual image files and processes them."""
+    if not files:
+        raise HTTPException(status_code=400, detail="No files uploaded.")
 
     service = ZipImageAnalysisService()
-
+    
     try:
-        extract_dir = service.extract_zip(zip_bytes)
-        analysis_result = service.process_images(extract_dir)
+        # Case A: A single ZIP file
+        if len(files) == 1 and files[0].filename.lower().endswith(".zip"):
+            zip_bytes = await files[0].read()
+            extract_dir = service.extract_zip(zip_bytes)
+            analysis_result = service.process_images(extract_dir)
+            display_name = files[0].filename
+        
+        # Case B: Multiple individual image files
+        else:
+            # Filter for images
+            img_files = [f for f in files if f.content_type and f.content_type.startswith("image/")]
+            if not img_files:
+                raise HTTPException(status_code=400, detail="No valid images or ZIP archive found.")
+            
+            extract_dir = service.save_files(img_files)
+            analysis_result = service.process_images(extract_dir)
+            display_name = f"Batch of {len(img_files)} images"
 
         return ImageAnalysisResponse(
-            filename=file.filename,
+            filename=display_name,
             processed_count=len(analysis_result.clusters),
             result=analysis_result
         )
@@ -174,13 +185,56 @@ async def analyze_images_zip(file: UploadFile = File(...)):
     except ValueError as val_err:
         raise HTTPException(status_code=400, detail=str(val_err))
     except Exception as exc:
-        logger.exception("Image analysis pipeline failed")
+        logger.exception("Image batch analysis pipeline failed")
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 
 # ──────────────────────────────────────────────
 #  NEW ENDPOINTS (Groq-powered)
 # ──────────────────────────────────────────────
+
+class ImageAskExistingRequest(BaseModel):
+    image_path: str
+    question: str
+
+
+@router.post("/image-ask-existing")
+async def ask_about_existing_image(payload: ImageAskExistingRequest):
+    """
+    New Enhancement: Ask about an image that was already processed from a ZIP.
+    Expects a local file path relative to the capstone_2 root.
+    """
+    if not payload.image_path or not payload.question.strip():
+        raise HTTPException(status_code=400, detail="Missing image path or question.")
+
+    # Convert relative path to absolute to prevent directory traversal or path issues
+    base_dir = os.getcwd()
+    abs_path = os.path.join(base_dir, payload.image_path)
+    
+    # Security check: Ensure the path is inside the shared_workspace
+    if "shared_workspace" not in abs_path:
+         raise HTTPException(status_code=403, detail="Access denied to requested path.")
+
+    if not os.path.exists(abs_path):
+        raise HTTPException(status_code=404, detail=f"Image not found at: {payload.image_path}")
+
+    try:
+        with open(abs_path, "rb") as f:
+            image_bytes = f.read()
+        
+        service = TeammateImageAnalysisService()
+        answer = service.ask_about_image(image_bytes, payload.question.strip())
+        
+        return {
+            "status": "success",
+            "image_path": payload.image_path,
+            "question": payload.question.strip(),
+            "answer": answer
+        }
+    except Exception as exc:
+        logger.exception("Existing Image Q&A failed")
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
 
 @router.post("/image-ask")
 async def ask_about_image(
