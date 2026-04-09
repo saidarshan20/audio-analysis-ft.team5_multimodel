@@ -127,6 +127,61 @@ export interface ImageZipAnalysisResponse {
   };
 }
 
+export interface SpeakerSegment {
+  start: number;
+  end: number;
+  speaker: string;
+  text: string;
+}
+
+// ── Acoustic Feature Types (Task 1 output) ─────────────────────────────────
+export interface WaveformData {
+  timestamps: number[];   // time in seconds (down-sampled ~1000 pts)
+  amplitudes: number[];   // normalized [-1, 1]
+}
+
+export interface SpectrogramData {
+  time_bins: number[];             // seconds (100 bins)
+  freq_bins: number[];             // Hz (128 bins)
+  magnitude_db: number[][];        // [freq_idx][time_idx] clipped to [-80, 0] dB
+}
+
+export interface EnergyData {
+  timestamps: number[];  // seconds
+  rms_values: number[];  // normalized [0, 1]
+}
+
+export interface MFCCData {
+  timestamps: number[];
+  coefficients: number[][];  // [mfcc_idx][time_idx], 13 coefficients
+}
+
+export interface AudioFeatures {
+  sample_rate: number;
+  duration: number;
+  num_channels: number;
+  waveform: WaveformData;
+  spectrogram: SpectrogramData;
+  energy: EnergyData;
+  mfcc?: MFCCData;
+}
+
+export interface AudioAnalysisResult {
+  duration: number;
+  segments: SpeakerSegment[];
+  transcript_text: string;
+  text_analysis: TextAnalysisResult | null;
+  features?: AudioFeatures;  // ← acoustic features from Task 1
+}
+
+export interface AudioAnalysisResponse {
+  status: string;
+  filename: string;
+  content_type: string;
+  result: AudioAnalysisResult;
+}
+
+
 /**
  * Uploads a .txt or .pdf file for multi-modal text analysis
  */
@@ -270,6 +325,53 @@ export async function analyzeImagesZip(file: File): Promise<ImageZipAnalysisResp
   if (!response.ok) {
     const err = await response.json().catch(() => ({ detail: 'Unknown error' }));
     throw new Error(err.detail || `ZIP Image analysis failed with status ${response.status}`);
+  }
+
+  return response.json();
+}
+
+/**
+ * Uploads an audio file for speaker diarization and text analysis
+ */
+export async function analyzeAudio(file: File): Promise<AudioAnalysisResponse> {
+  const formData = new FormData();
+  formData.append('file', file);
+
+  const response = await fetch(`${BASE_URL}/team5/analyze-audio`, {
+    method: 'POST',
+    body: formData,
+  });
+
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({ detail: 'Unknown error' }));
+    throw new Error(err.detail || `Audio analysis failed with status ${response.status}`);
+  }
+
+  return response.json();
+}
+
+/**
+ * Lightweight acoustic feature extraction — no Whisper/diarization.
+ * Returns waveform, spectrogram, and RMS energy data for visualization.
+ * Works even without HF_TOKEN or heavy model downloads.
+ */
+export async function extractAudioFeatures(file: File): Promise<{
+  status: string;
+  filename: string;
+  content_type: string;
+  result: AudioFeatures;
+}> {
+  const formData = new FormData();
+  formData.append('file', file);
+
+  const response = await fetch(`${BASE_URL}/team5/audio-features`, {
+    method: 'POST',
+    body: formData,
+  });
+
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({ detail: 'Unknown error' }));
+    throw new Error(err.detail || `Feature extraction failed with status ${response.status}`);
   }
 
   return response.json();

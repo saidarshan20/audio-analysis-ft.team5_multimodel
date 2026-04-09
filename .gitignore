@@ -3,6 +3,10 @@ __pycache__/
 *.py[cod]
 *$py.class
 
+# Ignore FFmpeg binaries
+ffmpeg*
+ffmpeg-*    
+
 # Environments
 .venv/
 env/
@@ -11,6 +15,9 @@ ENV/
 
 # Secrets
 .env
+.env.*
+!.env.example
+stuff/
 
 # OS-specific
 .DS_Store
@@ -25,12 +32,11 @@ shared_workspace/2_processed_data/*
 shared_workspace/3_models/*
 !shared_workspace/**/.gitkeep
 
-# Frontend dependencies & builds
-node_modules/
-frontend/node_modules/
-dist/
-frontend/dist/
-.DS_Store
+# Python tooling caches
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.ipynb_checkpoints/
 
 # Logs & temp folders
 logs/
@@ -39,5 +45,22 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
-# Development files
-.ipynb_checkpoints/
+# IDE/editor settings
+.vscode/
+.idea/
+
+# Frontend dependencies & builds
+node_modules/
+frontend/node_modules/
+dist/
+frontend/dist/
+.DS_Store
+.next/
+coverage/
+
+# Build/distribution artifacts
+build/
+*.egg-info/
+
+*.pt
+*.zip

@@ -182,3 +182,88 @@ class ImageAnalysisResponse(BaseModel):
     status: str = "success"
     processed_count: int
     result: ZipPipelineResult
+
+# ──────────────────────────────────────────────
+#  Audio Acoustic Feature Models
+#  Task 1 – Audio Ingestion, Preprocessing & Feature Extraction
+# ──────────────────────────────────────────────
+
+class WaveformData(BaseModel):
+    """Down-sampled waveform for the frontend player / waveform canvas."""
+    timestamps: list[float]   # time points in seconds
+    amplitudes: list[float]   # normalized amplitudes in [-1, 1]
+
+
+class SpectrogramData(BaseModel):
+    """
+    STFT spectrogram down-sampled to 128 freq-bins × 100 time-bins.
+    magnitude_db is a 2-D list: [freq_idx][time_idx] in decibels (clipped to [-80, 0]).
+    """
+    time_bins: list[float]           # seconds
+    freq_bins: list[float]           # Hz
+    magnitude_db: list[list[float]]  # [freq][time]
+
+
+class EnergyData(BaseModel):
+    """Frame-level RMS energy timeline, normalized to [0, 1]."""
+    timestamps: list[float]
+    rms_values: list[float]
+
+
+class MFCCData(BaseModel):
+    """13 MFCC coefficient tracks over time (optional, computed only on request)."""
+    timestamps: list[float]
+    coefficients: list[list[float]]  # [mfcc_idx][time_idx]
+
+
+class AudioFeatures(BaseModel):
+    """
+    All acoustic features extracted from a single audio file.
+    Attached to AudioAnalysisResult under the `features` key.
+    """
+    sample_rate: int
+    duration: float
+    num_channels: int
+    waveform: WaveformData
+    spectrogram: SpectrogramData
+    energy: EnergyData
+    mfcc: MFCCData | None = None
+
+
+# ──────────────────────────────────────────────
+#  Audio Analysis Models (Multimodal Pipeline)
+#  Task 2 – API Integration & Data Management
+# ──────────────────────────────────────────────
+
+class SpeakerSegment(BaseModel):
+    start: float
+    end: float
+    speaker: str
+    text: str
+
+
+class AudioAnalysisResult(BaseModel):
+    duration: float
+    segments: list[SpeakerSegment]
+    transcript_text: str
+    text_analysis: TextAnalysisResult | None = None
+    features: AudioFeatures | None = None   # ← acoustic feature data (Task 1)
+
+
+class AudioAnalysisResponse(BaseModel):
+    status: str = "success"
+    filename: str
+    content_type: str
+    result: AudioAnalysisResult
+
+
+class AudioFeaturesResponse(BaseModel):
+    """
+    Response for the lightweight /audio-features endpoint.
+    Returns only acoustic features – no Whisper/diarization required.
+    Useful for demos and machines without HF token / large model downloads.
+    """
+    status: str = "success"
+    filename: str
+    content_type: str
+    result: AudioFeatures
