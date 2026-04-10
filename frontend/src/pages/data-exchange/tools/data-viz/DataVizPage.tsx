@@ -8,6 +8,8 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import '../ToolPage.css';
+
+const BASE_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8000';
 import {
   analyzeTextFile,
   analyzeCodebase,
@@ -1523,21 +1525,37 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
 
                           {showSearchResults && searchResults.length > 0 && (
                             <div className="search-results-list">
-                              {searchResults.map((sr, idx) => (
-                                <div key={idx} className="search-result-item">
-                                  <div className="search-result-rank">
-                                    <span className="search-rank-num">#{idx + 1}</span>
-                                    <div className="search-score-bar">
-                                      <div className="search-score-fill" style={{ width: `${sr.relevance_score * 10}%` }} />
+                              {searchResults.map((sr, idx) => {
+                                // Find image path from either imgResult or imgZipResult
+                                let imgPath = null;
+                                if (imgZipResult) {
+                                  const pt = imgZipResult.result.clusters.find(c => c.filename === sr.filename);
+                                  if (pt?.annotated_image_path) imgPath = `${BASE_URL}/${pt.annotated_image_path}`;
+                                }
+                                
+                                return (
+                                  <div key={idx} className="search-result-item" style={{ display: 'flex', gap: '15px', alignItems: 'flex-start' }}>
+                                    {imgPath && (
+                                      <div className="search-result-thumb" style={{ width: '80px', height: '60px', borderRadius: '8px', overflow: 'hidden', flexShrink: 0, border: '1px solid rgba(255,255,255,0.1)' }}>
+                                        <img src={imgPath} alt={sr.filename} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                      </div>
+                                    )}
+                                    <div style={{ flex: 1 }}>
+                                      <div className="search-result-rank">
+                                        <span className="search-rank-num">#{idx + 1}</span>
+                                        <div className="search-score-bar">
+                                          <div className="search-score-fill" style={{ width: `${sr.relevance_score * 10}%` }} />
+                                        </div>
+                                        <span className="search-score-label">{sr.relevance_score}/10</span>
+                                      </div>
+                                      <div className="search-result-info">
+                                        <strong style={{ display: 'block', fontSize: '13px' }}>{sr.filename}</strong>
+                                        <span className="search-result-reason" style={{ fontSize: '11px', display: 'block', marginTop: '2px' }}>{sr.reason}</span>
+                                      </div>
                                     </div>
-                                    <span className="search-score-label">{sr.relevance_score}/10</span>
                                   </div>
-                                  <div className="search-result-info">
-                                    <strong>{sr.filename}</strong>
-                                    <span className="search-result-reason">{sr.reason}</span>
-                                  </div>
-                                </div>
-                              ))}
+                                );
+                              })}
                             </div>
                           )}
 
