@@ -1198,3 +1198,75 @@
   box-shadow: 0 4px 10px rgba(0,0,0,0.3);
 }
 
+/* ── Theme-adaptive utility classes ──────────────────────────────────────── */
+/* These classes ensure text and backgrounds look correct in both light and dark modes */
+
+.theme-heading {
+  color: #1e293b;
+}
+
+.theme-subtext {
+  color: #64748b;
+}
+
+.theme-progress-bg {
+  background: #e2e8f0;
+}
+
+/* Dark mode overrides for theme utilities */
+:root:not([data-theme="light"]) .theme-heading {
+  color: #f8fafc;
+}
+
+:root:not([data-theme="light"]) .theme-subtext {
+  color: #94a3b8;
+}
+
+:root:not([data-theme="light"]) .theme-progress-bg {
+  background: #1e293b;
+}
+
+/* Fix premium gallery filename text in light mode */
+.premium-gallery-info .theme-heading {
+  color: #1e293b;
+}
+:root:not([data-theme="light"]) .premium-gallery-info .theme-heading {
+  color: #f8fafc;
+}
+
+/* Fix premium gallery meta text in light mode */
+.premium-gallery-meta .theme-subtext {
+  color: #64748b;
+}
+:root:not([data-theme="light"]) .premium-gallery-meta .theme-subtext {
+  color: #94a3b8;
+}
+
+/* Fix qa-send-btn disabled state in light mode */
+:root[data-theme="light"] .qa-send-btn:disabled {
+  background: #e2e8f0;
+  color: #94a3b8;
+}
+
+/* Fix search result text in light mode */
+:root[data-theme="light"] .search-result-info strong {
+  color: #1e293b;
+}
+
+/* Fix qa-answer in dark mode */
+:root:not([data-theme="light"]) .qa-answer-label {
+  color: #7dd3fc;
+}
+
+/* Theme-adaptive chip for object labels */
+.theme-chip {
+  background: #f1f5f9;
+  color: #475569;
+  border: 1px solid #e2e8f0;
+}
+:root:not([data-theme="light"]) .theme-chip {
+  background: rgba(255, 255, 255, 0.05);
+  color: #cbd5e1;
+  border-color: rgba(255, 255, 255, 0.1);
+}
+

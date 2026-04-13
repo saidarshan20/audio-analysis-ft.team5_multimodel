@@ -1256,11 +1256,11 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
                               <span className="cluster-dot" style={{ background: `var(--cluster-${c.cluster_id % 5})`, display: 'inline-block', marginTop: '6px' }}></span>
                               <div style={{ width: '100%' }}>
                                 <strong style={{ color: '#fb8c36', display: 'block', fontSize: '14px', marginBottom: '4px' }}>{c.description}</strong>
-                                <span style={{ color: '#94a3b8', margin: '8px 0 4px', display: 'block', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Detected Contexts:</span>
+                                <span className="theme-subtext" style={{ margin: '8px 0 4px', display: 'block', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Detected Contexts:</span>
                                 <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
                                   {imgZipResult.result?.clusters?.filter(p => p.cluster_id === c.cluster_id).slice(0, 1).map(p => (
                                     p.objects?.slice(0, 4).map((obj, i) => (
-                                      <span key={i} className="chip" style={{ fontSize: '9px', background: 'rgba(255, 255, 255, 0.05)', color: '#cbd5e1' }}>{obj.label}</span>
+                                      <span key={i} className="chip theme-chip" style={{ fontSize: '9px' }}>{obj.label}</span>
                                     ))
                                   ))}
                                 </div>
@@ -1275,10 +1275,10 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
                     <div style={{ padding: '40px 0 0' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
                         <div>
-                          <h3 style={{ margin: 0, fontSize: '20px', fontWeight: 800, color: '#f8fafc', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                          <h3 className="theme-heading" style={{ margin: 0, fontSize: '20px', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '12px' }}>
                             <Layers size={24} color="#f59e0b" /> Semantic Category Explorer
                           </h3>
-                          <p style={{ color: '#94a3b8', fontSize: '13px', marginTop: '4px' }}>AI-organized content themes. Click to filter the gallery below.</p>
+                          <p className="theme-subtext" style={{ fontSize: '13px', marginTop: '4px' }}>AI-organized content themes. Click to filter the gallery below.</p>
                         </div>
                         {selectedCategory !== null && (
                           <button 
@@ -1299,8 +1299,8 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
                             style={{ 
                               cursor: 'pointer', 
                               transition: 'all 0.3s ease',
-                              border: selectedCategory === sum.cluster_id ? '2px solid #fb8c36' : '1px solid #1e293b',
-                              background: selectedCategory === sum.cluster_id ? 'rgba(251, 140, 54, 0.05)' : '#0f172a'
+                              border: selectedCategory === sum.cluster_id ? '2px solid #fb8c36' : undefined,
+                              background: selectedCategory === sum.cluster_id ? 'rgba(251, 140, 54, 0.05)' : undefined
                             }}
                             onClick={() => setSelectedCategory(sum.cluster_id)}
                           >
@@ -1318,10 +1318,10 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
                                 }}>
                                   <ImageIcon size={20} color="#fff" />
                                 </div>
-                                <span style={{ fontSize: '11px', color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase' }}>{sum.count} Items</span>
+                                <span className="theme-subtext" style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase' }}>{sum.count} Items</span>
                               </div>
-                              <h4 style={{ margin: 0, fontSize: '16px', color: '#f8fafc', fontWeight: 800 }}>{sum.description}</h4>
-                              <div style={{ marginTop: '12px', height: '4px', background: '#1e293b', borderRadius: '2px', overflow: 'hidden' }}>
+                              <h4 className="theme-heading" style={{ margin: 0, fontSize: '16px', fontWeight: 800 }}>{sum.description}</h4>
+                              <div className="theme-progress-bg" style={{ marginTop: '12px', height: '4px', borderRadius: '2px', overflow: 'hidden' }}>
                                 <div style={{ height: '100%', width: `${Math.min(100, (sum.count / imgZipResult.processed_count) * 100)}%`, background: `var(--cluster-${sum.cluster_id % 5})` }} />
                               </div>
                             </div>
@@ -1331,7 +1331,7 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
                     </div>
 
                     <div style={{ padding: '40px 0 20px' }}>
-                      <h3 style={{ marginBottom: '24px', fontSize: '20px', fontWeight: 800, color: '#f8fafc', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      <h3 className="theme-heading" style={{ marginBottom: '24px', fontSize: '20px', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '12px' }}>
                         <ImageIcon size={24} color="#60a5fa" /> Annotated Detection Gallery
                       </h3>
                       
@@ -1362,11 +1362,11 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
                               </div>
                             </div>
                             <div className="premium-gallery-info">
-                              <span style={{ display: 'block', color: '#f8fafc', fontSize: '14px', fontWeight: '700', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', marginBottom: '12px' }}>
+                              <span className="theme-heading" style={{ display: 'block', fontSize: '14px', fontWeight: '700', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', marginBottom: '12px' }}>
                                 {c.filename}
                               </span>
                               <div className="premium-gallery-meta">
-                                <span style={{ fontSize: '12px', color: '#94a3b8', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                <span className="theme-subtext" style={{ fontSize: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
                                   <Search size={14} /> {c.objects?.length || 0} Objects
                                 </span>
                                 <button 
@@ -1392,10 +1392,10 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
 
                 {(imgResult || imgZipResult) && (
                   <div className="ai-intelligence-section">
-                    <h3 style={{ fontSize: '22px', fontWeight: 800, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
+                    <h3 className="theme-heading" style={{ fontSize: '22px', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
                       <Sparkles size={24} color="#fb8c36" /> Intelligent Visual Reasoning
                     </h3>
-                    <p style={{ color: '#94a3b8', fontSize: '14px', marginBottom: '28px' }}>Contextual Multimodal Intelligence — Ask questions about images or perform a semantic lookup across your analyzed collection.</p>
+                    <p className="theme-subtext" style={{ fontSize: '14px', marginBottom: '28px' }}>Contextual Multimodal Intelligence — Ask questions about images or perform a semantic lookup across your analyzed collection.</p>
 
                     <div className="ai-intel-grid">
                       {/* ── Image Q&A Card ── */}
@@ -1524,7 +1524,7 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
                           </div>
 
                           {showSearchResults && searchResults.length > 0 && (
-                            <div className="search-results-list">
+                            <div className="search-results-list" style={{ maxHeight: '500px' }}>
                               {searchResults.map((sr, idx) => {
                                 // Find image path from either imgResult or imgZipResult
                                 let imgPath = null;
@@ -1534,13 +1534,13 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
                                 }
                                 
                                 return (
-                                  <div key={idx} className="search-result-item" style={{ display: 'flex', gap: '15px', alignItems: 'flex-start' }}>
+                                  <div key={idx} className="search-result-item" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                                     {imgPath && (
-                                      <div className="search-result-thumb" style={{ width: '80px', height: '60px', borderRadius: '8px', overflow: 'hidden', flexShrink: 0, border: '1px solid rgba(255,255,255,0.1)' }}>
-                                        <img src={imgPath} alt={sr.filename} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                      <div className="search-result-thumb" style={{ width: '100%', height: '180px', borderRadius: '10px', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.1)' }}>
+                                        <img src={imgPath} alt={sr.filename} style={{ width: '100%', height: '100%', objectFit: 'cover', cursor: 'pointer', transition: 'transform 0.3s' }} onMouseOver={(e) => (e.currentTarget.style.transform = 'scale(1.05)')} onMouseOut={(e) => (e.currentTarget.style.transform = 'scale(1)')} />
                                       </div>
                                     )}
-                                    <div style={{ flex: 1 }}>
+                                    <div>
                                       <div className="search-result-rank">
                                         <span className="search-rank-num">#{idx + 1}</span>
                                         <div className="search-score-bar">
@@ -1548,9 +1548,9 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
                                         </div>
                                         <span className="search-score-label">{sr.relevance_score}/10</span>
                                       </div>
-                                      <div className="search-result-info">
+                                      <div className="search-result-info" style={{ marginTop: '8px' }}>
                                         <strong style={{ display: 'block', fontSize: '13px' }}>{sr.filename}</strong>
-                                        <span className="search-result-reason" style={{ fontSize: '11px', display: 'block', marginTop: '2px' }}>{sr.reason}</span>
+                                        <span className="search-result-reason" style={{ fontSize: '11px', display: 'block', marginTop: '4px' }}>{sr.reason}</span>
                                       </div>
                                     </div>
                                   </div>
