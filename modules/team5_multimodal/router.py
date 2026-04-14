@@ -9,11 +9,13 @@ import logging
 import os
 
 from fastapi import APIRouter, HTTPException, UploadFile, File, Form
+import httpx
 from fastapi.responses import StreamingResponse, FileResponse
 from pydantic import BaseModel
 import json
 import asyncio
 
+from modules.team5_multimodal.config import get_settings
 from modules.team5_multimodal.models import (
     TextAnalysisResponse, CodeAnalysisResponse, MultiImageAnalysisResponse, ImageAnalysisResponse
 )
@@ -476,6 +478,68 @@ async def stream_temp_video():
         media_type="video/mp4",
         headers={"Accept-Ranges": "bytes", "Cache-Control": "no-cache", "Content-Disposition": "inline"},
     )
+
+
+# ──────────────────────────────────────────────
+#  data.gov.in Catalog Proxy
+# ──────────────────────────────────────────────
+@router.get("/datasets")
+async def list_datasets(q: str = "", offset: int = 0, limit: int = 20):
+    """
+    Proxy to data.gov.in catalog API.
+    Returns { total, results: [{name, desc, category, org}] }
+    """
+    settings = get_settings()
+    api_key = settings.data_gov_api_key
+    if not api_key:
+        return {"total": 0, "results": [], "error": "DATA_GOV_API_KEY not configured"}
+
+    params: dict = {
+        "format": "json",
+        "api-key": api_key,
+        "offset": offset,
+        "limit": limit,
+        "filters[org_type]": "Central",
+    }
+    if q.strip():
+        params["filters[title]"] = q.strip()
+
+    try:
+        async with httpx.AsyncClient(timeout=15) as client:
+            resp = await client.get("https://api.data.gov.in/lists", params=params)
+            resp.raise_for_status()
+            data = resp.json()
+
+        results = []
+        for item in data.get("records", []):
+            try:
+                sector_list = item.get("sector") or []
+                org_list = item.get("org") or []
+                category = sector_list[0] if isinstance(sector_list, list) and sector_list else "General"
+                org_name = org_list[0] if isinstance(org_list, list) and org_list else "Government of India"
+                title = str(item.get("title") or "Untitled").strip()
+                if not title or title.lower().startswith("mydata-") or title.lower() == "untitled":
+                    continue
+                results.append({
+                    "name": title,
+                    "desc": str(item.get("desc") or ""),
+                    "category": str(category),
+                    "org": str(org_name),
+                })
+            except Exception:
+                continue
+
+        total = data.get("total", len(results))
+        try:
+            total = int(total)
+        except (TypeError, ValueError):
+            total = len(results)
+
+        return {"total": total, "results": results}
+
+    except Exception as exc:
+        logger.warning("data.gov.in API error: %s", exc)
+        return {"total": 0, "results": [], "error": str(exc)}
 
 
 @router.get("/demo-video-metadata")

@@ -33,6 +33,9 @@ class Team5Settings(BaseSettings):
     ffmpeg_path: str = ""
     ffprobe_path: str = ""
 
+    # --- data.gov.in Open Data Catalog ---
+    data_gov_api_key: str = ""
+
     # --- CORS (for run_local.py standalone testing) ---
     cors_origins: list[str] = ["http://localhost:3000", "http://localhost:5173"]
 

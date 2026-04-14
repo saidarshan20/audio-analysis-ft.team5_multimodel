@@ -20,6 +20,8 @@ import {
   searchImages,
   analyzeAudio,
   analyzeVideo,
+  fetchDatasets,
+  DatasetEntry,
   TextAnalysisResult,
   CodeAnalysisResult,
   MultiImageAnalysisResponse,
@@ -148,38 +150,6 @@ const FILE_TYPES: { id: FileType; label: string; desc: string; icon: any }[] = [
   { id: 'music',  label: 'Audio',     desc: 'Voice & sound analysis',     icon: Music },
 ];
 
-const DATASETS = [
-  {
-    name: 'Details of Beneficiaries under Saakshar Bharat Programme (karkkum Bharatham Thittam) by Districts in Tamil Nadu from 2010-11 to 2017-18',
-    desc: 'Details of Beneficiaries under Saakshar Bharat Programme (karkkum Bharatham Thittam) by Districts in Tamil Nadu from 2010-11 to 2017-18',
-    category: 'Adult Education',
-  },
-  {
-    name: 'Enrolment in school education from 1950-51 to 2009-10',
-    desc: 'No description available',
-    category: 'Adult Education',
-  },
-  {
-    name: 'District-wise Number of Recognised Schools in India',
-    desc: 'Statistical data on school infrastructure across all districts in India',
-    category: 'Education',
-  },
-  {
-    name: 'Customer Purchase Behavior Analytics',
-    desc: 'Shopping patterns and purchase history across categories',
-    category: 'Commerce',
-  },
-  {
-    name: 'Sales Performance Data Q4 2025',
-    desc: 'Regional sales data with trend indicators and forecasts',
-    category: 'Business',
-  },
-  {
-    name: 'Product Inventory Records',
-    desc: 'Real-time inventory tracking data with stock levels',
-    category: 'Operations',
-  },
-];
 
 const DataVizPage = ({ onBack }: { onBack: () => void }) => {
   const [activeTab, setActiveTab] = useState<DatasetTab>('catalog');
@@ -232,6 +202,37 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
 
   // ── Audio State ──
   const [audioResult, setAudioResult] = useState<AudioAnalysisResponse | null>(null);
+
+  // ── Catalog State ──
+  const [datasets, setDatasets] = useState<DatasetEntry[]>([]);
+  const [datasetsTotal, setDatasetsTotal] = useState(0);
+  const [datasetsLoading, setDatasetsLoading] = useState(false);
+  const [datasetsOffset, setDatasetsOffset] = useState(0);
+
+  const loadDatasets = async (query: string, offset: number) => {
+    setDatasetsLoading(true);
+    try {
+      const page = await fetchDatasets(query, offset, 20);
+      setDatasetsTotal(page.total);
+      setDatasets(prev => offset === 0 ? page.results : [...prev, ...page.results]);
+      setDatasetsOffset(offset);
+    } catch {
+      // silently keep existing results
+    } finally {
+      setDatasetsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    const t = setTimeout(() => loadDatasets(search, 0), search ? 400 : 0);
+    return () => clearTimeout(t);
+  }, [search]);
+
+  useEffect(() => {
+    if (activeTab === 'catalog' && datasets.length === 0) {
+      loadDatasets('', 0);
+    }
+  }, [activeTab]);
 
   // ── Video State ──
   const [videoResult, setVideoResult] = useState<VideoAnalysisResult | null>(null);
@@ -434,10 +435,6 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
     }
   };
 
-  const filtered = DATASETS.filter(d =>
-    d.name.toLowerCase().includes(search.toLowerCase()) ||
-    d.desc.toLowerCase().includes(search.toLowerCase())
-  );
 
   const onFilesSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
@@ -597,22 +594,48 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
                 onChange={e => setSearch(e.target.value)}
               />
             </div>
-            <p className="xt-count">Found {filtered.length > 3 ? '1913' : filtered.length} datasets</p>
+            <p className="xt-count">
+              {datasetsLoading && datasets.length === 0
+                ? 'Loading datasets…'
+                : `Found ${datasetsTotal.toLocaleString()} datasets`}
+            </p>
             <div className="xt-dataset-list">
-              {filtered.map(d => (
-                <div
-                  key={d.name}
-                  className={`xt-dataset-row${selected === d.name ? ' selected' : ''}`}
-                  onClick={() => setSelected(d.name)}
-                >
-                  <div className="xt-dataset-info">
-                    <span className="xt-dataset-name">{d.name}</span>
-                    <span className="xt-dataset-desc">{d.desc}</span>
-                  </div>
-                  <span className="xt-dataset-badge">{d.category}</span>
-                </div>
-              ))}
+              {datasetsLoading && datasets.length === 0
+                ? Array.from({ length: 6 }).map((_, i) => (
+                    <div key={i} className="xt-dataset-row" style={{ opacity: 0.4, pointerEvents: 'none' }}>
+                      <div className="xt-dataset-info">
+                        <span className="xt-dataset-name" style={{ background: '#334155', borderRadius: 4, color: 'transparent', userSelect: 'none' }}>Loading dataset title placeholder</span>
+                        <span className="xt-dataset-desc" style={{ background: '#1e293b', borderRadius: 4, color: 'transparent', userSelect: 'none' }}>Loading description text here…</span>
+                      </div>
+                      <span className="xt-dataset-badge" style={{ background: '#334155', color: 'transparent' }}>Category</span>
+                    </div>
+                  ))
+                : datasets.map((d, i) => (
+                    <div
+                      key={`${d.name}-${i}`}
+                      className={`xt-dataset-row${selected === d.name ? ' selected' : ''}`}
+                      onClick={() => setSelected(d.name)}
+                    >
+                      <div className="xt-dataset-info">
+                        <span className="xt-dataset-name">{d.name}</span>
+                        <span className="xt-dataset-desc">{d.desc}</span>
+                      </div>
+                      <span className="xt-dataset-badge">{d.category}</span>
+                    </div>
+                  ))}
             </div>
+            {datasets.length > 0 && datasets.length < datasetsTotal && (
+              <div style={{ display: 'flex', justifyContent: 'center', marginTop: '16px' }}>
+                <button
+                  className="xt-tab"
+                  style={{ background: 'rgba(96, 165, 250, 0.1)', color: '#60a5fa', border: '1px solid rgba(96, 165, 250, 0.2)', padding: '8px 24px', cursor: datasetsLoading ? 'not-allowed' : 'pointer', opacity: datasetsLoading ? 0.6 : 1 }}
+                  onClick={() => !datasetsLoading && loadDatasets(search, datasetsOffset + 20)}
+                  disabled={datasetsLoading}
+                >
+                  {datasetsLoading ? 'Loading…' : `Load More (${datasets.length} / ${datasetsTotal.toLocaleString()})`}
+                </button>
+              </div>
+            )}
           </div>
         )}
 

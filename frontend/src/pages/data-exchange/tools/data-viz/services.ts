@@ -5,6 +5,28 @@
 
 const BASE_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8000';
 
+// ── data.gov.in Catalog ──────────────────────────────────────────────────────
+
+export interface DatasetEntry {
+  name: string;
+  desc: string;
+  category: string;
+  org: string;
+}
+
+export interface DatasetPage {
+  total: number;
+  results: DatasetEntry[];
+  error?: string;
+}
+
+export async function fetchDatasets(q: string, offset: number, limit: number): Promise<DatasetPage> {
+  const params = new URLSearchParams({ q, offset: String(offset), limit: String(limit) });
+  const response = await fetch(`${BASE_URL}/team5/datasets?${params}`);
+  if (!response.ok) throw new Error(`Dataset fetch failed: ${response.status}`);
+  return response.json();
+}
+
 export interface TextAnalysisResult {
   summary: string;
   sentiment: {
