@@ -129,6 +129,13 @@ export interface ImageZipAnalysisResponse {
       count: number;
     }>;
     plot_file_path: string;
+    metadata?: {
+      total_duration_sec: number;
+      input_tokens: number;
+      output_tokens: number;
+      total_tokens: number;
+      model: string;
+    };
   };
 }
 
