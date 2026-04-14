@@ -8,7 +8,9 @@ import os
 import uuid
 import zipfile
 import logging
+import time
 import tempfile
+import json
 from pathlib import Path
 
 import numpy as np
@@ -115,35 +117,51 @@ class ImageAnalysisService:
             logger.error(f"BLIP Captioning Error on {img_path}: {e}")
         return None
 
-    def _name_clusters(self, labels: np.ndarray, metadata: list[dict], n_clusters: int) -> list[ClusterInfo]:
-        """Use Groq to name these clusters semantically."""
+    def _name_clusters(self, labels: np.ndarray, metadata: list[dict], n_clusters: int) -> tuple[list[ClusterInfo], dict]:
+        """Use Groq to name all clusters in a single batch request for maximum speed."""
         cluster_info_list = []
+        input_tokens = 0
+        output_tokens = 0
+        
+        # Prepare batch prompt: Send samples from ALL groups in one go
+        batch_input = []
         for c_id in range(n_clusters):
             indices = [i for i, lbl in enumerate(labels) if lbl == c_id]
-            count = len(indices)
-            # Take representative captions
             samples = [metadata[i]["description"] for i in indices[:5] if metadata[i]["description"]]
-            caption_text = "\n".join(f"- {s}" for s in samples)
+            batch_input.append(f"Group {c_id}: " + ", ".join(samples[:5]))
+        
+        all_descriptions = "\n".join(batch_input)
+        
+        try:
+            response = _groq_client.chat.completions.create(
+                model=self.settings.groq_model,
+                messages=[
+                    {"role": "system", "content": "You are a categorical classification expert. Provide a 2-3 word name for EACH group of images based on their descriptions. Return ONLY a JSON object: {\"Group 0\": \"Name\", \"Group 1\": \"Name\", ...}"},
+                    {"role": "user", "content": f"Groups to name:\n{all_descriptions}"}
+                ],
+                response_format={"type": "json_object"}
+            )
             
-            try:
-                response = _groq_client.chat.completions.create(
-                    model=self.settings.groq_model,
-                    messages=[
-                        {"role": "system", "content": "You are a categorical classification expert. Provide a 2-3 word name for a group of images based on their descriptions."},
-                        {"role": "user", "content": f"Descriptions:\n{caption_text}\n\nSmart Group Name:"}
-                    ],
-                    max_tokens=20,
-                    temperature=0.4
-                )
-                smart_name = response.choices[0].message.content.strip().strip("\"'")
-            except Exception as e:
-                logger.warning(f"Groq failed to name cluster {c_id}: {e}")
-                smart_name = f"Group {c_id + 1}"
+            names_json = json.loads(response.choices[0].message.content)
             
-            cluster_info_list.append(ClusterInfo(cluster_id=c_id, description=smart_name, count=count))
-        return cluster_info_list
+            for c_id in range(n_clusters):
+                smart_name = names_json.get(f"Group {c_id}", f"Group {c_id + 1}")
+                count = len([i for i, lbl in enumerate(labels) if lbl == c_id])
+                cluster_info_list.append(ClusterInfo(cluster_id=c_id, description=smart_name, count=count))
+                
+            if hasattr(response, "usage") and response.usage:
+                input_tokens = response.usage.prompt_tokens
+                output_tokens = response.usage.completion_tokens
+        except Exception as e:
+            logger.warning(f"Batch cluster naming failed: {e}")
+            for c_id in range(n_clusters):
+                count = len([i for i, lbl in enumerate(labels) if lbl == c_id])
+                cluster_info_list.append(ClusterInfo(cluster_id=c_id, description=f"Group {c_id + 1}", count=count))
+            
+        return cluster_info_list, {"input": input_tokens, "output": output_tokens, "total": input_tokens + output_tokens}
 
     def process_images(self, extract_dir: str) -> ZipPipelineResult:
+        start_time = time.time()
         root = Path(extract_dir)
         valid_exts = {".jpg", ".jpeg", ".png", ".bmp", ".webp"}
         
@@ -271,16 +289,25 @@ class ImageAnalysisService:
             )
 
         # 4. Smart Cluster Naming (New Team 5 Feature)
-        cluster_summaries = self._name_clusters(labels, metadata_list, n_clusters)
+        cluster_summaries, tokens = self._name_clusters(labels, metadata_list, n_clusters)
 
         # 5. Matplotlib Output
         plot_path = self.proc_dir / f"cluster_plot_{uuid.uuid4().hex[:8]}.png"
         self._generate_plot(coords, labels, plot_path)
 
+        total_duration = time.time() - start_time
+
         return ZipPipelineResult(
             clusters=cluster_points,
             cluster_summaries=cluster_summaries,
-            plot_file_path=str(plot_path.relative_to(self.base_dir))
+            plot_file_path=str(plot_path.relative_to(self.base_dir)),
+            metadata={
+                "total_duration_sec": round(total_duration, 2),
+                "input_tokens": tokens["input"],
+                "output_tokens": tokens["output"],
+                "total_tokens": tokens["total"],
+                "model": self.settings.groq_model
+            }
         )
 
     def _generate_plot(self, coords, labels, out_path: Path):

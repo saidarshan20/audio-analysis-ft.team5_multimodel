@@ -177,6 +177,7 @@ class ZipPipelineResult(BaseModel):
     clusters: list[ClusterPoint]
     cluster_summaries: list[ClusterInfo] = Field(default_factory=list)
     plot_file_path: str
+    metadata: dict = {}
 
 class ImageAnalysisResponse(BaseModel):
     status: str = "success"
