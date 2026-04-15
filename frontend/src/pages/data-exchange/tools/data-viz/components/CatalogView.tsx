@@ -2,7 +2,11 @@ import { useState, useEffect } from 'react';
 import { Search } from 'lucide-react';
 import { fetchDatasets, DatasetEntry } from '../services';
 
-const CatalogView = () => {
+interface Props {
+  onSelect?: (id: string) => void;
+}
+
+const CatalogView = ({ onSelect }: Props) => {
   const [search, setSearch] = useState('');
   const [selected, setSelected] = useState<string | null>(null);
   const [datasets, setDatasets] = useState<DatasetEntry[]>([]);
@@ -54,16 +58,30 @@ const CatalogView = () => {
       </p>
       <div className="xt-dataset-list">
         {datasetsLoading && datasets.length === 0
-          ? Array.from({ length: 6 }).map((_, i) => (
-            <div key={i} className="xt-dataset-row" style={{ opacity: 0.4, pointerEvents: 'none' }}>
-              <div className="xt-dataset-info">
-                <span className="xt-dataset-name" style={{ background: '#334155', borderRadius: 4, color: 'transparent', userSelect: 'none' }}>Loading dataset title placeholder</span>
-                <span className="xt-dataset-desc" style={{ background: '#1e293b', borderRadius: 4, color: 'transparent', userSelect: 'none' }}>Loading description text here…</span>
-              </div>
-              <span className="xt-dataset-badge" style={{ background: '#334155', color: 'transparent' }}>Category</span>
-            </div>
           ))
-          : datasets.map((d: DatasetEntry, i: number) => (
+          : (
+            <>
+              {/* Pinned Demo Video (from video-analysis branch port) */}
+              <div 
+                className={`xt-dataset-row${selected === 'demo-video' ? ' selected' : ''}`}
+                style={{ borderLeft: '4px solid #fb8c36', background: 'rgba(251, 140, 54, 0.05)' }}
+                onClick={() => {
+                  setSelected('demo-video');
+                  onSelect?.('demo-video');
+                }}
+              >
+                <div className="xt-dataset-info">
+                  <span className="xt-dataset-name" style={{ color: '#fb8c36', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    🎬 Pre-analyzed Demo Video (Huhu Sample)
+                  </span>
+                  <span className="xt-dataset-desc">
+                    Experience full multimodal analysis immediately. Features YOLO object tracking, BLIP captioning, and CLIP scene descriptors from a test sample.
+                  </span>
+                </div>
+                <span className="xt-dataset-badge" style={{ background: 'rgba(251, 140, 54, 0.15)', color: '#fb8c36' }}>Sample</span>
+              </div>
+
+              {datasets.map((d: DatasetEntry, i: number) => (
             <div
               key={`${d.name}-${i}`}
               className={`xt-dataset-row${selected === d.name ? ' selected' : ''}`}

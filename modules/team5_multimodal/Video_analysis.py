@@ -262,7 +262,7 @@ def analyze_video(input_path: str, output_path: str = "", model_path: str = "yol
             
             client = Groq()
             completion = client.chat.completions.create(
-                model=os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile"),
+                model="llama3-8b-8192",
                 messages=[
                     {"role": "system", "content": "You are a multimodal video analysis AI."},
                     {"role": "user", "content": (

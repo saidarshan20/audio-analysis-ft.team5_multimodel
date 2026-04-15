@@ -13,6 +13,7 @@ import {
   analyzeImagesBatch,
   analyzeAudio,
   analyzeVideo,
+  fetchVideoDemoMetadata,
   TextAnalysisResult,
   CodeAnalysisResult,
   MultiImageAnalysisResponse,
@@ -239,42 +240,31 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
     }
   };
 
-  const handleUseSample = async () => {
+  const handleUseSample = async (typeOverride?: FileType) => {
+    const targetType = typeOverride || fileType;
     setLoading(true);
     try {
-      if (fileType === 'code') {
+      if (targetType === 'code') {
         setCodeResult(MOCK_CODE_RESULT);
         saveToHistory('code', MOCK_CODE_RESULT, 'Sample: Codebase');
         toast.success('Loaded Codebase Sample');
-      } else if (['csv', 'text', 'pdf'].includes(fileType)) {
+      } else if (['csv', 'text', 'pdf'].includes(targetType)) {
         setTextResult(MOCK_TEXT_RESULT);
-        saveToHistory(fileType as any, MOCK_TEXT_RESULT, `Sample: ${fileType.toUpperCase()}`);
-        toast.success(`Loaded ${fileType.toUpperCase()} Sample`);
-      } else if (fileType === 'videos') {
+        saveToHistory(targetType as any, MOCK_TEXT_RESULT, `Sample: ${targetType.toUpperCase()}`);
+        toast.success(`Loaded ${targetType.toUpperCase()} Sample`);
+      } else if (targetType === 'videos') {
         toast.loading('Loading demo video analysis...', { id: 'analysis' });
-        const videoUrl = `${BASE_URL}/team5/demo-video-stream`;
-        let metadata: any = {};
         try {
-          const metaRes = await fetch(`${BASE_URL}/team5/demo-video-metadata`);
-          if (metaRes.ok) metadata = await metaRes.json();
+          const vidData = await fetchVideoDemoMetadata();
+          setVideoResult(vidData);
+          saveToHistory('videos', vidData, 'Sample: Demo Video');
+          toast.success('Loaded demo video analysis!', { id: 'analysis' });
         } catch (e) {
           console.warn('Could not fetch demo metadata', e);
+          toast.error('Failed to load demo video metadata');
         }
-        const vidData: VideoAnalysisResult = {
-          duration_seconds: metadata.duration_seconds || 0,
-          keyframes_analyzed: metadata.keyframes_analyzed || 0,
-          detected_objects: metadata.detected_objects || {},
-          video_caption: metadata.video_caption || '',
-          clip_scenes: metadata.clip_scenes || [],
-          groq_summary: metadata.groq_summary || 'Demo video analysis.',
-          sentiment_analysis: metadata.sentiment_analysis || '',
-          video_url: videoUrl,
-        };
-        setVideoResult(vidData);
-        saveToHistory('videos', vidData, 'Sample: Demo Video');
-        toast.success('Loaded demo video analysis!', { id: 'analysis' });
       } else {
-        toast.info(`Sample for ${fileType} coming soon!`);
+        toast.info(`Sample for ${targetType} coming soon!`);
       }
     } catch {
       toast.error('Failed to load sample');
@@ -404,7 +394,16 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
         </div>
 
         {/* ── Catalog Tab ── */}
-        {activeTab === 'catalog' && <CatalogView />}
+        {activeTab === 'catalog' && (
+          <CatalogView 
+            onSelect={(id) => {
+              if (id === 'demo-video') {
+                setActiveTab('upload');
+                handleUseSample('videos');
+              }
+            }} 
+          />
+        )}
 
         {/* ── Upload Tab ── */}
         {activeTab === 'upload' && (

@@ -633,3 +633,21 @@ export async function submitAudioChat(
 
   return response.json();
 }
+
+/**
+ * Fetches pre-computed analysis metadata for the demo video (huhu_analyzed.mp4)
+ */
+export async function fetchVideoDemoMetadata(): Promise<VideoAnalysisResult> {
+  const response = await fetch(`${BASE_URL}/team5/demo-video-metadata`);
+  if (!response.ok) {
+    throw new Error(`Failed to fetch demo metadata: ${response.status}`);
+  }
+  return response.json();
+}
+
+/**
+ * Returns the URL for streaming the analyzed demo video
+ */
+export function getVideoDemoStreamUrl(): string {
+  return `${BASE_URL}/team5/demo-video-stream`;
+}
