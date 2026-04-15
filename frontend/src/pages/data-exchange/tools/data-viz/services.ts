@@ -452,6 +452,8 @@ export interface AudioFeatures {
   waveform: WaveformData;
   spectrogram: SpectrogramData;
   energy: EnergyData;
+  tempo: number;
+  spectral_centroid_mean: number;
   mfcc?: MFCCData;
   mel_spectrogram?: SpectrogramData;
 }

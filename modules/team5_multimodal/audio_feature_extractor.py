@@ -98,6 +98,8 @@ class AudioFeatures:
     waveform: WaveformData
     spectrogram: SpectrogramData
     energy: EnergyData
+    tempo: float = 0.0
+    spectral_centroid_mean: float = 0.0
     mfcc: Optional[MFCCData] = None
 
 
@@ -161,6 +163,13 @@ class AudioFeatureExtractor:
             energy = self._extract_energy(y, sr)
             mfcc = self._extract_mfcc(y, sr) if include_mfcc else None
 
+            # New specialized acoustic features (Ported from audio-analysis branch)
+            tempo_arr, _ = librosa.beat.beat_track(y=y, sr=sr)
+            tempo = float(np.atleast_1d(tempo_arr)[0])
+            
+            centroid = librosa.feature.spectral_centroid(y=y, sr=sr, n_fft=2048, hop_length=512)
+            spectral_centroid_mean = float(centroid.mean())
+
             return AudioFeatures(
                 sample_rate=sr,
                 duration=round(duration, 3),
@@ -168,6 +177,8 @@ class AudioFeatureExtractor:
                 waveform=waveform,
                 spectrogram=spectrogram,
                 energy=energy,
+                tempo=round(tempo, 2),
+                spectral_centroid_mean=round(spectral_centroid_mean, 2),
                 mfcc=mfcc,
             )
         finally:

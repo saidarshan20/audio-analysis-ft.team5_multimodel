@@ -228,6 +228,8 @@ class AudioFeatures(BaseModel):
     waveform: WaveformData
     spectrogram: SpectrogramData
     energy: EnergyData
+    tempo: float = 0.0
+    spectral_centroid_mean: float = 0.0
     mfcc: MFCCData | None = None
 
 
