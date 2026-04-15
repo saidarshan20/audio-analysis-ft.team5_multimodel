@@ -542,6 +542,46 @@ async def list_datasets(q: str = "", offset: int = 0, limit: int = 20):
         return {"total": 0, "results": [], "error": str(exc)}
 
 
+# ──────────────────────────────────────────────
+#  Code Chat — Q&A about a codebase analysis result
+# ──────────────────────────────────────────────
+class CodeChatRequest(BaseModel):
+    question: str
+    context: str          # plain-text summary of the analysis (~2-3 KB)
+    history: list[dict] = []   # [{role, content}] last N turns
+
+@router.post("/code-chat")
+async def chat_about_codebase(payload: CodeChatRequest):
+    """Answer a question about the codebase using the analysis result as context."""
+    from openai import AsyncOpenAI
+    settings = get_settings()
+    if settings.nvidia_api_key:
+        client = AsyncOpenAI(base_url="https://integrate.api.nvidia.com/v1", api_key=settings.nvidia_api_key)
+        model_name = settings.nvidia_model
+    else:
+        client = AsyncOpenAI(base_url="https://api.groq.com/openai/v1", api_key=settings.groq_api_key)
+        model_name = settings.groq_model
+
+    system = (
+        "You are an expert software architect. Answer questions about the codebase described below. "
+        "Be concise, reference actual component names and file paths from the context.\n\n"
+        f"=== CODEBASE CONTEXT ===\n{payload.context[:4000]}\n=== END ==="
+    )
+    messages = [{"role": "system", "content": system}]
+    for turn in payload.history[-6:]:
+        messages.append(turn)
+    messages.append({"role": "user", "content": payload.question.strip()})
+
+    try:
+        resp = await client.chat.completions.create(
+            model=model_name, messages=messages, temperature=0.3, max_tokens=600
+        )
+        return {"answer": resp.choices[0].message.content, "model": model_name}
+    except Exception as exc:
+        logger.error("code-chat LLM error: %s", exc)
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
 @router.get("/demo-video-metadata")
 async def get_demo_video_metadata():
     """Return pre-computed analysis metadata for the demo video (if available)."""

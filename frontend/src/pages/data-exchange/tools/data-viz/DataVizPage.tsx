@@ -167,6 +167,10 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
   const [progressMsg, setProgressMsg] = useState<string>('');
   const [textResult, setTextResult] = useState<TextAnalysisResult | null>(null);
   const [codeResult, setCodeResult] = useState<CodeAnalysisResult | null>(null);
+  const [chatMsgs, setChatMsgs] = useState<{role:'user'|'assistant';content:string}[]>([]);
+  const [chatInput, setChatInput] = useState('');
+  const [chatLoading, setChatLoading] = useState(false);
+  const chatEndRef = useRef<HTMLDivElement>(null);
   const [imgResult, setImgResult] = useState<MultiImageAnalysisResponse | null>(null);
   const [imgZipResult, setImgZipResult] = useState<ImageZipAnalysisResponse | null>(null);
   const [imgTokens, setImgTokens] = useState({ input: 0, output: 0, total: 0 });
@@ -327,6 +331,7 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
     // Clear current results
     setTextResult(null);
     setCodeResult(null);
+    setChatMsgs([]); setChatInput('');
     setImgResult(null);
 
     // Filter type to restorer
@@ -458,6 +463,52 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
   };
 
 
+  const buildCodeContext = (r: CodeAnalysisResult): string => {
+    const lines: string[] = [];
+    lines.push(`PROJECT: ${r.architecture?.title || r.filename}`);
+    lines.push(`SUMMARY: ${r.architecture?.summary || ''}`);
+    lines.push(`TECH STACK: ${(r.architecture?.tech_stack || []).join(', ')}`);
+    lines.push(`PATTERNS: ${(r.architecture?.detected_patterns || []).join(', ')}`);
+    (r.architecture?.nodes || []).slice(0, 15).forEach(n =>
+      lines.push(`COMPONENT: ${n.label} (${n.type}) — ${n.description || ''} [${n.path || ''}]`)
+    );
+    (r.details?.key_files || []).slice(0, 8).forEach(f =>
+      lines.push(`FILE: ${f.file_path} — ${f.summary}`)
+    );
+    (r.details?.tech_debt || []).slice(0, 5).forEach(d => lines.push(`DEBT: ${d}`));
+    (r.details?.security_risks || []).slice(0, 5).forEach(s => lines.push(`RISK: ${s}`));
+    return lines.join('\n');
+  };
+
+  const handleCodeChat = async () => {
+    if (!chatInput.trim() || !codeResult || chatLoading) return;
+    const question = chatInput.trim();
+    const userMsg = { role: 'user' as const, content: question };
+    setChatMsgs(prev => [...prev, userMsg]);
+    setChatInput('');
+    setChatLoading(true);
+    setTimeout(() => chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 50);
+    try {
+      const BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:8000';
+      const res = await fetch(`${BASE}/team5/code-chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          question,
+          context: buildCodeContext(codeResult),
+          history: chatMsgs.slice(-6),
+        }),
+      });
+      const data = await res.json();
+      setChatMsgs(prev => [...prev, { role: 'assistant', content: data.answer || 'No response.' }]);
+    } catch {
+      setChatMsgs(prev => [...prev, { role: 'assistant', content: 'Error contacting AI. Please try again.' }]);
+    } finally {
+      setChatLoading(false);
+      setTimeout(() => chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 50);
+    }
+  };
+
   const onFilesSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     if (files.length > 0) {
@@ -497,6 +548,7 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
     setProgressMsg('Initializing analysis pipeline...');
     setTextResult(null);
     setCodeResult(null);
+    setChatMsgs([]); setChatInput('');
     setImgResult(null);
     setImgZipResult(null);
     setImgTokens({ input: 0, output: 0, total: 0 });
@@ -920,7 +972,7 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
                     >
                       Download JSON
                     </button>
-                    <button className="xt-upload-btn" onClick={() => { setTextResult(null); setCodeResult(null); setImgResult(null); setImgZipResult(null); setImgTokens({ input: 0, output: 0, total: 0 }); setImgDuration(0); setImgModel(''); setAudioResult(null); setVideoResult(null); setExpandedVidObject(null); setActiveHighlight(null); setVideoTab('video'); setSelectedFiles([]); setShowHistory(false); }}>
+                    <button className="xt-upload-btn" onClick={() => { setTextResult(null); setCodeResult(null); setChatMsgs([]); setChatInput(''); setImgResult(null); setImgZipResult(null); setImgTokens({ input: 0, output: 0, total: 0 }); setImgDuration(0); setImgModel(''); setAudioResult(null); setVideoResult(null); setExpandedVidObject(null); setActiveHighlight(null); setVideoTab('video'); setSelectedFiles([]); setShowHistory(false); }}>
                       Analyze Another File
                     </button>
                   </div>
@@ -1226,6 +1278,64 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
                         </div>
                       </div>
                     )}
+
+                    {/* ── Codebase Chat ── */}
+                    <div className="result-card" style={{ marginTop: '8px' }}>
+                      <h4 style={{ marginTop: 0, marginBottom: '12px', fontSize: '14px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <MessageCircle size={16} color="#fb8c36" /> Ask About This Codebase
+                      </h4>
+                      <div style={{ maxHeight: '280px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '10px' }}>
+                        {chatMsgs.length === 0 && (
+                          <p style={{ color: '#475569', fontSize: '12px', margin: 0 }}>
+                            Ask anything — architecture decisions, data flows, security risks, tech debt…
+                          </p>
+                        )}
+                        {chatMsgs.map((m, i) => (
+                          <div key={i} style={{
+                            alignSelf: m.role === 'user' ? 'flex-end' : 'flex-start',
+                            maxWidth: '85%',
+                            background: m.role === 'user' ? 'rgba(251,140,54,0.15)' : 'rgba(255,255,255,0.05)',
+                            border: `1px solid ${m.role === 'user' ? 'rgba(251,140,54,0.3)' : 'rgba(255,255,255,0.08)'}`,
+                            borderRadius: '10px',
+                            padding: '8px 12px',
+                            fontSize: '12px',
+                            color: '#e2e8f0',
+                            lineHeight: 1.5,
+                          }}>
+                            {m.content}
+                          </div>
+                        ))}
+                        {chatLoading && (
+                          <div style={{ alignSelf: 'flex-start', color: '#64748b', fontSize: '12px' }}>Thinking…</div>
+                        )}
+                        <div ref={chatEndRef} />
+                      </div>
+                      <div style={{ display: 'flex', gap: '8px' }}>
+                        <input
+                          type="text"
+                          value={chatInput}
+                          onChange={e => setChatInput(e.target.value)}
+                          onKeyDown={e => e.key === 'Enter' && !e.shiftKey && handleCodeChat()}
+                          placeholder="e.g. How does authentication work?"
+                          disabled={chatLoading}
+                          style={{
+                            flex: 1, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)',
+                            borderRadius: '8px', padding: '8px 12px', color: '#f1f5f9', fontSize: '12px', outline: 'none',
+                          }}
+                        />
+                        <button
+                          onClick={handleCodeChat}
+                          disabled={chatLoading || !chatInput.trim()}
+                          style={{
+                            background: '#fb8c36', border: 'none', borderRadius: '8px', padding: '8px 14px',
+                            color: '#fff', fontSize: '12px', fontWeight: 600, cursor: chatLoading ? 'not-allowed' : 'pointer',
+                            opacity: chatLoading || !chatInput.trim() ? 0.5 : 1,
+                          }}
+                        >
+                          {chatLoading ? '…' : 'Ask'}
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 )}
 
