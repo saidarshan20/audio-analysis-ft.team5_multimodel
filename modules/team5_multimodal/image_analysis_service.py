@@ -254,27 +254,32 @@ class ImageAnalysisService:
                 model=self.settings.groq_model,
                 messages=[
                     {"role": "system", "content": (
-                        "You are an intelligent image search engine. "
-                        "Rank the provided image descriptions by how well they match the user's search query. "
-                        'Return ONLY a valid JSON array: [{"filename": "name.jpg", "relevance_score": 9, "reason": "why"}]. '
+                        "You are an intelligent semantic image search engine. "
+                        "The user might search in English or other languages (e.g., Hindi/Urdu like 'kutta' for dog). "
+                        "Rank the provided image descriptions by how well they match the query's meaning. "
+                        "You MUST return a valid JSON object with a 'results' key. "
+                        "Schema: {\"results\": [{\"filename\": \"...\", \"relevance_score\": 1-10, \"reason\": \"...\"}]}. "
                         "Score 1-10 (10 = perfect match). ONLY include images with score >= 3."
                     )},
-                    {"role": "user", "content": f"Search Query: \"{query}\"\n\nImage Descriptions:\n{captions_text}\n\nReturn the ranked JSON array."}
+                    {"role": "user", "content": f"Search Query: \"{query}\"\n\nImage Descriptions:\n{captions_text}"}
                 ],
-                max_tokens=800,
+                response_format={"type": "json_object"},
+                max_tokens=1000,
                 temperature=0.1
             )
 
             content = response.choices[0].message.content.strip()
-            if "```json" in content:
-                content = content.split("```json")[1].split("```")[0].strip()
-            elif "```" in content:
-                content = content.split("```")[1].split("```")[0].strip()
+            try:
+                data = json.loads(content)
+                ranked = data.get("results", [])
+            except json.JSONDecodeError as je:
+                logger.error("JSON Search Decode Error. Raw content: %s", content)
+                raise je
 
-            ranked = json.loads(content)
             caption_map = {c['filename']: c['caption'] for c in captions}
             for item in ranked:
                 item['caption'] = caption_map.get(item['filename'], '')
+            
             ranked.sort(key=lambda x: x.get('relevance_score', 0), reverse=True)
             return ranked
         except Exception as e:

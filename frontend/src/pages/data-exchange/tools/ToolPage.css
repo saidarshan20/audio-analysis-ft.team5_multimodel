@@ -1270,3 +1270,81 @@
   border-color: rgba(255, 255, 255, 0.1);
 }
 
+/* ── Metrics Strip Cards (Light & Dark) ─────────────────────────────────── */
+.metrics-strip {
+  display: flex;
+  gap: 10px;
+  align-items: stretch;
+  flex-wrap: wrap;
+}
+
+.metrics-strip.with-margin {
+  margin-bottom: 24px;
+}
+
+.metric-card {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 8px 12px;
+  flex: 1 1 130px;
+  min-width: 0;
+}
+
+.metric-card-icon {
+  color: #fb8c36;
+  flex-shrink: 0;
+  opacity: 0.8;
+}
+
+.metric-card-content {
+  min-width: 0;
+}
+
+.metric-card-label {
+  font-size: 9px;
+  color: #94a3b8;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 1px;
+}
+
+.metric-card-value {
+  font-size: 12px;
+  font-weight: 700;
+  color: #1e293b;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.metric-card-sub {
+  font-size: 9px;
+  color: #94a3b8;
+  margin-top: 1px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Dark mode overrides for metrics strip */
+:root:not([data-theme="light"]) .metric-card {
+  background: rgba(255, 255, 255, 0.02);
+  border-color: rgba(255, 255, 255, 0.06);
+}
+
+:root:not([data-theme="light"]) .metric-card-label {
+  color: #64748b;
+}
+
+:root:not([data-theme="light"]) .metric-card-value {
+  color: #f1f5f9;
+}
+
+:root:not([data-theme="light"]) .metric-card-sub {
+  color: #475569;
+}
+
