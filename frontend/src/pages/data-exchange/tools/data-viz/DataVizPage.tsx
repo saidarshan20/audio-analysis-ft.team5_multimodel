@@ -47,15 +47,15 @@ const MID_PREFIX = 'nd_';
 const safeId = (id: string) => MID_PREFIX + id.replace(/[^a-zA-Z0-9]/g, '_');
 
 // 6-tone dark-theme palette cycling by group
-const GROUP_TONES = ['toneBlue','toneAmber','toneMint','toneRose','toneIndigo','toneTeal'];
+const GROUP_TONES = ['toneBlue', 'toneAmber', 'toneMint', 'toneRose', 'toneIndigo', 'toneTeal'];
 
 const SHAPE_DELIMITERS: Record<string, [string, string]> = {
   database: ['[("', '")]'],
-  circle:   ['(("', '"))'],
-  hexagon:  ['{{\"', '"}}'],
-  queue:    ['[/"', '"/]'],
+  circle: ['(("', '"))'],
+  hexagon: ['{{\"', '"}}'],
+  queue: ['[/"', '"/]'],
   document: ['["', '"]'],
-  box:      ['["', '"]'],
+  box: ['["', '"]'],
 };
 
 function mermaidNode(n: any, indent: string): string {
@@ -108,7 +108,7 @@ const generateMermaidGraph = (arch: any): string => {
     const src = safeId(e.source);
     const tgt = safeId(e.target);
     const lbl = e.label ? `|"${(e.label ?? '').replace(/"/g, "'")}"| ` : '';
-    const arrow = e.style === 'dashed' ? '-.->': '-->';
+    const arrow = e.style === 'dashed' ? '-.->' : '-->';
     chart += `  ${src} ${arrow}${lbl}${tgt}\n`;
   });
 
@@ -141,13 +141,13 @@ type DatasetTab = 'catalog' | 'upload';
 type FileType = 'csv' | 'text' | 'pdf' | 'images' | 'images-zip' | 'videos' | 'music' | 'code';
 
 const FILE_TYPES: { id: FileType; label: string; desc: string; icon: any }[] = [
-  { id: 'csv',    label: 'CSV Data',  desc: 'Tabular data & spreadsheets', icon: FileSpreadsheet },
-  { id: 'text',   label: 'Text File', desc: 'Plain text & documents',     icon: FileText },
-  { id: 'pdf',    label: 'PDF Doc',   desc: 'PDF reports & exports',      icon: Search }, 
+  { id: 'csv', label: 'CSV Data', desc: 'Tabular data & spreadsheets', icon: FileSpreadsheet },
+  { id: 'text', label: 'Text File', desc: 'Plain text & documents', icon: FileText },
+  { id: 'pdf', label: 'PDF Doc', desc: 'PDF reports & exports', icon: Search },
   { id: 'images-zip', label: 'Visual Intelligence', desc: 'Single image, Batch, or ZIP', icon: ImageIcon },
-  { id: 'code',   label: 'Codebase',  desc: 'ZIP repo analysis',          icon: Code2 },
-  { id: 'videos', label: 'Videos',    desc: 'Video streams & files',      icon: Video },
-  { id: 'music',  label: 'Audio',     desc: 'Voice & sound analysis',     icon: Music },
+  { id: 'code', label: 'Codebase', desc: 'ZIP repo analysis', icon: Code2 },
+  { id: 'videos', label: 'Videos', desc: 'Video streams & files', icon: Video },
+  { id: 'music', label: 'Audio', desc: 'Voice & sound analysis', icon: Music },
 ];
 
 
@@ -160,14 +160,14 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
   const [fileType, setFileType] = useState<FileType>('images-zip');
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [githubUrl, setGithubUrl] = useState('');
-  
+
   // -- Analysis State --
   const [loading, setLoading] = useState(false);
   const [analysisStep, setAnalysisStep] = useState<string>('');
   const [progressMsg, setProgressMsg] = useState<string>('');
   const [textResult, setTextResult] = useState<TextAnalysisResult | null>(null);
   const [codeResult, setCodeResult] = useState<CodeAnalysisResult | null>(null);
-  const [chatMsgs, setChatMsgs] = useState<{role:'user'|'assistant';content:string}[]>([]);
+  const [chatMsgs, setChatMsgs] = useState<{ role: 'user' | 'assistant'; content: string }[]>([]);
   const [chatInput, setChatInput] = useState('');
   const [chatLoading, setChatLoading] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
@@ -206,9 +206,6 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
   const [searchLoading, setSearchLoading] = useState(false);
   const [searchResults, setSearchResults] = useState<ImageSearchResult[]>([]);
   const [showSearchResults, setShowSearchResults] = useState(false);
-  const [imgTokens, setImgTokens] = useState({ input: 0, output: 0, total: 0 });
-  const [imgDuration, setImgDuration] = useState(0);
-  const [imgModel, setImgModel] = useState('');
 
   // ── Audio State ──
   const [audioResult, setAudioResult] = useState<AudioAnalysisResponse | null>(null);
@@ -247,7 +244,7 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
   // ── Video State ──
   const [videoResult, setVideoResult] = useState<VideoAnalysisResult | null>(null);
   const [expandedVidObject, setExpandedVidObject] = useState<string | null>(null);
-  const [activeHighlight, setActiveHighlight] = useState<{second: number; box: number[]} | null>(null);
+  const [activeHighlight, setActiveHighlight] = useState<{ second: number; box: number[] } | null>(null);
   const [subtitleUrl, setSubtitleUrl] = useState<string | null>(null);
   const [videoTab, setVideoTab] = useState<'video' | 'audio' | 'text'>('video');
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -265,7 +262,7 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
 
   const handleImageQA = async () => {
     if (!qaQuestion.trim()) return;
-    
+
     setQaLoading(true);
     try {
       let res: ImageQAResponse;
@@ -537,10 +534,10 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
 
   const handleContinue = async () => {
     const usingGithub = fileType === 'code' && githubUrl.trim().length > 5;
-    
+
     if (selectedFiles.length === 0 && !usingGithub) {
-       toast.error("Please select a file or provide a valid GitHub URL");
-       return;
+      toast.error("Please select a file or provide a valid GitHub URL");
+      return;
     }
 
     setLoading(true);
@@ -600,7 +597,7 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
         toast.loading(`Processing Visual Intel Batch...`, { id: 'analysis' });
         const res = await analyzeImagesBatch(files);
         setImgZipResult(res);
-        
+
         // --- Store Performance Metrics ---
         if (res.result?.metadata) {
           setImgDuration(res.result.metadata.total_duration_sec);
@@ -611,7 +608,7 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
           });
           setImgModel(res.result.metadata.model);
         }
-        
+
         toast.success(`Analysis complete! Processed ${res.processed_count} images.`, { id: 'analysis' });
       } else if (fileType === 'music') {
         toast.loading('Transcribing & analyzing audio...', { id: 'analysis' });
@@ -691,27 +688,27 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
             <div className="xt-dataset-list">
               {datasetsLoading && datasets.length === 0
                 ? Array.from({ length: 6 }).map((_, i) => (
-                    <div key={i} className="xt-dataset-row" style={{ opacity: 0.4, pointerEvents: 'none' }}>
-                      <div className="xt-dataset-info">
-                        <span className="xt-dataset-name" style={{ background: '#334155', borderRadius: 4, color: 'transparent', userSelect: 'none' }}>Loading dataset title placeholder</span>
-                        <span className="xt-dataset-desc" style={{ background: '#1e293b', borderRadius: 4, color: 'transparent', userSelect: 'none' }}>Loading description text here…</span>
-                      </div>
-                      <span className="xt-dataset-badge" style={{ background: '#334155', color: 'transparent' }}>Category</span>
+                  <div key={i} className="xt-dataset-row" style={{ opacity: 0.4, pointerEvents: 'none' }}>
+                    <div className="xt-dataset-info">
+                      <span className="xt-dataset-name" style={{ background: '#334155', borderRadius: 4, color: 'transparent', userSelect: 'none' }}>Loading dataset title placeholder</span>
+                      <span className="xt-dataset-desc" style={{ background: '#1e293b', borderRadius: 4, color: 'transparent', userSelect: 'none' }}>Loading description text here…</span>
                     </div>
-                  ))
+                    <span className="xt-dataset-badge" style={{ background: '#334155', color: 'transparent' }}>Category</span>
+                  </div>
+                ))
                 : datasets.map((d, i) => (
-                    <div
-                      key={`${d.name}-${i}`}
-                      className={`xt-dataset-row${selected === d.name ? ' selected' : ''}`}
-                      onClick={() => setSelected(d.name)}
-                    >
-                      <div className="xt-dataset-info">
-                        <span className="xt-dataset-name">{d.name}</span>
-                        <span className="xt-dataset-desc">{d.desc}</span>
-                      </div>
-                      <span className="xt-dataset-badge">{d.category}</span>
+                  <div
+                    key={`${d.name}-${i}`}
+                    className={`xt-dataset-row${selected === d.name ? ' selected' : ''}`}
+                    onClick={() => setSelected(d.name)}
+                  >
+                    <div className="xt-dataset-info">
+                      <span className="xt-dataset-name">{d.name}</span>
+                      <span className="xt-dataset-desc">{d.desc}</span>
                     </div>
-                  ))}
+                    <span className="xt-dataset-badge">{d.category}</span>
+                  </div>
+                ))}
             </div>
             {datasets.length > 0 && datasets.length < datasetsTotal && (
               <div style={{ display: 'flex', justifyContent: 'center', marginTop: '16px' }}>
@@ -733,8 +730,8 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
               <div />
               {history.length > 0 && !textResult && !codeResult && !imgResult && !imgZipResult && (
-                <button 
-                  className="xt-tab" 
+                <button
+                  className="xt-tab"
                   style={{ background: 'rgba(96, 165, 250, 0.1)', color: '#60a5fa', border: '1px solid rgba(96, 165, 250, 0.2)' }}
                   onClick={() => setShowHistory(!showHistory)}
                 >
@@ -748,17 +745,17 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
                 <h3 style={{ fontSize: '14px', marginBottom: '12px', color: '#fb8c36' }}>Local Analysis History</h3>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                   {history.map(item => (
-                    <div 
-                      key={item.id} 
-                      className="history-item" 
+                    <div
+                      key={item.id}
+                      className="history-item"
                       onClick={() => loadHistoryItem(item)}
-                      style={{ 
-                        background: '#1e293b', 
-                        padding: '10px 15px', 
-                        borderRadius: '8px', 
-                        cursor: 'pointer', 
-                        display: 'flex', 
-                        justifyContent: 'space-between', 
+                      style={{
+                        background: '#1e293b',
+                        padding: '10px 15px',
+                        borderRadius: '8px',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        justifyContent: 'space-between',
                         alignItems: 'center',
                         border: '1px solid #334155'
                       }}
@@ -769,7 +766,7 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
                           {item.type.toUpperCase()} • {new Date(item.timestamp).toLocaleString()}
                         </div>
                       </div>
-                      <button 
+                      <button
                         onClick={(e) => deleteHistoryItem(item.id, e)}
                         style={{ background: 'transparent', border: 'none', color: '#f87171', cursor: 'pointer', padding: '5px' }}
                       >
@@ -782,16 +779,16 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
             )}
 
             {!textResult && !codeResult && !imgResult && !imgZipResult && !audioResult && !videoResult ? (
-              <div className="wizard-container" style={{boxShadow: 'none', border: 'none', background: 'transparent', padding: '0px 0'}}>
+              <div className="wizard-container" style={{ boxShadow: 'none', border: 'none', background: 'transparent', padding: '0px 0' }}>
                 {/* Step 1: Type Selection */}
-                <div className="wizard-header" style={{textAlign: 'left', marginBottom: '24px'}}>
-                  <h2 style={{fontSize: '20px', fontWeight: 700}}>1. Select Analysis Type</h2>
-                  <p style={{color: '#94a3b8'}}>Choose the format of the data you want to analyze with AI.</p>
+                <div className="wizard-header" style={{ textAlign: 'left', marginBottom: '24px' }}>
+                  <h2 style={{ fontSize: '20px', fontWeight: 700 }}>1. Select Analysis Type</h2>
+                  <p style={{ color: '#94a3b8' }}>Choose the format of the data you want to analyze with AI.</p>
                 </div>
                 <div className="type-grid">
                   {FILE_TYPES.map(type => (
-                    <div 
-                      key={type.id} 
+                    <div
+                      key={type.id}
                       className={`type-card${fileType === type.id ? ' active' : ''}`}
                       onClick={() => setFileType(type.id)}
                     >
@@ -805,15 +802,15 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
                 </div>
 
                 {/* Step 2: Action Area */}
-                <div className="wizard-header" style={{textAlign: 'left', marginBottom: '24px', marginTop: '40px'}}>
-                  <h2 style={{fontSize: '20px', fontWeight: 700}}>2. Provide Dataset</h2>
-                  <p style={{color: '#94a3b8'}}>Upload your own files or use a curated sample for demonstration.</p>
+                <div className="wizard-header" style={{ textAlign: 'left', marginBottom: '24px', marginTop: '40px' }}>
+                  <h2 style={{ fontSize: '20px', fontWeight: 700 }}>2. Provide Dataset</h2>
+                  <p style={{ color: '#94a3b8' }}>Upload your own files or use a curated sample for demonstration.</p>
                 </div>
-                
+
                 <div className="action-grid" style={{ gridTemplateColumns: fileType === 'code' ? '1fr 1fr 200px' : '1fr 200px' }}>
-                  <div 
-                    className={`action-area ${loading && selectedFiles.length > 0 ? 'active-loading' : ''}`} 
-                    onClick={() => !loading && fileInputRef.current?.click()} 
+                  <div
+                    className={`action-area ${loading && selectedFiles.length > 0 ? 'active-loading' : ''}`}
+                    onClick={() => !loading && fileInputRef.current?.click()}
                   >
                     <input
                       type="file"
@@ -825,8 +822,8 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
                         fileType === 'music'
                           ? '.mp3,.wav,.m4a,.ogg,.flac,audio/*'
                           : fileType === 'videos'
-                          ? '.mp4,.mov,.avi,.mkv,.webm,video/*'
-                          : '.txt,.pdf,.zip,image/*'
+                            ? '.mp4,.mov,.avi,.mkv,.webm,video/*'
+                            : '.txt,.pdf,.zip,image/*'
                       }
                     />
                     <div className="action-icon">
@@ -835,13 +832,13 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
                     <div className="action-title">
                       {selectedFiles.length > 0 ? `${selectedFiles.length} file(s) selected` : 'Upload local files'}
                     </div>
-                    <p style={{fontSize: '13px', color: '#94a3b8', marginTop: '4px'}}>
+                    <p style={{ fontSize: '13px', color: '#94a3b8', marginTop: '4px' }}>
                       {fileType === 'music' ? 'Supports .mp3, .wav, .m4a, .ogg, .flac' : fileType === 'videos' ? 'Supports .mp4, .mov, .avi, .mkv' : 'Supports .zip, .txt, .pdf, images'}
                     </p>
                   </div>
 
                   {fileType === 'code' && (
-                    <div 
+                    <div
                       className={`action-area ${loading && githubUrl.trim().length > 5 ? 'active-loading' : ''}`}
                       style={{ cursor: 'default' }}
                     >
@@ -849,7 +846,7 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
                         {loading && githubUrl.trim().length > 5 ? <Loader2 size={32} className="animate-spin" /> : <Code2 size={32} />}
                       </div>
                       <div className="action-title">GitHub Repository</div>
-                      <input 
+                      <input
                         type="url"
                         className="xt-search-input"
                         placeholder="https://github.com/..."
@@ -857,9 +854,9 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
                         onChange={(e) => setGithubUrl(e.target.value)}
                         style={{ width: '100%', height: '42px', fontSize: '13px' }}
                       />
-                      <button 
-                        onClick={() => setGithubUrl('https://github.com/tiangolo/fastapi')} 
-                        style={{marginTop: '12px', fontSize: '12px', color: '#fb8c36', background: 'transparent', border: 'none', cursor: 'pointer', padding: 0, textDecoration: 'underline'}}
+                      <button
+                        onClick={() => setGithubUrl('https://github.com/tiangolo/fastapi')}
+                        style={{ marginTop: '12px', fontSize: '12px', color: '#fb8c36', background: 'transparent', border: 'none', cursor: 'pointer', padding: 0, textDecoration: 'underline' }}
                       >
                         Try: tiangolo/fastapi
                       </button>
@@ -871,75 +868,75 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
                       <Database size={32} />
                     </div>
                     <div className="action-title">Quick Demo</div>
-                    <button className="sample-file-btn" onClick={handleUseSample} disabled={loading} style={{width: '100%', padding: '12px', marginTop: '8px'}}>
+                    <button className="sample-file-btn" onClick={handleUseSample} disabled={loading} style={{ width: '100%', padding: '12px', marginTop: '8px' }}>
                       Use Sample
                     </button>
                   </div>
                 </div>
 
                 {/* Step 3: Footer */}
-                <div className="wizard-footer" style={{marginTop: '40px', flexDirection: 'column', alignItems: 'center'}}>
+                <div className="wizard-footer" style={{ marginTop: '40px', flexDirection: 'column', alignItems: 'center' }}>
                   {loading && (fileType === 'code') && (
-                    <div className="analysis-progress-simple" style={{width: '100%', maxWidth: '550px', marginBottom: '32px'}}>
-                       <div className="progress-steps" style={{display: 'flex', justifyContent: 'space-between', marginBottom: '14px', position: 'relative'}}>
-                          {['Cloning', 'Graphing', 'Architecture', 'Analysis'].map((step, idx) => {
-                             const steps = ['cloning', 'graphing', 'arch', 'details'];
-                             const currentIdx = steps.indexOf(analysisStep);
-                             const isActive = idx === currentIdx;
-                             const isDone = idx < currentIdx;
-                             
-                             return (
-                               <div key={idx} style={{
-                                 color: isActive ? '#fb8c36' : isDone ? '#4ade80' : '#64748b',
-                                 fontSize: '12px',
-                                 fontWeight: isActive ? 600 : 400,
-                                 display: 'flex',
-                                 flexDirection: 'column',
-                                 alignItems: 'center',
-                                 gap: '6px',
-                                 flex: 1,
-                                 transition: 'all 0.3s ease'
-                               }}>
-                                 <div style={{
-                                   width: '20px', 
-                                   height: '20px', 
-                                   borderRadius: '50%', 
-                                   border: `1.5px solid ${isActive ? '#fb8c36' : isDone ? '#4ade80' : '#334155'}`,
-                                   display: 'flex',
-                                   alignItems: 'center',
-                                   justifyContent: 'center',
-                                   fontSize: '10px',
-                                   background: isActive ? 'rgba(251, 140, 54, 0.05)' : 'transparent',
-                                 }}>
-                                   {isDone ? '✓' : isActive ? <Loader2 size={10} className="animate-spin" /> : idx + 1}
-                                 </div>
-                                 <span>{step}</span>
-                               </div>
-                             )
-                          })}
-                       </div>
-                       <div className="progress-bar-bg" style={{height: '4px', background: '#020617', borderRadius: '2px', overflow: 'hidden', border: '1px solid #1e293b'}}>
-                          <div className="progress-bar-fill" style={{
-                            height: '100%', 
-                            background: '#fb8c36', 
-                            width: analysisStep === 'cloning' || analysisStep === 'extracting' ? '15%' : analysisStep === 'graphing' ? '40%' : analysisStep === 'arch' ? '70%' : analysisStep === 'details' ? '90%' : '0%',
-                            transition: 'width 0.8s'
-                          }}></div>
-                       </div>
-                       <p style={{fontSize: '11px', color: '#64748b', marginTop: '10px', textAlign: 'center'}}>{progressMsg}</p>
+                    <div className="analysis-progress-simple" style={{ width: '100%', maxWidth: '550px', marginBottom: '32px' }}>
+                      <div className="progress-steps" style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '14px', position: 'relative' }}>
+                        {['Cloning', 'Graphing', 'Architecture', 'Analysis'].map((step, idx) => {
+                          const steps = ['cloning', 'graphing', 'arch', 'details'];
+                          const currentIdx = steps.indexOf(analysisStep);
+                          const isActive = idx === currentIdx;
+                          const isDone = idx < currentIdx;
+
+                          return (
+                            <div key={idx} style={{
+                              color: isActive ? '#fb8c36' : isDone ? '#4ade80' : '#64748b',
+                              fontSize: '12px',
+                              fontWeight: isActive ? 600 : 400,
+                              display: 'flex',
+                              flexDirection: 'column',
+                              alignItems: 'center',
+                              gap: '6px',
+                              flex: 1,
+                              transition: 'all 0.3s ease'
+                            }}>
+                              <div style={{
+                                width: '20px',
+                                height: '20px',
+                                borderRadius: '50%',
+                                border: `1.5px solid ${isActive ? '#fb8c36' : isDone ? '#4ade80' : '#334155'}`,
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                fontSize: '10px',
+                                background: isActive ? 'rgba(251, 140, 54, 0.05)' : 'transparent',
+                              }}>
+                                {isDone ? '✓' : isActive ? <Loader2 size={10} className="animate-spin" /> : idx + 1}
+                              </div>
+                              <span>{step}</span>
+                            </div>
+                          )
+                        })}
+                      </div>
+                      <div className="progress-bar-bg" style={{ height: '4px', background: '#020617', borderRadius: '2px', overflow: 'hidden', border: '1px solid #1e293b' }}>
+                        <div className="progress-bar-fill" style={{
+                          height: '100%',
+                          background: '#fb8c36',
+                          width: analysisStep === 'cloning' || analysisStep === 'extracting' ? '15%' : analysisStep === 'graphing' ? '40%' : analysisStep === 'arch' ? '70%' : analysisStep === 'details' ? '90%' : '0%',
+                          transition: 'width 0.8s'
+                        }}></div>
+                      </div>
+                      <p style={{ fontSize: '11px', color: '#64748b', marginTop: '10px', textAlign: 'center' }}>{progressMsg}</p>
                     </div>
                   )}
 
-                  <button 
-                    className="continue-btn" 
+                  <button
+                    className="continue-btn"
                     onClick={handleContinue}
                     disabled={loading || (selectedFiles.length === 0 && !(fileType === 'code' && githubUrl.trim().length > 5))}
                     style={{
-                      maxWidth: '220px', 
-                      padding: '12px 24px', 
-                      display: 'flex', 
-                      alignItems: 'center', 
-                      justifyContent: 'center', 
+                      maxWidth: '220px',
+                      padding: '12px 24px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
                       gap: '10px',
                       background: loading ? '#1e293b' : 'var(--brand-orange)',
                       opacity: loading ? 0.8 : 1,
@@ -965,8 +962,8 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
                 <div className="results-header">
                   <h3>Analysis Results</h3>
                   <div style={{ display: 'flex', gap: '10px' }}>
-                    <button 
-                      className="xt-tab" 
+                    <button
+                      className="xt-tab"
                       style={{ background: 'rgba(96, 165, 250, 0.1)', color: '#60a5fa', border: '1px solid rgba(96, 165, 250, 0.2)' }}
                       onClick={handleDownloadResult}
                     >
@@ -1073,99 +1070,99 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
 
                     {/* ── Summary + Patterns + Tech stack | Process Flow ── */}
                     <div className="viz-row">
-                        <div className="result-card" style={{ flex: 1 }}>
-                          <div className="summary-section">
-                            <h4><Code2 size={20} /> {codeResult.architecture?.title}</h4>
-                            <p>{codeResult.architecture?.summary}</p>
-                          </div>
+                      <div className="result-card" style={{ flex: 1 }}>
+                        <div className="summary-section">
+                          <h4><Code2 size={20} /> {codeResult.architecture?.title}</h4>
+                          <p>{codeResult.architecture?.summary}</p>
+                        </div>
 
-                          {/* Tech stack chips */}
-                          {(codeResult.architecture?.tech_stack?.length ?? 0) > 0 && (
-                            <div style={{ marginTop: '16px', display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                              {codeResult.architecture.tech_stack.map((t, i) => (
-                                <span key={i} className="chip" style={{ background: 'rgba(99,102,241,0.1)', color: '#a5b4fc', borderColor: 'rgba(99,102,241,0.3)', padding: '4px 10px', fontSize: '11px' }}>
-                                  {t}
+                        {/* Tech stack chips */}
+                        {(codeResult.architecture?.tech_stack?.length ?? 0) > 0 && (
+                          <div style={{ marginTop: '16px', display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                            {codeResult.architecture.tech_stack.map((t, i) => (
+                              <span key={i} className="chip" style={{ background: 'rgba(99,102,241,0.1)', color: '#a5b4fc', borderColor: 'rgba(99,102,241,0.3)', padding: '4px 10px', fontSize: '11px' }}>
+                                {t}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+
+                        {codeResult.architecture?.detected_patterns && codeResult.architecture.detected_patterns.length > 0 && (
+                          <div style={{ marginTop: '16px' }}>
+                            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                              {codeResult.architecture.detected_patterns.map((p, i) => (
+                                <span key={i} className="chip" style={{ background: 'rgba(251, 140, 54, 0.1)', color: '#fb8c36', borderColor: 'rgba(251, 140, 54, 0.3)', padding: '4px 10px', fontSize: '11px' }}>
+                                  <Sparkles size={10} /> {p}
                                 </span>
                               ))}
                             </div>
-                          )}
+                          </div>
+                        )}
 
-                          {codeResult.architecture?.detected_patterns && codeResult.architecture.detected_patterns.length > 0 && (
-                            <div style={{ marginTop: '16px' }}>
-                              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                                {codeResult.architecture.detected_patterns.map((p, i) => (
-                                  <span key={i} className="chip" style={{ background: 'rgba(251, 140, 54, 0.1)', color: '#fb8c36', borderColor: 'rgba(251, 140, 54, 0.3)', padding: '4px 10px', fontSize: '11px' }}>
-                                    <Sparkles size={10} /> {p}
-                                  </span>
+                        {/* Node cards grouped by group */}
+                        {(() => {
+                          const nodes = codeResult.architecture?.nodes ?? [];
+                          const groups = codeResult.architecture?.groups ?? [];
+                          if (nodes.length === 0) return null;
+                          const groupMap = Object.fromEntries(groups.map(g => [g.id, g.label]));
+                          const TONE_COLORS: Record<string, string> = {
+                            toneBlue: '#3b82f6', toneAmber: '#f59e0b', toneMint: '#10b981',
+                            toneRose: '#f43f5e', toneIndigo: '#6366f1', toneTeal: '#14b8a6',
+                          };
+                          const groupColor = (gid: string) => {
+                            const idx = groups.findIndex(g => g.id === gid);
+                            return Object.values(TONE_COLORS)[idx % 6] ?? '#64748b';
+                          };
+                          // group nodes by group_id
+                          const sections: { label: string; color: string; nodes: any[] }[] = [];
+                          groups.forEach(g => {
+                            const members = nodes.filter(n => n.group_id === g.id);
+                            if (members.length) sections.push({ label: g.label, color: groupColor(g.id), nodes: members });
+                          });
+                          const ungrouped = nodes.filter(n => !n.group_id || !groupMap[n.group_id]);
+                          if (ungrouped.length) sections.push({ label: 'Other', color: '#64748b', nodes: ungrouped });
+
+                          return sections.map(sec => (
+                            <div key={sec.label} style={{ marginTop: '24px' }}>
+                              <h4 style={{ color: sec.color, fontSize: '13px', fontWeight: 700, marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <span style={{ width: '10px', height: '10px', borderRadius: '2px', background: sec.color, display: 'inline-block' }} />
+                                {sec.label}
+                              </h4>
+                              <div className="components-grid">
+                                {sec.nodes.map(n => (
+                                  <div key={n.id} className="comp-item" style={{ borderColor: sec.color + '33' }}>
+                                    <strong style={{ color: '#f1f5f9' }}>{n.label}</strong>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '6px 0 8px' }}>
+                                      <span style={{ fontSize: '10px', color: '#94a3b8', fontWeight: 700 }}>{n.type}</span>
+                                      {n.shape && n.shape !== 'box' && <span style={{ color: sec.color, fontSize: '10px', fontWeight: 700 }}>{n.shape}</span>}
+                                    </div>
+                                    <p style={{ color: '#94a3b8', fontSize: '12px', margin: 0 }}>{n.description}</p>
+                                    {n.path && (
+                                      <div style={{ marginTop: '10px' }}>
+                                        <span className="chip" style={{ fontSize: '10px', padding: '2px 8px', color: sec.color, borderColor: sec.color + '44' }}>{n.path.split('/').pop()}</span>
+                                      </div>
+                                    )}
+                                  </div>
                                 ))}
                               </div>
                             </div>
-                          )}
-                          
-                          {/* Node cards grouped by group */}
-                          {(() => {
-                            const nodes = codeResult.architecture?.nodes ?? [];
-                            const groups = codeResult.architecture?.groups ?? [];
-                            if (nodes.length === 0) return null;
-                            const groupMap = Object.fromEntries(groups.map(g => [g.id, g.label]));
-                            const TONE_COLORS: Record<string, string> = {
-                              toneBlue: '#3b82f6', toneAmber: '#f59e0b', toneMint: '#10b981',
-                              toneRose: '#f43f5e', toneIndigo: '#6366f1', toneTeal: '#14b8a6',
-                            };
-                            const groupColor = (gid: string) => {
-                              const idx = groups.findIndex(g => g.id === gid);
-                              return Object.values(TONE_COLORS)[idx % 6] ?? '#64748b';
-                            };
-                            // group nodes by group_id
-                            const sections: { label: string; color: string; nodes: any[] }[] = [];
-                            groups.forEach(g => {
-                              const members = nodes.filter(n => n.group_id === g.id);
-                              if (members.length) sections.push({ label: g.label, color: groupColor(g.id), nodes: members });
-                            });
-                            const ungrouped = nodes.filter(n => !n.group_id || !groupMap[n.group_id]);
-                            if (ungrouped.length) sections.push({ label: 'Other', color: '#64748b', nodes: ungrouped });
+                          ));
+                        })()}
 
-                            return sections.map(sec => (
-                              <div key={sec.label} style={{ marginTop: '24px' }}>
-                                <h4 style={{ color: sec.color, fontSize: '13px', fontWeight: 700, marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                  <span style={{ width: '10px', height: '10px', borderRadius: '2px', background: sec.color, display: 'inline-block' }} />
-                                  {sec.label}
-                                </h4>
-                                <div className="components-grid">
-                                  {sec.nodes.map(n => (
-                                    <div key={n.id} className="comp-item" style={{ borderColor: sec.color + '33' }}>
-                                      <strong style={{ color: '#f1f5f9' }}>{n.label}</strong>
-                                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '6px 0 8px' }}>
-                                        <span style={{ fontSize: '10px', color: '#94a3b8', fontWeight: 700 }}>{n.type}</span>
-                                        {n.shape && n.shape !== 'box' && <span style={{ color: sec.color, fontSize: '10px', fontWeight: 700 }}>{n.shape}</span>}
-                                      </div>
-                                      <p style={{ color: '#94a3b8', fontSize: '12px', margin: 0 }}>{n.description}</p>
-                                      {n.path && (
-                                        <div style={{ marginTop: '10px' }}>
-                                          <span className="chip" style={{ fontSize: '10px', padding: '2px 8px', color: sec.color, borderColor: sec.color + '44' }}>{n.path.split('/').pop()}</span>
-                                        </div>
-                                      )}
-                                    </div>
-                                  ))}
-                                </div>
-                              </div>
-                            ));
-                          })()}
+                      </div>
 
+                      {/* Process Flow — alongside summary */}
+                      <div className="result-card" style={{ width: '300px', flexShrink: 0 }}>
+                        <h4 style={{ color: '#fb8c36', marginTop: 0, fontSize: '16px', fontWeight: 700 }}>Process Flow</h4>
+                        <div className="timeline-list">
+                          {codeResult.details?.flow?.map(f => (
+                            <div key={f.step} className="timeline-item" style={{ border: 'none', background: 'transparent', paddingLeft: 0 }}>
+                              <span className="date" style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '1px' }}>Step {f.step}</span>
+                              <span className="desc" style={{ display: 'block', marginTop: '4px', lineHeight: 1.5, color: '#94a3b8', fontSize: '12px' }}>{f.description}</span>
+                            </div>
+                          ))}
                         </div>
-
-                        {/* Process Flow — alongside summary */}
-                        <div className="result-card" style={{ width: '300px', flexShrink: 0 }}>
-                          <h4 style={{ color: '#fb8c36', marginTop: 0, fontSize: '16px', fontWeight: 700 }}>Process Flow</h4>
-                          <div className="timeline-list">
-                            {codeResult.details?.flow?.map(f => (
-                              <div key={f.step} className="timeline-item" style={{ border: 'none', background: 'transparent', paddingLeft: 0 }}>
-                                <span className="date" style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '1px' }}>Step {f.step}</span>
-                                <span className="desc" style={{ display: 'block', marginTop: '4px', lineHeight: 1.5, color: '#94a3b8', fontSize: '12px' }}>{f.description}</span>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
+                      </div>
                     </div>
 
                     {/* ── Components full-width ── */}
@@ -1252,7 +1249,7 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
                         </div>
                       )}
                     </div>
-                    
+
                     {/* ── Key files ── */}
                     {codeResult.details?.key_files && codeResult.details.key_files.length > 0 && (
                       <div className="result-card">
@@ -1449,10 +1446,10 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
                         <h4><BarChart2 size={20} /> Multi-Dimensional Semantic Analysis</h4>
                         <p className="viz-desc">Visualizing semantic relationships across your image collection using advanced clustering algorithms.</p>
                         <div style={{ marginTop: '20px', background: '#020617', padding: '20px', borderRadius: '16px', border: '1px solid #1e293b', display: 'flex', justifyContent: 'center', boxShadow: 'inset 0 2px 10px rgba(0,0,0,0.5)' }}>
-                          <img 
-                            src={`${import.meta.env.VITE_API_URL ?? 'http://localhost:8000'}/${imgZipResult.result?.plot_file_path}`} 
-                            alt="Cluster Plot" 
-                            style={{ maxWidth: '100%', maxHeight: '400px', borderRadius: '8px', objectFit: 'contain' }} 
+                          <img
+                            src={`${import.meta.env.VITE_API_URL ?? 'http://localhost:8000'}/${imgZipResult.result?.plot_file_path}`}
+                            alt="Cluster Plot"
+                            style={{ maxWidth: '100%', maxHeight: '400px', borderRadius: '8px', objectFit: 'contain' }}
                             onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
                           />
                         </div>
@@ -1491,8 +1488,8 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
                           <p className="theme-subtext" style={{ fontSize: '13px', marginTop: '4px' }}>AI-organized content themes. Click to filter the gallery below.</p>
                         </div>
                         {selectedCategory !== null && (
-                          <button 
-                            className="qa-send-btn" 
+                          <button
+                            className="qa-send-btn"
                             style={{ background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', border: '1px solid rgba(239, 68, 68, 0.2)', padding: '6px 12px', height: 'auto', fontSize: '12px' }}
                             onClick={() => setSelectedCategory(null)}
                           >
@@ -1503,11 +1500,11 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
 
                       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '20px' }}>
                         {imgZipResult.result?.cluster_summaries?.map((sum, i) => (
-                          <div 
-                            key={i} 
+                          <div
+                            key={i}
                             className={`ai-intel-card ${selectedCategory === sum.cluster_id ? 'active-category' : ''}`}
-                            style={{ 
-                              cursor: 'pointer', 
+                            style={{
+                              cursor: 'pointer',
                               transition: 'all 0.3s ease',
                               border: selectedCategory === sum.cluster_id ? '2px solid #fb8c36' : undefined,
                               background: selectedCategory === sum.cluster_id ? 'rgba(251, 140, 54, 0.05)' : undefined
@@ -1516,10 +1513,10 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
                           >
                             <div style={{ padding: '20px' }}>
                               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
-                                <div style={{ 
-                                  width: '40px', 
-                                  height: '40px', 
-                                  borderRadius: '12px', 
+                                <div style={{
+                                  width: '40px',
+                                  height: '40px',
+                                  borderRadius: '12px',
                                   background: `var(--cluster-${sum.cluster_id % 5})`,
                                   display: 'flex',
                                   alignItems: 'center',
@@ -1544,15 +1541,15 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
                       <h3 className="theme-heading" style={{ marginBottom: '24px', fontSize: '20px', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '12px' }}>
                         <ImageIcon size={24} color="#60a5fa" /> Annotated Detection Gallery
                       </h3>
-                      
+
                       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '24px' }}>
                         {imgZipResult.result?.clusters?.filter(c => selectedCategory === null || c.cluster_id === selectedCategory).map((c, i) => (
                           <div key={i} className="premium-gallery-card" onClick={() => setSelectedClusterPoint(c)} style={{ cursor: 'pointer' }}>
                             <div style={{ overflow: 'hidden', position: 'relative' }}>
                               {c.annotated_image_path ? (
-                                <img 
+                                <img
                                   className="premium-gallery-img"
-                                  src={`${import.meta.env.VITE_API_URL ?? 'http://localhost:8000'}/${c.annotated_image_path}`} 
+                                  src={`${import.meta.env.VITE_API_URL ?? 'http://localhost:8000'}/${c.annotated_image_path}`}
                                   alt={c.filename}
                                   onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
                                 />
@@ -1560,8 +1557,8 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
                                 <div className="premium-gallery-img" style={{ background: '#1e293b', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748b', fontSize: '12px' }}>No Tracking Data</div>
                               )}
                               <div style={{ position: 'absolute', top: '12px', right: '12px' }}>
-                                <span className="premium-cluster-badge" style={{ 
-                                  color: '#fff', 
+                                <span className="premium-cluster-badge" style={{
+                                  color: '#fff',
                                   background: `var(--cluster-${c.cluster_id % 5})`,
                                   border: `1px solid rgba(255,255,255,0.3)`,
                                   backdropFilter: 'blur(4px)',
@@ -1579,8 +1576,8 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
                                 <span className="theme-subtext" style={{ fontSize: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
                                   <Search size={14} /> {c.objects?.length || 0} Objects
                                 </span>
-                                <button 
-                                  className="qa-send-btn" 
+                                <button
+                                  className="qa-send-btn"
                                   style={{ height: '28px', width: 'auto', padding: '0 10px', fontSize: '11px', gap: '6px' }}
                                   onClick={(e) => {
                                     e.stopPropagation();
@@ -1627,7 +1624,7 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
                                 <ImageIcon size={18} color="#60a5fa" />
                                 <span style={{ color: '#f8fafc', fontSize: '13px', fontWeight: 600 }}>{selectedImageForQA.filename}</span>
                               </div>
-                              <button 
+                              <button
                                 onClick={() => setSelectedImageForQA(null)}
                                 style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: '11px', textDecoration: 'underline' }}
                               >
@@ -1742,7 +1739,7 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
                                   const pt = imgZipResult.result.clusters.find(c => c.filename === sr.filename);
                                   if (pt?.annotated_image_path) imgPath = `${BASE_URL}/${pt.annotated_image_path}`;
                                 }
-                                
+
                                 return (
                                   <div key={idx} className="search-result-item" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                                     {imgPath && (
@@ -2055,18 +2052,18 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
       </div>
 
       {selectedClusterPoint && (
-        <div 
+        <div
           style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', background: 'rgba(2, 6, 23, 0.9)', backdropFilter: 'blur(10px)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '40px' }}
           onClick={() => setSelectedClusterPoint(null)}
         >
-          <div 
+          <div
             style={{ background: '#0f172a', borderRadius: '16px', border: '1px solid #1e293b', width: '100%', maxWidth: '1000px', maxHeight: '90vh', overflow: 'hidden', display: 'flex', flexDirection: 'column', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)' }}
             onClick={(e) => e.stopPropagation()}
           >
             <div style={{ padding: '20px', borderBottom: '1px solid #1e293b', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#1e293b' }}>
               <h3 style={{ margin: 0, color: '#f8fafc', fontSize: '18px' }}>{selectedClusterPoint?.filename}</h3>
-              <button 
-                onClick={() => setSelectedClusterPoint(null)} 
+              <button
+                onClick={() => setSelectedClusterPoint(null)}
                 style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: '28px', padding: 0, lineHeight: 1 }}
               >
                 &times;
@@ -2074,11 +2071,11 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
             </div>
             <div style={{ display: 'flex', flexDirection: 'row', flex: 1, overflow: 'hidden' }}>
               <div style={{ flex: '1', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#020617', padding: '20px', overflow: 'auto' }}>
-                 {selectedClusterPoint?.annotated_image_path ? (
-                    <img src={`${import.meta.env.VITE_API_URL ?? 'http://localhost:8000'}/${selectedClusterPoint.annotated_image_path}`} alt="Full size" style={{ maxWidth: '100%', maxHeight: '70vh', objectFit: 'contain', borderRadius: '4px' }} />
-                 ) : (
-                    <div style={{ color: '#64748b' }}>No Tracking Data</div>
-                 )}
+                {selectedClusterPoint?.annotated_image_path ? (
+                  <img src={`${import.meta.env.VITE_API_URL ?? 'http://localhost:8000'}/${selectedClusterPoint.annotated_image_path}`} alt="Full size" style={{ maxWidth: '100%', maxHeight: '70vh', objectFit: 'contain', borderRadius: '4px' }} />
+                ) : (
+                  <div style={{ color: '#64748b' }}>No Tracking Data</div>
+                )}
               </div>
               <div style={{ width: '350px', display: 'flex', flexDirection: 'column', gap: '20px', padding: '20px', overflowY: 'auto', background: '#0f172a', borderLeft: '1px solid #1e293b' }}>
                 <div>
@@ -2098,10 +2095,10 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
                   </div>
                 </div>
                 <div>
-                   <span style={{ fontSize: '12px', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '1px', fontWeight: 'bold' }}>Assigned Cluster</span>
-                   <div style={{ marginTop: '8px', padding: '12px 15px', background: `var(--cluster-${(selectedClusterPoint?.cluster_id || 0) % 5})`, color: '#fff', borderRadius: '8px', fontWeight: 'bold', display: 'inline-block', boxShadow: '0 4px 6px rgba(0,0,0,0.1)' }}>
-                     Cluster {selectedClusterPoint?.cluster_id}
-                   </div>
+                  <span style={{ fontSize: '12px', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '1px', fontWeight: 'bold' }}>Assigned Cluster</span>
+                  <div style={{ marginTop: '8px', padding: '12px 15px', background: `var(--cluster-${(selectedClusterPoint?.cluster_id || 0) % 5})`, color: '#fff', borderRadius: '8px', fontWeight: 'bold', display: 'inline-block', boxShadow: '0 4px 6px rgba(0,0,0,0.1)' }}>
+                    Cluster {selectedClusterPoint?.cluster_id}
+                  </div>
                 </div>
               </div>
             </div>
