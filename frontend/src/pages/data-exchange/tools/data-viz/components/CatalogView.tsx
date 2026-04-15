@@ -58,6 +58,14 @@ const CatalogView = ({ onSelect }: Props) => {
       </p>
       <div className="xt-dataset-list">
         {datasetsLoading && datasets.length === 0
+          ? Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} className="xt-dataset-row" style={{ opacity: 0.4, pointerEvents: 'none' }}>
+              <div className="xt-dataset-info">
+                <span className="xt-dataset-name" style={{ background: '#334155', borderRadius: 4, color: 'transparent', userSelect: 'none' }}>Loading dataset title placeholder</span>
+                <span className="xt-dataset-desc" style={{ background: '#1e293b', borderRadius: 4, color: 'transparent', userSelect: 'none' }}>Loading description text here…</span>
+              </div>
+              <span className="xt-dataset-badge" style={{ background: '#334155', color: 'transparent' }}>Category</span>
+            </div>
           ))
           : (
             <>
@@ -93,7 +101,9 @@ const CatalogView = ({ onSelect }: Props) => {
               </div>
               <span className="xt-dataset-badge">{d.category}</span>
             </div>
-          ))}
+            ))}
+            </>
+          )}
       </div>
       {datasets.length > 0 && datasets.length < datasetsTotal && (
         <div style={{ display: 'flex', justifyContent: 'center', marginTop: '16px' }}>
