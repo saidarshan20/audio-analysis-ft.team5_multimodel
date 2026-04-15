@@ -484,7 +484,7 @@ async def stream_temp_video():
 #  data.gov.in Catalog Proxy
 # ──────────────────────────────────────────────
 @router.get("/datasets")
-async def list_datasets(q: str = "", offset: int = 0, limit: int = 20):
+async def list_datasets(q: str = "", sector: str = "", offset: int = 0, limit: int = 20):
     """
     Proxy to data.gov.in catalog API.
     Returns { total, results: [{name, desc, category, org}] }
@@ -501,6 +501,11 @@ async def list_datasets(q: str = "", offset: int = 0, limit: int = 20):
         "limit": limit,
         "filters[org_type]": "Central",
     }
+    
+    # Add sector filter if provided
+    if sector.strip():
+        params["filters[sector]"] = sector.strip()
+
     if q.strip():
         # Searching by dataset keywords/tags is more comprehensive than title alone
         params["filters[title]"] = q.strip()

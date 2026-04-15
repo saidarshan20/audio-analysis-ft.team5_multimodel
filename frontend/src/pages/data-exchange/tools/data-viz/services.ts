@@ -20,8 +20,13 @@ export interface DatasetPage {
   error?: string;
 }
 
-export async function fetchDatasets(q: string, offset: number, limit: number): Promise<DatasetPage> {
-  const params = new URLSearchParams({ q, offset: String(offset), limit: String(limit) });
+export async function fetchDatasets(q: string, offset: number, limit: number, sector: string = ''): Promise<DatasetPage> {
+  const params = new URLSearchParams({ 
+    q, 
+    offset: String(offset), 
+    limit: String(limit),
+    sector 
+  });
   const response = await fetch(`${BASE_URL}/team5/datasets?${params}`);
   if (!response.ok) throw new Error(`Dataset fetch failed: ${response.status}`);
   return response.json();

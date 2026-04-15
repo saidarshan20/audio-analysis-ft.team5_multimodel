@@ -1,10 +1,12 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { Search } from 'lucide-react';
 import { fetchDatasets, DatasetEntry } from '../services';
 
 interface Props {
   onSelect?: (id: string) => void;
 }
+
+const PAGE_SIZE = 50;
 
 const CatalogView = ({ onSelect }: Props) => {
   const [search, setSearch] = useState('');
@@ -14,17 +16,31 @@ const CatalogView = ({ onSelect }: Props) => {
   const [datasetsLoading, setDatasetsLoading] = useState(false);
   const [datasetsOffset, setDatasetsOffset] = useState(0);
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
+  const [hasMore, setHasMore] = useState(true);
 
-  // Derived categories from current dataset results
-  const categories = Array.from(new Set(datasets.map(d => d.category))).slice(0, 8);
+  // For infinite scroll
+  const observer = useRef<IntersectionObserver | null>(null);
+  const lastElementRef = useCallback((node: HTMLDivElement) => {
+    if (datasetsLoading) return;
+    if (observer.current) observer.current.disconnect();
+    observer.current = new IntersectionObserver(entries => {
+      if (entries[0].isIntersecting && hasMore) {
+        setDatasetsOffset(prev => prev + PAGE_SIZE);
+      }
+    });
+    if (node) observer.current.observe(node);
+  }, [datasetsLoading, hasMore]);
 
-  const loadDatasets = async (query: string, offset: number) => {
+  // Derived categories from current dataset results (for chips)
+  const categories = Array.from(new Set(datasets.map(d => d.category))).slice(0, 10);
+
+  const loadDatasets = async (query: string, category: string, offset: number) => {
     setDatasetsLoading(true);
     try {
-      const page = await fetchDatasets(query, offset, 20);
+      const page = await fetchDatasets(query, offset, PAGE_SIZE, category);
       setDatasetsTotal(page.total);
       setDatasets(prev => offset === 0 ? page.results : [...prev, ...page.results]);
-      setDatasetsOffset(offset);
+      setHasMore(offset + PAGE_SIZE < page.total);
     } catch {
       // silently keep existing results
     } finally {
@@ -32,25 +48,38 @@ const CatalogView = ({ onSelect }: Props) => {
     }
   };
 
+  // Effect: When search or activeCategory changes, reset and load
   useEffect(() => {
-    const t = setTimeout(() => loadDatasets(search, 0), search ? 400 : 0);
-    return () => clearTimeout(t);
-  }, [search]);
-
-  useEffect(() => {
-    if (datasets.length === 0) {
-      loadDatasets('', 0);
+    // Global search logic: clear category if searching
+    if (search.trim()) {
+      setActiveCategory(null);
     }
-  }, []);
+    
+    setDatasetsOffset(0);
+    const t = setTimeout(() => {
+      loadDatasets(search, activeCategory || '', 0);
+    }, search ? 400 : 0);
+    
+    return () => clearTimeout(t);
+  }, [search, activeCategory]);
+
+  // Effect: When offset changes (Infinite scroll trigger)
+  useEffect(() => {
+    if (datasetsOffset > 0) {
+      loadDatasets(search, activeCategory || '', datasetsOffset);
+    }
+  }, [datasetsOffset]);
 
   return (
     <div className="view-animate-in">
       <h2 className="xt-panel-title">Explore Dataset Catalog</h2>
+      
+      {/* Search Bar */}
       <div className="xt-search-wrap" style={{ position: 'relative' }}>
         <Search size={15} className="xt-search-icon" />
         <input
           className="xt-search-input"
-          placeholder="Search Central Gov datasets..."
+          placeholder="Search items globally across the repository..."
           value={search}
           onChange={e => setSearch(e.target.value)}
           style={{ paddingRight: '40px' }}
@@ -82,7 +111,10 @@ const CatalogView = ({ onSelect }: Props) => {
         {categories.map(cat => (
           <button 
             key={cat}
-            onClick={() => setActiveCategory(activeCategory === cat ? null : cat)}
+            onClick={() => {
+              setSearch(''); // Ensure search is cleared when using sector filter
+              setActiveCategory(activeCategory === cat ? null : cat);
+            }}
             className={`xt-tab ${activeCategory === cat ? 'active' : ''}`}
             style={{ fontSize: '11px', padding: '4px 12px', whiteSpace: 'nowrap' }}
           >
@@ -93,54 +125,56 @@ const CatalogView = ({ onSelect }: Props) => {
 
       <p className="xt-count">
         {datasetsLoading && datasets.length === 0
-          ? 'Connecting to data.gov.in…'
-          : `Found ${datasetsTotal.toLocaleString()} datasets in repository`}
+          ? 'Connecting to repository…'
+          : `Found ${datasetsTotal.toLocaleString()} datasets`}
       </p>
+
       <div className="xt-dataset-list">
-        {datasetsLoading && datasets.length === 0
-          ? Array.from({ length: 6 }).map((_, i) => (
-            <div key={i} className="xt-dataset-row" style={{ opacity: 0.4, pointerEvents: 'none' }}>
+        {datasets.length === 0 && datasetsLoading ? (
+          /* Initial Loading Skeltons with Shimmer */
+          Array.from({ length: 8 }).map((_, i) => (
+            <div key={i} className="xt-dataset-row shimmer" style={{ opacity: 0.6, pointerEvents: 'none', background: 'rgba(30, 41, 59, 0.4)' }}>
               <div className="xt-dataset-info">
-                <span className="xt-dataset-name" style={{ background: '#334155', borderRadius: 4, color: 'transparent', userSelect: 'none' }}>Loading dataset title placeholder</span>
-                <span className="xt-dataset-desc" style={{ background: '#1e293b', borderRadius: 4, color: 'transparent', userSelect: 'none' }}>Loading description text here…</span>
+                <div style={{ width: '240px', height: '14px', background: '#334155', borderRadius: 4, marginBottom: '8px' }} />
+                <div style={{ width: '380px', height: '10px', background: '#1e293b', borderRadius: 4 }} />
               </div>
-              <span className="xt-dataset-badge" style={{ background: '#334155', color: 'transparent' }}>Category</span>
+              <div style={{ width: '80px', height: '18px', background: '#334155', borderRadius: '10px' }} />
             </div>
           ))
-          : (
-            <>
-              {datasets
-                .filter(d => !activeCategory || d.category === activeCategory)
-                .map((d: DatasetEntry, i: number) => (
-                <div
-                  key={`${d.name}-${i}`}
-                  className={`xt-dataset-row${selected === d.name ? ' selected' : ''}`}
-                  onClick={() => {
-                    setSelected(d.name);
-                    onSelect?.(d.name);
-                  }}
-                >
-                  <div className="xt-dataset-info">
-                    <span className="xt-dataset-name">{d.name}</span>
-                    <span className="xt-dataset-desc">{d.desc}</span>
-                  </div>
-                  <span className="xt-dataset-badge">{d.category}</span>
+        ) : (
+          <>
+            {datasets.map((d: DatasetEntry, i: number) => (
+              <div
+                key={`${d.name}-${i}`}
+                ref={i === datasets.length - 1 ? lastElementRef : null}
+                className={`xt-dataset-row${selected === d.name ? ' selected' : ''}`}
+                onClick={() => {
+                  setSelected(d.name);
+                  onSelect?.(d.name);
+                }}
+              >
+                <div className="xt-dataset-info">
+                  <span className="xt-dataset-name">{d.name}</span>
+                  <span className="xt-dataset-desc">{d.desc}</span>
                 </div>
-              ))}
-            </>
-          )}
+                <span className="xt-dataset-badge">{d.category}</span>
+              </div>
+            ))}
+            
+            {datasetsLoading && datasets.length > 0 && (
+              /* Load More Spinner/Shimmer */
+              <div style={{ padding: '20px', textAlign: 'center', opacity: 0.6 }}>
+                <span style={{ fontSize: '13px', color: '#94a3b8' }}>Loading more records...</span>
+              </div>
+            )}
+          </>
+        )}
       </div>
-      {datasets.length > 0 && datasets.length < datasetsTotal && (
-        <div style={{ display: 'flex', justifyContent: 'center', marginTop: '16px' }}>
-          <button
-            className="xt-tab"
-            style={{ background: 'rgba(96, 165, 250, 0.1)', color: '#60a5fa', border: '1px solid rgba(96, 165, 250, 0.2)', padding: '8px 24px', cursor: datasetsLoading ? 'not-allowed' : 'pointer', opacity: datasetsLoading ? 0.6 : 1 }}
-            onClick={() => !datasetsLoading && loadDatasets(search, datasetsOffset + 20)}
-            disabled={datasetsLoading}
-          >
-            {datasetsLoading ? 'Loading…' : `Load More (${datasets.length} / ${datasetsTotal.toLocaleString()})`}
-          </button>
-        </div>
+
+      {!hasMore && datasets.length > 0 && (
+        <p style={{ textAlign: 'center', fontSize: '12px', color: '#475569', marginTop: '20px' }}>
+          — End of results —
+        </p>
       )}
     </div>
   );
