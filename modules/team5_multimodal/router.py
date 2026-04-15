@@ -497,24 +497,24 @@ async def list_datasets(q: str = "", sector: str = "", offset: int = 0, limit: i
     params: dict = {
         "format": "json",
         "api-key": api_key,
-        "offset": offset,
-        "limit": limit,
+        "offset": int(offset),
+        "limit": int(limit),
         "filters[org_type]": "Central",
     }
     
     # Add sector filter if provided
-    if sector.strip():
+    if sector and sector.strip():
         params["filters[sector]"] = sector.strip()
 
-    if q.strip():
-        # Searching by dataset keywords/tags is more comprehensive than title alone
+    if q and q.strip():
+        # Searching by dataset title as a filter
         params["filters[title]"] = q.strip()
-        # Note: We can expand this to filters[desc] or other fields if the API allows multi-filter AND queries
 
     try:
         async with httpx.AsyncClient(timeout=15) as client:
             resp = await client.get("https://api.data.gov.in/lists", params=params)
-            resp.raise_for_status()
+            if resp.status_code != 200:
+                return {"total": 0, "results": [], "error": f"OGD API returned status {resp.status_code}"}
             data = resp.json()
 
         results = []
@@ -527,11 +527,20 @@ async def list_datasets(q: str = "", sector: str = "", offset: int = 0, limit: i
                 title = str(item.get("title") or "Untitled").strip()
                 if not title or title.lower().startswith("mydata-") or title.lower() == "untitled":
                     continue
+                
+                # Extract deeper metadata for the Detail Hub (Aggressive search for ID)
+                index_id = item.get("index_name") or item.get("resource_uuid") or item.get("id") or ""
+                fields = item.get("field") or item.get("fields") or []
+                last_updated = item.get("updated_date") or ""
+                
                 results.append({
+                    "id": str(index_id),
                     "name": title,
                     "desc": str(item.get("desc") or ""),
                     "category": str(category),
                     "org": str(org_name),
+                    "fields": fields,
+                    "updated": last_updated
                 })
             except Exception:
                 continue
@@ -547,6 +556,91 @@ async def list_datasets(q: str = "", sector: str = "", offset: int = 0, limit: i
     except Exception as exc:
         logger.warning("data.gov.in API error: %s", exc)
         return {"total": 0, "results": [], "error": str(exc)}
+
+
+@router.get("/datasets/sample/{index_id:path}")
+async def get_dataset_sample(index_id: str, limit: int = 10):
+    """Fetch sample rows for a specific dataset from data.gov.in."""
+    settings = get_settings()
+    api_key = settings.data_gov_api_key
+    if not api_key:
+        raise HTTPException(status_code=400, detail="DATA_GOV_API_KEY not configured")
+
+    params = {
+        "api-key": api_key,
+        "format": "json",
+        "limit": limit
+    }
+    
+    try:
+        async with httpx.AsyncClient(timeout=25) as client:
+            url = f"https://api.data.gov.in/resource/{index_id}"
+            resp = await client.get(url, params=params)
+            
+            if resp.status_code != 200:
+                return {
+                    "records": [], 
+                    "error": f"OGD API returned status {resp.status_code}",
+                    "id": index_id
+                }
+            
+            data = resp.json()
+            # OGD API can return rows in several keys depending on the resource type
+            records = data.get("records") or data.get("data") or data.get("results") or []
+            
+            return {
+                "records": records, 
+                "field": data.get("field") or data.get("fields") or [],
+                "total": data.get("total", 0),
+                "id": index_id
+            }
+    except Exception as exc:
+        logger.error("Dataset sample fetch error: %s", exc)
+        return {"records": [], "error": str(exc), "id": index_id}
+
+
+class DatasetChatRequest(BaseModel):
+    dataset_name: str
+    description: str
+    fields: list[dict]
+    question: str
+    history: list[dict] = []
+
+@router.post("/datasets/chat")
+async def chat_about_dataset(payload: DatasetChatRequest):
+    """Professional AI analysis of dataset metadata to provide insights without being 'gimmicky'."""
+    from openai import AsyncOpenAI
+    settings = get_settings()
+    if settings.nvidia_api_key:
+        client = AsyncOpenAI(base_url="https://integrate.api.nvidia.com/v1", api_key=settings.nvidia_api_key)
+        model_name = settings.nvidia_model
+    else:
+        client = AsyncOpenAI(base_url="https://api.groq.com/openai/v1", api_key=settings.groq_api_key)
+        model_name = settings.groq_model
+
+    column_names = [f.get("name") or f.get("id") for f in payload.fields]
+    system = (
+        "You are a Senior Data Scientist. Analyze the following dataset metadata to answer technical or analytical questions. "
+        "Avoid conversational fluff. Focus on data potential, possible correlations, and analytical use-cases.\n\n"
+        f"DATASET: {payload.dataset_name}\n"
+        f"DESCRIPTION: {payload.description}\n"
+        f"DETECTED COLUMNS: {', '.join(column_names)}\n\n"
+        "Provide professional, fact-based responses."
+    )
+    
+    messages = [{"role": "system", "content": system}]
+    for turn in payload.history[-4:]:
+        messages.append(turn)
+    messages.append({"role": "user", "content": payload.question})
+
+    try:
+        resp = await client.chat.completions.create(
+            model=model_name, messages=messages, temperature=0.2, max_tokens=600
+        )
+        return {"answer": resp.choices[0].message.content}
+    except Exception as exc:
+        logger.error("dataset-chat error: %s", exc)
+        raise HTTPException(status_code=500, detail=str(exc))
 
 
 # ──────────────────────────────────────────────
