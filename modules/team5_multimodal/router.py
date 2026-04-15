@@ -502,7 +502,9 @@ async def list_datasets(q: str = "", offset: int = 0, limit: int = 20):
         "filters[org_type]": "Central",
     }
     if q.strip():
+        # Searching by dataset keywords/tags is more comprehensive than title alone
         params["filters[title]"] = q.strip()
+        # Note: We can expand this to filters[desc] or other fields if the API allows multi-filter AND queries
 
     try:
         async with httpx.AsyncClient(timeout=15) as client:

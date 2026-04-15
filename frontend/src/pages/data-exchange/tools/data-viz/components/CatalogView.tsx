@@ -13,6 +13,10 @@ const CatalogView = ({ onSelect }: Props) => {
   const [datasetsTotal, setDatasetsTotal] = useState(0);
   const [datasetsLoading, setDatasetsLoading] = useState(false);
   const [datasetsOffset, setDatasetsOffset] = useState(0);
+  const [activeCategory, setActiveCategory] = useState<string | null>(null);
+
+  // Derived categories from current dataset results
+  const categories = Array.from(new Set(datasets.map(d => d.category))).slice(0, 8);
 
   const loadDatasets = async (query: string, offset: number) => {
     setDatasetsLoading(true);
@@ -42,19 +46,55 @@ const CatalogView = ({ onSelect }: Props) => {
   return (
     <div className="view-animate-in">
       <h2 className="xt-panel-title">Explore Dataset Catalog</h2>
-      <div className="xt-search-wrap">
+      <div className="xt-search-wrap" style={{ position: 'relative' }}>
         <Search size={15} className="xt-search-icon" />
         <input
           className="xt-search-input"
-          placeholder="Search datasets by name, description, or tags..."
+          placeholder="Search Central Gov datasets..."
           value={search}
           onChange={e => setSearch(e.target.value)}
+          style={{ paddingRight: '40px' }}
         />
+        {search && (
+          <button 
+            onClick={() => setSearch('')}
+            style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', background: 'transparent', border: 'none', color: '#64748b', cursor: 'pointer', fontSize: '16px' }}
+          >
+            ✕
+          </button>
+        )}
+        {datasetsLoading && (
+          <div style={{ position: 'absolute', right: search ? '36px' : '12px', top: '50%', transform: 'translateY(-50%)' }}>
+            <div className="animate-spin" style={{ width: '12px', height: '12px', border: '2px solid rgba(251,140,54,0.2)', borderTop: '2px solid #fb8c36', borderRadius: '50%' }} />
+          </div>
+        )}
       </div>
+
+      {/* Category Filter Chips */}
+      <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', padding: '10px 0', marginBottom: '10px', scrollbarWidth: 'none' }}>
+        <button 
+          onClick={() => setActiveCategory(null)}
+          className={`xt-tab ${!activeCategory ? 'active' : ''}`}
+          style={{ fontSize: '11px', padding: '4px 12px', whiteSpace: 'nowrap' }}
+        >
+          All Sectors
+        </button>
+        {categories.map(cat => (
+          <button 
+            key={cat}
+            onClick={() => setActiveCategory(activeCategory === cat ? null : cat)}
+            className={`xt-tab ${activeCategory === cat ? 'active' : ''}`}
+            style={{ fontSize: '11px', padding: '4px 12px', whiteSpace: 'nowrap' }}
+          >
+            {cat}
+          </button>
+        ))}
+      </div>
+
       <p className="xt-count">
         {datasetsLoading && datasets.length === 0
-          ? 'Loading datasets…'
-          : `Found ${datasetsTotal.toLocaleString()} datasets`}
+          ? 'Connecting to data.gov.in…'
+          : `Found ${datasetsTotal.toLocaleString()} datasets in repository`}
       </p>
       <div className="xt-dataset-list">
         {datasetsLoading && datasets.length === 0
@@ -69,7 +109,9 @@ const CatalogView = ({ onSelect }: Props) => {
           ))
           : (
             <>
-              {datasets.map((d: DatasetEntry, i: number) => (
+              {datasets
+                .filter(d => !activeCategory || d.category === activeCategory)
+                .map((d: DatasetEntry, i: number) => (
                 <div
                   key={`${d.name}-${i}`}
                   className={`xt-dataset-row${selected === d.name ? ' selected' : ''}`}
