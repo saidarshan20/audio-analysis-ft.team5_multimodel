@@ -6,6 +6,7 @@ Migrated from app/services/text_service.py.
 import io
 import json
 import logging
+import re
 
 import pdfplumber
 from groq import AsyncGroq
@@ -19,11 +20,15 @@ SYSTEM_PROMPT = """You are an expert text analysis engine. Given the user's text
 
 {
   "summary": "<3 concise sentences summarizing the text>",
+  "topic": "<1-3 words describing the main topic>",
+  "theme": "<1 sentence describing the overarching theme or core message>",
+  "top_keywords": ["keyword1", "keyword2", "keyword3", "keyword4", "keyword5"],
   "sentiment": {
     "positive": <float 0-1>,
     "negative": <float 0-1>,
     "neutral": <float 0-1>,
-    "overall_label": "<positive|negative|neutral|mixed>"
+    "overall_label": "<positive|negative|neutral|mixed>",
+    "detailed_analysis": "<1-2 sentences explaining contextually why this sentiment was chosen>"
   },
   "entities": [
     {"id": "<unique_snake_case>", "label": "<display name>", "type": "<Person|Place|Organization|Event|Concept>"}
@@ -83,6 +88,51 @@ class TextAnalysisService:
         logger.debug("LLM raw response: %s", raw)
 
         data = json.loads(raw)  # type: ignore[arg-type]
+        
+        # NLTK Word Frequency extraction
+        try:
+            import nltk
+            from collections import Counter
+            from nltk.corpus import stopwords
+            from nltk.tokenize import word_tokenize
+            
+            # Ensure resources are available
+            try:
+                stop_words = set(stopwords.words('english'))
+            except LookupError:
+                nltk.download('stopwords', quiet=True)
+                nltk.download('punkt', quiet=True)
+                stop_words = set(stopwords.words('english'))
+                
+            # Clean and tokenize
+            text_clean = re.sub(r'[^\w\s]', '', text.lower())
+            tokens = word_tokenize(text_clean)
+            
+            # Filter stopwords and numeric strings
+            filtered_tokens = [w for w in tokens if not w in stop_words and len(w) > 2 and not w.isnumeric()]
+            
+            # Count frequencies (Top 50)
+            word_counts = Counter(filtered_tokens)
+            top_words = word_counts.most_common(50)
+            data['word_frequencies'] = [{"word": word, "count": count} for word, count in top_words]
+            
+            # Bigram Keyphrase extraction (Token reduction metric)
+            bigrams = list(nltk.bigrams(filtered_tokens))
+            bigram_counts = Counter(bigrams)
+            top_bigrams = bigram_counts.most_common(5)
+            data['top_keyphrases'] = [f"{w1} {w2}" for (w1, w2), _ in top_bigrams]
+        except Exception as e:
+            logger.warning(f"NLTK Word frequency extraction failed: {e}")
+            data['word_frequencies'] = []
+            data['top_keyphrases'] = []
+
+        # Exact Count tracking
+        data['char_count'] = len(text)
+        words = [w for w in text.split() if w.strip()]
+        data['word_count'] = len(words)
+        sentences = [s for s in re.split(r'[.!?]+', text) if s.strip()]
+        data['sentence_count'] = max(1, len(sentences)) if text.strip() else 0
+
         return TextAnalysisResult.model_validate(data)
 
     @staticmethod
@@ -96,4 +146,19 @@ class TextAnalysisService:
                     text_parts.append(page_text)
         return "\n".join(text_parts)
 
+    async def chat_with_transcript(self, transcript: str, history: list[dict], message: str) -> str:
+        messages = [
+            {"role": "system", "content": "You are a highly analytical assistant evaluating an audio transcript. Answer questions strictly utilizing the context provided. Transcript:\n\n" + transcript}
+        ]
+        for msg in history:
+            messages.append({"role": msg["role"], "content": msg["content"]})
+        
+        messages.append({"role": "user", "content": message})
+
+        response = await self._client.chat.completions.create(
+            model=self._settings.groq_model,
+            messages=messages,
+            temperature=0.5,
+        )
+        return response.choices[0].message.content
 

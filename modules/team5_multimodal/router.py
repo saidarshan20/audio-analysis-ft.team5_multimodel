@@ -582,6 +582,48 @@ async def chat_about_codebase(payload: CodeChatRequest):
         raise HTTPException(status_code=500, detail=str(exc))
 
 
+# ──────────────────────────────────────────────
+#  Audio Chat — Q&A about a transcript
+# ──────────────────────────────────────────────
+class AudioChatRequest(BaseModel):
+    transcript_text: str
+    question: str
+    history: list[dict] = []  # [{role, content}] — last N turns
+
+@router.post("/audio-chat")
+async def chat_about_audio(payload: AudioChatRequest):
+    """Answer a question about an audio transcript using the transcript as context."""
+    from openai import AsyncOpenAI
+    settings = get_settings()
+    if settings.nvidia_api_key:
+        client = AsyncOpenAI(base_url="https://integrate.api.nvidia.com/v1", api_key=settings.nvidia_api_key)
+        model_name = settings.nvidia_model
+    else:
+        client = AsyncOpenAI(base_url="https://api.groq.com/openai/v1", api_key=settings.groq_api_key)
+        model_name = settings.groq_model
+
+    # Truncate long transcripts to avoid token limits
+    transcript_excerpt = payload.transcript_text[:4000] if payload.transcript_text else "(no transcript)"
+    system = (
+        "You are an expert audio analyst. Answer questions about the audio recording based on its transcript. "
+        "Be concise and insightful. Reference specific quotes or speakers when relevant.\n\n"
+        f"=== TRANSCRIPT ===\n{transcript_excerpt}\n=== END ==="
+    )
+    messages = [{"role": "system", "content": system}]
+    for turn in payload.history[-6:]:
+        messages.append(turn)
+    messages.append({"role": "user", "content": payload.question.strip()})
+
+    try:
+        resp = await client.chat.completions.create(
+            model=model_name, messages=messages, temperature=0.3, max_tokens=600
+        )
+        return {"answer": resp.choices[0].message.content, "model": model_name}
+    except Exception as exc:
+        logger.error("audio-chat LLM error: %s", exc)
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
 @router.get("/demo-video-stream")
 async def get_demo_video():
     """Stream the pre-analyzed demo video (huhu_analyzed.mp4) with range-request headers."""

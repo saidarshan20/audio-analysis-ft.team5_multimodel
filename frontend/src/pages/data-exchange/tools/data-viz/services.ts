@@ -40,6 +40,25 @@ export interface TextAnalysisResult {
   kg_edges: Array<{ source: string; target: string; relation: string }>;
   timeline: Array<{ date: string; description: string }>;
   locations: Array<{ name: string; lat: number; lng: number }>;
+  // Extended NLP fields (audio branch)
+  word_count?: number;
+  conversation_score?: number;
+  emotion?: string;
+  tone?: string;
+  domain?: string;
+  bullet_points?: string[];
+  action_items?: string[];
+  topic?: string;
+  theme?: string;
+  sentence_sentiments?: Array<{ sentence: string; sentiment: string }>;
+  top_keyphrases?: string[];
+  top_keywords?: string[];
+  decisions?: string[];
+  agreements?: string[];
+  questions?: string[];
+  unanswered_questions?: string[];
+  disagreements?: string[];
+  topic_segments?: Array<{ topic: string; segment: string }>;
 }
 
 export interface DiagramGroup {
@@ -434,6 +453,7 @@ export interface AudioFeatures {
   spectrogram: SpectrogramData;
   energy: EnergyData;
   mfcc?: MFCCData;
+  mel_spectrogram?: SpectrogramData;
 }
 
 export interface AudioFeaturesResponse {
@@ -443,12 +463,39 @@ export interface AudioFeaturesResponse {
   result: AudioFeatures;
 }
 
+export interface AudioQualityMetrics {
+  snr: number;
+  loudness: number;
+  clarity: number;
+  noise: number;
+}
+
+export interface AudioQuality {
+  overall_score?: number;
+  composite_percent?: number;
+  rating?: string;
+  summary?: string;
+  snr_db?: number;
+  metrics?: AudioQualityMetrics;
+}
+
+export interface SpeakerMetrics {
+  dominance_ratio: number;
+  wpm: number;
+  participation_ratio: number;
+}
+
 export interface AudioAnalysisResult {
   duration: number;
   segments: SpeakerSegment[];
   transcript_text: string;
   features?: AudioFeatures;
   text_analysis: TextAnalysisResult | null;
+  // Extended fields (audio branch)
+  audio_quality?: AudioQuality;
+  language?: string;
+  speaker_metrics?: Record<string, SpeakerMetrics>;
+  interruption_count?: number;
 }
 
 export interface AudioAnalysisResponse {
@@ -546,6 +593,40 @@ export async function analyzeVideo(file: File): Promise<VideoAnalysisResult> {
   if (!response.ok) {
     const err = await response.json().catch(() => ({ detail: 'Unknown error' }));
     throw new Error(err.detail || `Video analysis failed with status ${response.status}`);
+  }
+
+  return response.json();
+}
+
+// ── Audio Chat ────────────────────────────────────────────────────────────────
+
+export interface AudioChatMessage {
+  role: 'user' | 'assistant';
+  content: string;
+}
+
+export interface AudioChatResponse {
+  answer: string;
+  model: string;
+}
+
+/**
+ * Ask a question about an audio transcript using multi-turn LLM chat
+ */
+export async function submitAudioChat(
+  transcriptText: string,
+  history: AudioChatMessage[],
+  question: string
+): Promise<AudioChatResponse> {
+  const response = await fetch(`${BASE_URL}/team5/audio-chat`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ transcript_text: transcriptText, history, question }),
+  });
+
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({ detail: 'Unknown error' }));
+    throw new Error(err.detail || `Audio chat failed with status ${response.status}`);
   }
 
   return response.json();
