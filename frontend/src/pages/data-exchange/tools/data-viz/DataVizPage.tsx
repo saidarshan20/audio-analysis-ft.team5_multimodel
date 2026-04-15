@@ -913,7 +913,7 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
                 {codeResult && (
                   <div className="code-analysis-view">
                     {/* ── Analysis run stats strip ── */}
-                    <div style={{ display: 'flex', gap: '10px', alignItems: 'stretch', flexWrap: 'wrap' }}>
+                    <div className="metrics-strip">
                       {[
                         {
                           icon: <Clock size={13} />,
@@ -946,12 +946,12 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
                           sub: 'via Groq',
                         },
                       ].map((s, i) => (
-                        <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '10px', padding: '8px 12px', flex: '1 1 130px', minWidth: 0 }}>
-                          <span style={{ color: '#fb8c36', flexShrink: 0, opacity: 0.8 }}>{s.icon}</span>
-                          <div style={{ minWidth: 0 }}>
-                            <div style={{ fontSize: '9px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '1px' }}>{s.label}</div>
-                            <div style={{ fontSize: '12px', fontWeight: 700, color: '#f1f5f9', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{s.value}</div>
-                            <div style={{ fontSize: '9px', color: '#475569', marginTop: '1px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{s.sub}</div>
+                        <div key={i} className="metric-card">
+                          <span className="metric-card-icon">{s.icon}</span>
+                          <div className="metric-card-content">
+                            <div className="metric-card-label">{s.label}</div>
+                            <div className="metric-card-value">{s.value}</div>
+                            <div className="metric-card-sub">{s.sub}</div>
                           </div>
                         </div>
                       ))}
@@ -1250,7 +1250,7 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
                 {imgZipResult && (
                   <div className="img-analysis-view">
                     {/* ── Image Analysis Metrics Strip ── */}
-                    <div style={{ display: 'flex', gap: '10px', alignItems: 'stretch', flexWrap: 'wrap', marginBottom: '24px' }}>
+                    <div className="metrics-strip with-margin">
                       {[
                         {
                           icon: <Clock size={13} />,
@@ -1277,12 +1277,12 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
                           sub: 'via Groq',
                         },
                       ].map((s, i) => (
-                        <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '10px', padding: '8px 12px', flex: '1 1 130px', minWidth: 0 }}>
-                          <span style={{ color: '#fb8c36', flexShrink: 0, opacity: 0.8 }}>{s.icon}</span>
-                          <div style={{ minWidth: 0 }}>
-                            <div style={{ fontSize: '9px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '1px' }}>{s.label}</div>
-                            <div style={{ fontSize: '12px', fontWeight: 700, color: '#f1f5f9', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{s.value}</div>
-                            <div style={{ fontSize: '9px', color: '#475569', marginTop: '1px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{s.sub}</div>
+                        <div key={i} className="metric-card">
+                          <span className="metric-card-icon">{s.icon}</span>
+                          <div className="metric-card-content">
+                            <div className="metric-card-label">{s.label}</div>
+                            <div className="metric-card-value">{s.value}</div>
+                            <div className="metric-card-sub">{s.sub}</div>
                           </div>
                         </div>
                       ))}
