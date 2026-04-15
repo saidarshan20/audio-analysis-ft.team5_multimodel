@@ -1284,25 +1284,43 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
                 {/* ZIP Image Analysis Result */}
                 {imgZipResult && (
                   <div className="img-analysis-view">
-                    {/* Metrics strip */}
-                    <div className="metrics-strip" style={{ display: 'flex', gap: '12px', marginBottom: '20px', flexWrap: 'wrap' }}>
-                      <div className="metric-card" style={{ flex: 1, minWidth: '120px', background: '#0f172a', border: '1px solid #1e293b', borderRadius: '12px', padding: '14px 18px' }}>
-                        <div style={{ fontSize: '11px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '6px' }}>Processing Time</div>
-                        <div style={{ fontSize: '22px', fontWeight: 700, color: '#fb8c36' }}>{imgDuration > 0 ? `${imgDuration.toFixed(1)}s` : `—`}</div>
-                      </div>
-                      <div className="metric-card" style={{ flex: 1, minWidth: '120px', background: '#0f172a', border: '1px solid #1e293b', borderRadius: '12px', padding: '14px 18px' }}>
-                        <div style={{ fontSize: '11px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '6px' }}>Images Processed</div>
-                        <div style={{ fontSize: '22px', fontWeight: 700, color: '#38bdf8' }}>{imgZipResult.processed_count}</div>
-                      </div>
-                      <div className="metric-card" style={{ flex: 1, minWidth: '120px', background: '#0f172a', border: '1px solid #1e293b', borderRadius: '12px', padding: '14px 18px' }}>
-                        <div style={{ fontSize: '11px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '6px' }}>LLM Tokens</div>
-                        <div style={{ fontSize: '22px', fontWeight: 700, color: '#a78bfa' }}>{imgTokens.total > 0 ? imgTokens.total.toLocaleString() : '—'}</div>
-                        {imgTokens.total > 0 && <div style={{ fontSize: '10px', color: '#475569', marginTop: '2px' }}>in {imgTokens.input.toLocaleString()} · out {imgTokens.output.toLocaleString()}</div>}
-                      </div>
-                      <div className="metric-card" style={{ flex: 1, minWidth: '120px', background: '#0f172a', border: '1px solid #1e293b', borderRadius: '12px', padding: '14px 18px' }}>
-                        <div style={{ fontSize: '11px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '6px' }}>Model</div>
-                        <div style={{ fontSize: '13px', fontWeight: 600, color: '#e2e8f0', wordBreak: 'break-word' }}>{imgModel || '—'}</div>
-                      </div>
+                    {/* ── Image Analysis Metrics Strip ── */}
+                    <div style={{ display: 'flex', gap: '10px', alignItems: 'stretch', flexWrap: 'wrap', marginBottom: '24px' }}>
+                      {[
+                        {
+                          icon: <Clock size={13} />,
+                          label: 'Processing time',
+                          value: `${imgDuration.toFixed(1)}s`,
+                          sub: 'ML pipeline',
+                        },
+                        {
+                          icon: <ImageIcon size={13} />,
+                          label: 'Images processed',
+                          value: imgZipResult.processed_count.toString(),
+                          sub: 'from batch/ZIP',
+                        },
+                        {
+                          icon: <Zap size={13} />,
+                          label: 'LLM tokens used',
+                          value: imgTokens.total.toLocaleString(),
+                          sub: `${imgTokens.input.toLocaleString()} in / ${imgTokens.output.toLocaleString()} out`,
+                        },
+                        {
+                          icon: <Cpu size={13} />,
+                          label: 'Model',
+                          value: imgModel.replace('llama-3.1-70b-versatile', 'Llama 3.1 70B') || 'Llama 3.1 70B',
+                          sub: 'via Groq',
+                        },
+                      ].map((s, i) => (
+                        <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '10px', padding: '8px 12px', flex: '1 1 130px', minWidth: 0 }}>
+                          <span style={{ color: '#fb8c36', flexShrink: 0, opacity: 0.8 }}>{s.icon}</span>
+                          <div style={{ minWidth: 0 }}>
+                            <div style={{ fontSize: '9px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '1px' }}>{s.label}</div>
+                            <div style={{ fontSize: '12px', fontWeight: 700, color: '#f1f5f9', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{s.value}</div>
+                            <div style={{ fontSize: '9px', color: '#475569', marginTop: '1px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{s.sub}</div>
+                          </div>
+                        </div>
+                      ))}
                     </div>
                     <div className="viz-row">
                       <div className="scatter-box result-card">
