@@ -421,6 +421,11 @@ export interface EnergyData {
   rms_values: number[];
 }
 
+export interface MFCCData {
+  timestamps: number[];
+  coefficients: number[][];  // [mfcc_idx][time_idx], 13 coefficients
+}
+
 export interface AudioFeatures {
   sample_rate: number;
   duration: number;
@@ -428,6 +433,14 @@ export interface AudioFeatures {
   waveform: WaveformData;
   spectrogram: SpectrogramData;
   energy: EnergyData;
+  mfcc?: MFCCData;
+}
+
+export interface AudioFeaturesResponse {
+  status: string;
+  filename: string;
+  content_type: string;
+  result: AudioFeatures;
 }
 
 export interface AudioAnalysisResult {
@@ -435,13 +448,7 @@ export interface AudioAnalysisResult {
   segments: SpeakerSegment[];
   transcript_text: string;
   features?: AudioFeatures;
-  text_analysis: {
-    summary: string;
-    sentiment: { positive: number; negative: number; neutral: number; overall_label: string };
-    entities: Array<{ id: string; label: string; type: string }>;
-    timeline: Array<{ date: string; description: string }>;
-    locations: Array<{ name: string; lat: number; lng: number }>;
-  } | null;
+  text_analysis: TextAnalysisResult | null;
 }
 
 export interface AudioAnalysisResponse {
@@ -449,6 +456,27 @@ export interface AudioAnalysisResponse {
   filename: string;
   content_type: string;
   result: AudioAnalysisResult;
+}
+
+/**
+ * Lightweight acoustic feature extraction — waveform, spectrogram, RMS energy.
+ * No Whisper/diarization. Suitable for visualization demos.
+ */
+export async function extractAudioFeatures(file: File): Promise<AudioFeaturesResponse> {
+  const formData = new FormData();
+  formData.append('file', file);
+
+  const response = await fetch(`${BASE_URL}/team5/audio-features`, {
+    method: 'POST',
+    body: formData,
+  });
+
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({ detail: 'Unknown error' }));
+    throw new Error(err.detail || `Feature extraction failed with status ${response.status}`);
+  }
+
+  return response.json();
 }
 
 /**

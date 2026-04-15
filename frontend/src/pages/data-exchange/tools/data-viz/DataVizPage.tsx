@@ -29,6 +29,7 @@ import {
   ImageQAResponse,
   ImageSearchResult,
   AudioAnalysisResponse,
+  AudioAnalysisResult,
   VideoAnalysisResult,
 } from './services';
 import MermaidDiagram from "../../../../components/MermaidDiagram";
@@ -38,7 +39,7 @@ type HistoryItem = {
   type: FileType | 'github';
   label: string;
   timestamp: number;
-  data: TextAnalysisResult | CodeAnalysisResult | MultiImageAnalysisResponse;
+  data: TextAnalysisResult | CodeAnalysisResult | MultiImageAnalysisResponse | AudioAnalysisResult;
 };
 
 // ── Mermaid compiler (gitdiagram-style) ──────────────────────────────────────
@@ -330,12 +331,16 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
     setCodeResult(null);
     setChatMsgs([]); setChatInput('');
     setImgResult(null);
+    setAudioResult(null);
 
     // Filter type to restorer
     if (item.type === 'code' || item.type === 'github') {
       setCodeResult(item.data as CodeAnalysisResult);
     } else if (item.type === 'images') {
       setImgResult(item.data as MultiImageAnalysisResponse);
+    } else if (item.type === 'music') {
+      // audio results are stored as AudioAnalysisResult, wrap into AudioAnalysisResponse
+      setAudioResult({ status: 'success', filename: item.label, content_type: 'audio/wav', result: item.data as AudioAnalysisResult });
     } else {
       setTextResult(item.data as TextAnalysisResult);
     }
@@ -351,7 +356,7 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
   };
 
   const handleDownloadResult = () => {
-    const activeData = textResult || codeResult || imgResult;
+    const activeData = textResult || codeResult || imgResult || (audioResult?.result) || imgZipResult;
     if (!activeData) return;
 
     const blob = new Blob([JSON.stringify(activeData, null, 2)], { type: 'application/json' });
@@ -610,10 +615,11 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
         }
 
         toast.success(`Analysis complete! Processed ${res.processed_count} images.`, { id: 'analysis' });
-      } else if (fileType === 'music') {
-        toast.loading('Transcribing & analyzing audio...', { id: 'analysis' });
+      } else if (fileType === 'music' && files.length === 1) {
+        toast.loading('Processing audio pipeline...', { id: 'analysis' });
         const res = await analyzeAudio(files[0]);
         setAudioResult(res);
+        saveToHistory('music', res.result, files[0].name);
         toast.success('Audio analysis complete!', { id: 'analysis' });
       } else if (fileType === 'videos') {
         toast.loading('Running video analysis (YOLO + BLIP + CLIP)...', { id: 'analysis' });
@@ -2113,7 +2119,7 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
 export default DataVizPage;
 
 // ── AudioResultView ───────────────────────────────────────────────────────────
-const AudioResultView = ({ result, file }: { result: AudioAnalysisResponse['result']; file?: File }) => {
+const AudioResultView = ({ result, file }: { result: AudioAnalysisResult; file?: File }) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const waveformRef = useRef<HTMLDivElement>(null);
@@ -2157,17 +2163,19 @@ const AudioResultView = ({ result, file }: { result: AudioAnalysisResponse['resu
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', marginTop: '1.5rem' }}>
 
-      {/* Metadata chips */}
+      {/* ── Metadata chips ───────────────────────────────────────────── */}
       {result.features && (
         <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-          {[
-            `🎵 ${result.features.sample_rate.toLocaleString()} Hz`,
-            `⏱ ${formatTime(result.features.duration)}`,
-            result.features.num_channels === 1 ? '🔊 Mono' : '🔊 Stereo',
-          ].map(label => (
-            <span key={label} style={{ background: 'rgba(99,102,241,0.15)', color: '#818cf8', border: '1px solid rgba(99,102,241,0.3)', fontSize: '12px', padding: '5px 12px', borderRadius: '99px' }}>{label}</span>
-          ))}
-          <span style={{ background: 'rgba(74,222,128,0.1)', color: '#4ade80', border: '1px solid rgba(74,222,128,0.25)', fontSize: '12px', padding: '5px 12px', borderRadius: '99px' }}>
+          <span className="chip" style={{ background: 'rgba(99,102,241,0.15)', color: '#818cf8', border: '1px solid rgba(99,102,241,0.3)', fontSize: '12px', padding: '5px 12px' }}>
+            🎵 {result.features.sample_rate.toLocaleString()} Hz
+          </span>
+          <span className="chip" style={{ background: 'rgba(99,102,241,0.15)', color: '#818cf8', border: '1px solid rgba(99,102,241,0.3)', fontSize: '12px', padding: '5px 12px' }}>
+            ⏱ {formatTime(result.features.duration)}
+          </span>
+          <span className="chip" style={{ background: 'rgba(99,102,241,0.15)', color: '#818cf8', border: '1px solid rgba(99,102,241,0.3)', fontSize: '12px', padding: '5px 12px' }}>
+            {result.features.num_channels === 1 ? '🔊 Mono' : '🔊 Stereo'}
+          </span>
+          <span className="chip" style={{ background: 'rgba(74,222,128,0.1)', color: '#4ade80', border: '1px solid rgba(74,222,128,0.25)', fontSize: '12px', padding: '5px 12px' }}>
             {result.segments.length} segments
           </span>
         </div>
@@ -2206,7 +2214,7 @@ const AudioResultView = ({ result, file }: { result: AudioAnalysisResponse['resu
             <h3 style={{ fontSize: '14px', fontWeight: 600, marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#818cf8', marginTop: 0 }}>
               <FileText size={16} /> Transcript
             </h3>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', maxHeight: '380px', overflowY: 'auto' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', maxHeight: '380px', overflowY: 'auto', paddingRight: '0.25rem' }}>
               {result.segments.map((seg, i) => {
                 const isCurrent = currentTime >= seg.start && currentTime <= seg.end;
                 return (
@@ -2231,7 +2239,7 @@ const AudioResultView = ({ result, file }: { result: AudioAnalysisResponse['resu
           )}
 
           {/* Speaker legend */}
-          {(() => {
+          {result.segments.length > 0 && (() => {
             const speakers = Array.from(new Set(result.segments.map(s => s.speaker)));
             return (
               <div className="result-card" style={{ padding: '1rem' }}>

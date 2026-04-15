@@ -205,23 +205,36 @@ class AudioAnalysisService:
             os.environ["PATH"] = os.pathsep.join(to_add + existing)
 
     def _configure_ffmpeg(self) -> str | None:
-        ffmpeg_cfg = self.settings.ffmpeg_path or os.environ.get("FFMPEG_PATH", "")
-        ffprobe_cfg = self.settings.ffprobe_path or os.environ.get("FFPROBE_PATH", "")
-        ffmpeg_name = "ffmpeg.exe" if os.name == "nt" else "ffmpeg"
-        ffprobe_name = "ffprobe.exe" if os.name == "nt" else "ffprobe"
+        is_win = os.name == "nt"
+        ffmpeg_name   = "ffmpeg.exe"  if is_win else "ffmpeg"
+        ffprobe_name  = "ffprobe.exe" if is_win else "ffprobe"
 
-        ffmpeg_exe = self._resolve_binary_path(ffmpeg_cfg, ffmpeg_name)
+        # Support FFMPEG_DIR env var (a directory containing both ffmpeg + ffprobe binaries)
+        ffmpeg_dir_env = os.environ.get("FFMPEG_DIR", "")
+        if ffmpeg_dir_env:
+            base = os.path.join(os.path.dirname(os.path.abspath(__file__)), ffmpeg_dir_env) \
+                   if not os.path.isabs(ffmpeg_dir_env) else ffmpeg_dir_env
+            ffmpeg_cfg  = os.path.join(base, ffmpeg_name)
+            ffprobe_cfg = os.path.join(base, ffprobe_name)
+        else:
+            ffmpeg_cfg  = self.settings.ffmpeg_path  or os.environ.get("FFMPEG_PATH",  "")
+            ffprobe_cfg = self.settings.ffprobe_path or os.environ.get("FFPROBE_PATH", "")
+
+        ffmpeg_exe  = self._resolve_binary_path(ffmpeg_cfg,  ffmpeg_name)
         ffprobe_exe = self._resolve_binary_path(ffprobe_cfg, ffprobe_name)
 
         if ffmpeg_exe and ffprobe_exe:
-            # Older pydub resolves ffprobe only via PATH, so ensure bin dirs are present.
+            # Prepend bin dirs so pydub can resolve both binaries via PATH too.
             self._prepend_path_dirs([os.path.dirname(ffmpeg_exe), os.path.dirname(ffprobe_exe)])
+            # Set pydub class attributes explicitly (PATH alone is not always enough).
             AudioSegment.converter = ffmpeg_exe
+            AudioSegment.ffprobe   = ffprobe_exe
+            logger.info("ffmpeg configured: %s | ffprobe: %s", ffmpeg_exe, ffprobe_exe)
             return None
 
         return (
             "ffmpeg/ffprobe not found. Install ffmpeg and add it to PATH, "
-            "or set FFMPEG_PATH and FFPROBE_PATH in your environment."
+            "or set FFMPEG_PATH / FFPROBE_PATH (or FFMPEG_DIR) in your environment."
         )
 
     def _cleanup_tmpdir(self, tmpdir: str) -> None:
