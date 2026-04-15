@@ -211,7 +211,7 @@ def _get_llm_client() -> AsyncOpenAI:
             _openai_client = AsyncOpenAI(api_key=s.groq_api_key, base_url="https://api.groq.com/openai/v1")
     return _openai_client
 
-def _get_langchain_model(force_groq: bool = True) -> ChatOpenAI:
+def _get_langchain_model(force_groq: bool = False) -> ChatOpenAI:
     """Get the LangChain ChatOpenAI adapter. 
     Defaults to Groq for code analysis due to superior inference speed on large AST-to-JSON tasks.
     """
@@ -306,9 +306,14 @@ class CodeAnalysisService:
         file_nodes = graph_data.get("file_nodes", [])
         entry_points = set(graph_data.get("entry_points", []))
 
-        # Build a human-readable file tree with imports/exports
+        # Cap to top 60 files and 30K chars to avoid NVIDIA context limits
+        MAX_FILES = 60
+        MAX_CHARS = 30_000
+        file_nodes_capped = file_nodes[:MAX_FILES]
+
         lines = []
-        for fn in file_nodes:
+        total_chars = 0
+        for fn in file_nodes_capped:
             path = fn["path"]
             tag = " [ENTRY POINT]" if path in entry_points else ""
             line = f"  {path}{tag}"
@@ -321,9 +326,13 @@ class CodeAnalysisService:
                 items.append(f"imports: {', '.join(fn['imports'][:5])}")
             if items:
                 line += f"\n    → {' | '.join(items)}"
+            total_chars += len(line)
+            if total_chars > MAX_CHARS:
+                lines.append(f"  ... (truncated for context limit)")
+                break
             lines.append(line)
 
-        user_msg = f"FILE DEPENDENCY GRAPH:\n" + "\n".join(lines)
+        user_msg = f"FILE DEPENDENCY GRAPH ({len(file_nodes)} total files, showing top {len(file_nodes_capped)}):\n" + "\n".join(lines)
         model = _get_langchain_model()
         messages = [
             SystemMessage(content=EXPLANATION_SYSTEM_PROMPT),
@@ -359,11 +368,11 @@ class CodeAnalysisService:
         try:
             response = await model.ainvoke(messages)
             logger.info("[LangGraph] Node: architecting LLM responded")
-            usage = getattr(response, "usage_metadata", {})
+            usage = getattr(response, "usage_metadata", None) or {}
         except Exception as e:
             logger.error("[LangGraph] Node: architecting LLM failed: %s", str(e))
             raise
-            
+
         # Ensure we parse the string content correctly
         content_str = str(response.content)
         # Handle potential markdown wrapping
@@ -371,8 +380,14 @@ class CodeAnalysisService:
             content_str = content_str.split("```json")[1].split("```")[0].strip()
         elif "```" in content_str:
              content_str = content_str.split("```")[1].split("```")[0].strip()
-             
-        arch_data = json.loads(content_str)
+
+        try:
+            arch_data = json.loads(content_str)
+        except Exception:
+            arch_data = None
+        if not isinstance(arch_data, dict):
+            logger.warning("[LangGraph] arch_node: got non-dict response (%r), using empty dict", type(arch_data))
+            arch_data = {}
         return {
             "architecture": arch_data,
             "metadata": {
@@ -389,13 +404,13 @@ class CodeAnalysisService:
         """Node 3: Deep File-level Analysis Pass."""
         logger.info("[LangGraph] Node: detailing started")
         root_dir = state["root_dir"]
-        arch_data = state["architecture"]
+        arch_data = state["architecture"] or {}   # guard against None from arch_node
 
         # Build a file→node label lookup so the LLM knows which component each file belongs to
         file_to_component: dict[str, str] = {}
-        for node in (arch_data or {}).get("nodes", []):
-            if node.get("path"):
-                file_to_component[node["path"]] = node["label"]
+        for node in arch_data.get("nodes", []):
+            if node and node.get("path"):
+                file_to_component[node["path"]] = node.get("label", "")
 
         code_snippets = self.select_important_files(root_dir, file_to_component)
 
@@ -405,12 +420,12 @@ class CodeAnalysisService:
             "tech_stack": arch_data.get("tech_stack", []),
             "groups": arch_data.get("groups", []),
             "nodes": [
-                {"label": n["label"], "type": n.get("type", ""), "path": n.get("path", ""), "group_id": n.get("group_id", "")}
-                for n in arch_data.get("nodes", [])
+                {"label": n.get("label", ""), "type": n.get("type", ""), "path": n.get("path", ""), "group_id": n.get("group_id", "")}
+                for n in arch_data.get("nodes", []) if n
             ],
             "edges": [
-                {"source": e["source"], "target": e["target"], "label": e.get("label", "")}
-                for e in arch_data.get("edges", [])
+                {"source": e.get("source", ""), "target": e.get("target", ""), "label": e.get("label", "")}
+                for e in arch_data.get("edges", []) if e
             ],
         }
         context = json.dumps(arch_summary, indent=2)
@@ -423,14 +438,20 @@ class CodeAnalysisService:
         ]
         
         response = await model.ainvoke(messages)
-        usage = getattr(response, "usage_metadata", {})
+        usage = getattr(response, "usage_metadata", None) or {}
         content_str = str(response.content)
         if "```json" in content_str:
             content_str = content_str.split("```json")[1].split("```")[0].strip()
         elif "```" in content_str:
              content_str = content_str.split("```")[1].split("```")[0].strip()
-             
-        detail_data = json.loads(content_str)
+
+        try:
+            detail_data = json.loads(content_str)
+        except Exception:
+            detail_data = None
+        if not isinstance(detail_data, dict):
+            logger.warning("[LangGraph] detail_node: got non-dict response (%r), using empty dict", type(detail_data))
+            detail_data = {}
         return {
             "details": detail_data,
             "metadata": {
