@@ -582,6 +582,26 @@ async def chat_about_codebase(payload: CodeChatRequest):
         raise HTTPException(status_code=500, detail=str(exc))
 
 
+@router.get("/demo-video-stream")
+async def get_demo_video():
+    """Stream the pre-analyzed demo video (huhu_analyzed.mp4) with range-request headers."""
+    video_path = os.path.join(os.path.dirname(__file__), "huhu_analyzed.mp4")
+    if not os.path.exists(video_path):
+        raise HTTPException(
+            status_code=404,
+            detail="Demo video not found. Place huhu_analyzed.mp4 in modules/team5_multimodal/."
+        )
+    return FileResponse(
+        video_path,
+        media_type="video/mp4",
+        headers={
+            "Accept-Ranges": "bytes",
+            "Cache-Control": "no-cache",
+            "Content-Disposition": "inline",
+        },
+    )
+
+
 @router.get("/demo-video-metadata")
 async def get_demo_video_metadata():
     """Return pre-computed analysis metadata for the demo video (if available)."""

@@ -71,7 +71,7 @@ def analyze_video(input_path: str, output_path: str = "", model_path: str = "yol
         frame_count += 1
 
         # Only process 1 frame per second
-        if frame_count % (fps // 2) != 0:
+        if frame_count % fps != 0:
             continue
 
         second = frame_count // fps
@@ -157,13 +157,13 @@ def analyze_video(input_path: str, output_path: str = "", model_path: str = "yol
     ffmpeg_cmd = [
         ffmpeg_path,
         "-y",                           # overwrite
-        "-framerate", "2",              # input is 2 fps (two keyframes per second)
+        "-framerate", "1",              # input is 1 fps (one keyframe per second)
         "-i", os.path.join(temp_dir, "frame_%06d.png"),
         "-c:v", "libx264",             # H.264 codec
         "-preset", "fast",
         "-pix_fmt", "yuv420p",          # browser compatibility
         "-movflags", "+faststart",      # stream-friendly
-        "-r", "2",                      # output 2 fps
+        "-r", "1",                      # output 1 fps
         output_path
     ]
     

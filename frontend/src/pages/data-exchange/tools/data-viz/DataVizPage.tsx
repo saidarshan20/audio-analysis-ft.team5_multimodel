@@ -39,7 +39,7 @@ type HistoryItem = {
   type: FileType | 'github';
   label: string;
   timestamp: number;
-  data: TextAnalysisResult | CodeAnalysisResult | MultiImageAnalysisResponse | AudioAnalysisResult;
+  data: TextAnalysisResult | CodeAnalysisResult | MultiImageAnalysisResponse | AudioAnalysisResult | VideoAnalysisResult;
 };
 
 // ── Mermaid compiler (gitdiagram-style) ──────────────────────────────────────
@@ -341,6 +341,8 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
     } else if (item.type === 'music') {
       // audio results are stored as AudioAnalysisResult, wrap into AudioAnalysisResponse
       setAudioResult({ status: 'success', filename: item.label, content_type: 'audio/wav', result: item.data as AudioAnalysisResult });
+    } else if (item.type === 'videos') {
+      setVideoResult(item.data as VideoAnalysisResult);
     } else {
       setTextResult(item.data as TextAnalysisResult);
     }
@@ -519,10 +521,9 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
     }
   };
 
-  const handleUseSample = () => {
+  const handleUseSample = async () => {
     setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
+    try {
       if (fileType === 'code') {
         setCodeResult(MOCK_CODE_RESULT);
         saveToHistory('code', MOCK_CODE_RESULT, 'Sample: Codebase');
@@ -531,10 +532,37 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
         setTextResult(MOCK_TEXT_RESULT);
         saveToHistory(fileType as any, MOCK_TEXT_RESULT, `Sample: ${fileType.toUpperCase()}`);
         toast.success(`Loaded ${fileType.toUpperCase()} Sample`);
+      } else if (fileType === 'videos') {
+        toast.loading('Loading demo video analysis...', { id: 'analysis' });
+        const videoUrl = `${BASE_URL}/team5/demo-video-stream`;
+        let metadata: any = {};
+        try {
+          const metaRes = await fetch(`${BASE_URL}/team5/demo-video-metadata`);
+          if (metaRes.ok) metadata = await metaRes.json();
+        } catch (e) {
+          console.warn('Could not fetch demo metadata', e);
+        }
+        const vidData: VideoAnalysisResult = {
+          duration_seconds: metadata.duration_seconds || 0,
+          keyframes_analyzed: metadata.keyframes_analyzed || 0,
+          detected_objects: metadata.detected_objects || {},
+          video_caption: metadata.video_caption || '',
+          clip_scenes: metadata.clip_scenes || [],
+          groq_summary: metadata.groq_summary || 'Demo video analysis.',
+          sentiment_analysis: metadata.sentiment_analysis || '',
+          video_url: videoUrl,
+        };
+        setVideoResult(vidData);
+        saveToHistory('videos', vidData, 'Sample: Demo Video');
+        toast.success('Loaded demo video analysis!', { id: 'analysis' });
       } else {
         toast.info(`Sample for ${fileType} coming soon!`);
       }
-    }, 800);
+    } catch (e) {
+      toast.error('Failed to load sample');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleContinue = async () => {
@@ -625,6 +653,7 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
         toast.loading('Running video analysis (YOLO + BLIP + CLIP)...', { id: 'analysis' });
         const res = await analyzeVideo(files[0]);
         setVideoResult(res);
+        saveToHistory('videos', res, files[0].name);
         toast.success('Video analysis complete!', { id: 'analysis' });
       } else {
         toast.error('Unsupported file combo.', { id: 'analysis' });
