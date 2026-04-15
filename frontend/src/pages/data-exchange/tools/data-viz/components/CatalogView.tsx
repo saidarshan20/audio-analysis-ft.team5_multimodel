@@ -69,39 +69,22 @@ const CatalogView = ({ onSelect }: Props) => {
           ))
           : (
             <>
-              {/* Pinned Demo Video (from video-analysis branch port) */}
-              <div 
-                className={`xt-dataset-row${selected === 'demo-video' ? ' selected' : ''}`}
-                style={{ borderLeft: '4px solid #fb8c36', background: 'rgba(251, 140, 54, 0.05)' }}
-                onClick={() => {
-                  setSelected('demo-video');
-                  onSelect?.('demo-video');
-                }}
-              >
-                <div className="xt-dataset-info">
-                  <span className="xt-dataset-name" style={{ color: '#fb8c36', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    🎬 Pre-analyzed Demo Video (Huhu Sample)
-                  </span>
-                  <span className="xt-dataset-desc">
-                    Experience full multimodal analysis immediately. Features YOLO object tracking, BLIP captioning, and CLIP scene descriptors from a test sample.
-                  </span>
-                </div>
-                <span className="xt-dataset-badge" style={{ background: 'rgba(251, 140, 54, 0.15)', color: '#fb8c36' }}>Sample</span>
-              </div>
-
               {datasets.map((d: DatasetEntry, i: number) => (
-            <div
-              key={`${d.name}-${i}`}
-              className={`xt-dataset-row${selected === d.name ? ' selected' : ''}`}
-              onClick={() => setSelected(d.name)}
-            >
-              <div className="xt-dataset-info">
-                <span className="xt-dataset-name">{d.name}</span>
-                <span className="xt-dataset-desc">{d.desc}</span>
-              </div>
-              <span className="xt-dataset-badge">{d.category}</span>
-            </div>
-            ))}
+                <div
+                  key={`${d.name}-${i}`}
+                  className={`xt-dataset-row${selected === d.name ? ' selected' : ''}`}
+                  onClick={() => {
+                    setSelected(d.name);
+                    onSelect?.(d.name);
+                  }}
+                >
+                  <div className="xt-dataset-info">
+                    <span className="xt-dataset-name">{d.name}</span>
+                    <span className="xt-dataset-desc">{d.desc}</span>
+                  </div>
+                  <span className="xt-dataset-badge">{d.category}</span>
+                </div>
+              ))}
             </>
           )}
       </div>

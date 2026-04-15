@@ -394,16 +394,7 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
         </div>
 
         {/* ── Catalog Tab ── */}
-        {activeTab === 'catalog' && (
-          <CatalogView 
-            onSelect={(id) => {
-              if (id === 'demo-video') {
-                setActiveTab('upload');
-                handleUseSample('videos');
-              }
-            }} 
-          />
-        )}
+        {activeTab === 'catalog' && <CatalogView />}
 
         {/* ── Upload Tab ── */}
         {activeTab === 'upload' && (
@@ -533,7 +524,7 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
                   <div className="action-area" style={{ cursor: 'default', justifyContent: 'center' }}>
                     <div className="action-icon"><Database size={32} /></div>
                     <div className="action-title">Quick Demo</div>
-                    <button className="sample-file-btn" onClick={handleUseSample} disabled={loading} style={{ width: '100%', padding: '12px', marginTop: '8px' }}>
+                    <button className="sample-file-btn" onClick={() => handleUseSample()} disabled={loading} style={{ width: '100%', padding: '12px', marginTop: '8px' }}>
                       Use Sample
                     </button>
                   </div>
