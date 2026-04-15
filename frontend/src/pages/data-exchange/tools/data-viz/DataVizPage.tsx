@@ -359,6 +359,49 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
     }
   };
 
+  const handleAnalyzeCatalogDataset = async (dataset: any, records: any[]) => {
+    if (records.length === 0) {
+      toast.error('No records available to analyze');
+      return;
+    }
+
+    setLoading(true);
+    setAnalysisStep('init');
+    setProgressMsg('Preparing dataset for AI analysis...');
+    resetResults();
+
+    try {
+      // 1. Convert JSON records to CSV blob for the analysis engine
+      const keys = Object.keys(records[0]);
+      const csvContent = [
+        keys.join(','),
+        ...records.map(row => keys.map(k => {
+          const val = row[k] === null || row[k] === undefined ? '' : String(row[k]);
+          return `"${val.replace(/"/g, '""')}"`;
+        }).join(','))
+      ].join('\n');
+
+      const file = new File([csvContent], `${dataset.name.slice(0, 30)}.csv`, { type: 'text/csv' });
+      
+      // 2. Setup state to match a manual CSV upload
+      setFileType('csv');
+      setSelectedFiles([file]);
+      setActiveTab('upload');
+
+      // 3. Trigger analysis exactly like handleContinue
+      toast.loading('Analyzing dataset structure & patterns...', { id: 'analysis' });
+      const res = await analyzeTextFile(file);
+      setTextResult(res);
+      saveToHistory('csv', res, `Catalog: ${dataset.name}`);
+      toast.success('Dataset analysis complete!', { id: 'analysis' });
+    } catch (err: any) {
+      toast.error(err.message || 'Analysis failed', { id: 'analysis' });
+    } finally {
+      setLoading(false);
+      setAnalysisStep('');
+    }
+  };
+
   const hasResult = !!(textResult || codeResult || imgResult || imgZipResult || audioResult || videoResult);
 
   // ── Render ────────────────────────────────────────────────────────────────────
@@ -394,7 +437,9 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
         </div>
 
         {/* ── Catalog Tab ── */}
-        {activeTab === 'catalog' && <CatalogView />}
+        {activeTab === 'catalog' && (
+          <CatalogView onAnalyzeDataset={handleAnalyzeCatalogDataset} />
+        )}
 
         {/* ── Upload Tab ── */}
         {activeTab === 'upload' && (

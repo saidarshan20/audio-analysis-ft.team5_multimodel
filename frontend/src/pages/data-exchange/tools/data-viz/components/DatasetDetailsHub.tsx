@@ -8,16 +8,18 @@ import {
   Table as TableIcon, 
   ChevronRight, 
   Send,
-  Loader2
+  Loader2,
+  FileSpreadsheet
 } from 'lucide-react';
 import { DatasetEntry, fetchDatasetSample, chatAboutDataset } from '../services';
 
 interface Props {
   dataset: DatasetEntry;
   onClose: () => void;
+  onAnalyze?: (dataset: DatasetEntry, records: any[]) => void;
 }
 
-const DatasetDetailsHub: React.FC<Props> = ({ dataset, onClose }) => {
+const DatasetDetailsHub: React.FC<Props> = ({ dataset, onClose, onAnalyze }) => {
   const [activeTab, setActiveTab] = useState<'info' | 'preview' | 'chat'>('info');
   const [sampleData, setSampleData] = useState<any[]>([]);
   const [sampleLoading, setSampleLoading] = useState(false);
@@ -131,12 +133,22 @@ const DatasetDetailsHub: React.FC<Props> = ({ dataset, onClose }) => {
               {dataset.fields?.map((f, i) => (
                 <div key={i} className="hub-field-badge">
                   <span className="field-name">{f.name}</span>
-                  <span className="field-type">{f.type === 'keyword' ? 'TEXT' : f.type.toUpperCase()}</span>
+                  <span className="field-type">
+                    {(f.type || 'unknown').toString().toUpperCase() === 'KEYWORD' ? 'TEXT' : (f.type || 'DATA').toString().toUpperCase()}
+                  </span>
                 </div>
               ))}
             </div>
 
-            <div className="hub-cta-section">
+            <div className="hub-cta-section" style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              <button 
+                className="xt-continue-btn" 
+                style={{ width: '100%', justifyContent: 'center', gap: '10px' }} 
+                onClick={() => onAnalyze?.(dataset, sampleData)}
+                disabled={sampleData.length === 0}
+              >
+                <FileSpreadsheet size={16} /> Analyze in CSV Tool
+              </button>
               <button className="xt-tab active" style={{ width: '100%', justifyContent: 'center' }} onClick={() => setActiveTab('preview')}>
                 <TableIcon size={16} /> Explore Sample Records
               </button>
@@ -165,6 +177,16 @@ const DatasetDetailsHub: React.FC<Props> = ({ dataset, onClose }) => {
               </div>
             ) : sampleData.length > 0 ? (
               <div className="hub-table-wrap">
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                  <span style={{ fontSize: '11px', color: '#94a3b8' }}>Showing up to 50 sample records from {dataset.name}</span>
+                  <button 
+                    className="xt-tab active" 
+                    style={{ fontSize: '11px', padding: '6px 12px', background: 'rgba(251, 140, 54, 0.1)', color: '#fb8c36' }}
+                    onClick={() => onAnalyze?.(dataset, sampleData)}
+                  >
+                    Analyze Full Snapshot
+                  </button>
+                </div>
                 <table className="hub-table">
                   <thead>
                     <tr>

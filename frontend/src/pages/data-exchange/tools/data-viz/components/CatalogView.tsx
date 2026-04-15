@@ -5,11 +5,12 @@ import DatasetDetailsHub from './DatasetDetailsHub';
 
 interface Props {
   onSelect?: (id: string) => void;
+  onAnalyzeDataset?: (dataset: DatasetEntry, records: any[]) => void;
 }
 
 const PAGE_SIZE = 50;
 
-const CatalogView = ({ onSelect }: Props) => {
+const CatalogView = ({ onSelect, onAnalyzeDataset }: Props) => {
   const [search, setSearch] = useState('');
   const [selected, setSelected] = useState<DatasetEntry | null>(null);
   const [datasets, setDatasets] = useState<DatasetEntry[]>([]);
@@ -202,6 +203,7 @@ const CatalogView = ({ onSelect }: Props) => {
         <DatasetDetailsHub 
           dataset={selected} 
           onClose={() => setSelected(null)} 
+          onAnalyze={onAnalyzeDataset}
         />
       )}
     </div>
