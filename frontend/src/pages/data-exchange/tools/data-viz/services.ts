@@ -20,10 +20,33 @@ export interface DatasetPage {
   error?: string;
 }
 
-export async function fetchDatasets(q: string, offset: number, limit: number): Promise<DatasetPage> {
-  const params = new URLSearchParams({ q, offset: String(offset), limit: String(limit) });
+export async function fetchDatasets(q: string, offset: number, limit: number, sector: string = ''): Promise<DatasetPage> {
+  const params = new URLSearchParams({ q, offset: String(offset), limit: String(limit), sector });
   const response = await fetch(`${BASE_URL}/team5/datasets?${params}`);
   if (!response.ok) throw new Error(`Dataset fetch failed: ${response.status}`);
+  return response.json();
+}
+
+export async function fetchDatasetSample(indexId: string): Promise<{ records: any[], [key: string]: any }> {
+  // encoding the indexId as it might contain path-like chars
+  const response = await fetch(`${BASE_URL}/team5/datasets/sample/${encodeURIComponent(indexId)}`);
+  if (!response.ok) throw new Error(`Sample fetch failed: ${response.status}`);
+  return response.json();
+}
+
+export async function chatAboutDataset(
+  name: string, 
+  desc: string, 
+  fields: any[], 
+  question: string, 
+  history: any[] = []
+): Promise<{ answer: string }> {
+  const response = await fetch(`${BASE_URL}/team5/datasets/chat`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ dataset_name: name, description: desc, fields, question, history }),
+  });
+  if (!response.ok) throw new Error(`Chat failed: ${response.status}`);
   return response.json();
 }
 
