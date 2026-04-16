@@ -5,6 +5,28 @@
 
 const BASE_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8000';
 
+// ── data.gov.in Catalog ──────────────────────────────────────────────────────
+
+export interface DatasetEntry {
+  name: string;
+  desc: string;
+  category: string;
+  org: string;
+}
+
+export interface DatasetPage {
+  total: number;
+  results: DatasetEntry[];
+  error?: string;
+}
+
+export async function fetchDatasets(q: string, offset: number, limit: number): Promise<DatasetPage> {
+  const params = new URLSearchParams({ q, offset: String(offset), limit: String(limit) });
+  const response = await fetch(`${BASE_URL}/team5/datasets?${params}`);
+  if (!response.ok) throw new Error(`Dataset fetch failed: ${response.status}`);
+  return response.json();
+}
+
 export interface TextAnalysisResult {
   summary: string;
   sentiment: {
@@ -502,11 +524,25 @@ export interface VideoAnalysisResult {
   duration_seconds: number;
   keyframes_analyzed: number;
   detected_objects: Record<string, number>;
+  object_details?: Record<string, Array<{
+    second: number;
+    confidence: number;
+    image?: string;
+    box_2d?: number[];
+  }>>;
   video_caption: string;
   clip_scenes: ClipScene[];
   groq_summary: string;
   sentiment_analysis: string;
-  transcript: { full_text: string; segments: Array<{ start: number; end: number; text: string }>; language: string };
+  transcript?: {
+    full_text: string;
+    segments?: Array<{ start: number; end: number; text: string }>;
+    language?: string;
+    vtt_content?: string;
+    entities?: Array<{ label: string; items: string[] }>;
+    topics?: Array<{ name: string; count: number }>;
+    audio_plots?: { waveform?: string; spectrogram?: string; energy?: string };
+  };
   video_url?: string;
 }
 
