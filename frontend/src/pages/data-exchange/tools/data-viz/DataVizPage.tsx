@@ -7,7 +7,12 @@ import { toast } from 'sonner';
 import '../ToolPage.css';
 
 import {
+  analyzeTextFile,
+  analyzeCodebase,
+  analyzeGithubRepo,
+  analyzeAudio,
   analyzeVideo,
+  analyzeImagesBatch,
   fetchVideoDemoMetadata,
   uploadDatasetTeam4,
   getPreviewTeam4,
@@ -329,7 +334,7 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
         setTextResult(res);
         saveToHistory(fileType as any, res, files[0].name);
         toast.success('Document analysis complete!', { id: 'analysis' });
-      } else if (fileType === 'images-zip' && (isZip || files.every(f => f.type.startsWith('image/')))) {
+      } else if (fileType === 'images-zip' && (isZip || files.every(f => f.type.startsWith('image/') || f.name.toLowerCase().endsWith('.heic') || f.name.toLowerCase().endsWith('.heif')))) {
         toast.loading('Processing Visual Intel Batch...', { id: 'analysis' });
         const res = await analyzeImagesBatch(files);
         setImgZipResult(res);
