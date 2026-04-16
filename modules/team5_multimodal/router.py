@@ -558,11 +558,24 @@ async def list_datasets(q: str = "", offset: int = 0, limit: int = 20):
                 title = str(item.get("title") or "Untitled").strip()
                 if not title or title.lower().startswith("mydata-") or title.lower() == "untitled":
                     continue
+                # index_name is the resource ID used to fetch sample rows
+                index_name = str(item.get("index_name") or item.get("id") or "")
+                # field list for schema display
+                raw_fields = item.get("field") or []
+                fields = [
+                    {"name": str(f.get("name", "?")), "type": str(f.get("type", "unknown"))}
+                    for f in raw_fields
+                    if isinstance(f, dict)
+                ] if isinstance(raw_fields, list) else []
+
                 results.append({
                     "name": title,
                     "desc": str(item.get("desc") or ""),
                     "category": str(category),
                     "org": str(org_name),
+                    "id": index_name,
+                    "updated": str(item.get("updated") or item.get("date_last_updated") or ""),
+                    "fields": fields,
                 })
             except Exception:
                 continue
@@ -617,6 +630,108 @@ async def chat_about_codebase(payload: CodeChatRequest):
         return {"answer": resp.choices[0].message.content, "model": model_name}
     except Exception as exc:
         logger.error("code-chat LLM error: %s", exc)
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+# ──────────────────────────────────────────────
+#  Dataset Sample Preview — proxy data.gov.in resource rows
+# ──────────────────────────────────────────────
+@router.get("/datasets/sample/{index_id:path}")
+async def get_dataset_sample(index_id: str, limit: int = 50):
+    """
+    Fetch up to `limit` rows from a data.gov.in resource.
+    Returns { records: [...], field: [...], total: int }
+    """
+    settings = get_settings()
+    api_key = settings.data_gov_api_key
+    if not api_key:
+        return {"records": [], "field": [], "total": 0, "error": "DATA_GOV_API_KEY not configured"}
+
+    url = f"https://api.data.gov.in/resource/{index_id}"
+    params = {"api-key": api_key, "format": "json", "limit": limit, "offset": 0}
+
+    try:
+        async with httpx.AsyncClient(timeout=20) as client:
+            resp = await client.get(url, params=params)
+            resp.raise_for_status()
+            data = resp.json()
+
+        records = data.get("records", [])
+        fields  = data.get("field", [])
+        total   = data.get("total", len(records))
+        try:
+            total = int(total)
+        except (TypeError, ValueError):
+            total = len(records)
+
+        return {"records": records, "field": fields, "total": total}
+
+    except httpx.HTTPStatusError as exc:
+        status = exc.response.status_code
+        if status == 404:
+            return {"records": [], "field": [], "total": 0, "error": "Resource not found on data.gov.in"}
+        return {"records": [], "field": [], "total": 0, "error": f"data.gov.in returned HTTP {status}"}
+    except Exception as exc:
+        logger.warning("Dataset sample fetch error for %s: %s", index_id, exc)
+        return {"records": [], "field": [], "total": 0, "error": str(exc)}
+
+
+# ──────────────────────────────────────────────
+#  Dataset AI Chat — LLM analysis of a catalog dataset
+# ──────────────────────────────────────────────
+class DatasetChatRequest(BaseModel):
+    dataset_name: str
+    description: str
+    fields: list[dict] = []
+    question: str
+    history: list[dict] = []
+
+
+@router.post("/datasets/chat")
+async def chat_about_dataset(payload: DatasetChatRequest):
+    """Answer a question about a data.gov.in dataset using its metadata as context."""
+    from openai import AsyncOpenAI
+    settings = get_settings()
+
+    if settings.nvidia_api_key:
+        client = AsyncOpenAI(base_url="https://integrate.api.nvidia.com/v1", api_key=settings.nvidia_api_key)
+        model_name = settings.nvidia_model
+    else:
+        client = AsyncOpenAI(base_url="https://api.groq.com/openai/v1", api_key=settings.groq_api_key)
+        model_name = settings.groq_model
+
+    # Build schema context
+    schema_lines = ""
+    if payload.fields:
+        schema_lines = "\n".join(
+            f"  - {f.get('name', '?')} ({f.get('type', 'unknown')})"
+            for f in payload.fields[:30]
+        )
+        schema_lines = f"\nSchema ({len(payload.fields)} columns):\n{schema_lines}"
+
+    system = (
+        "You are a data analyst specializing in Indian government open datasets. "
+        "Answer questions about the dataset described below. "
+        "Be specific, concise, and practical. Reference column names when relevant.\n\n"
+        f"=== DATASET ===\n"
+        f"Name: {payload.dataset_name}\n"
+        f"Description: {payload.description[:800]}\n"
+        f"{schema_lines}\n"
+        "=== END ==="
+    )
+
+    messages = [{"role": "system", "content": system}]
+    for turn in payload.history[-6:]:
+        messages.append(turn)
+    messages.append({"role": "user", "content": payload.question.strip()})
+
+    try:
+        resp = await client.chat.completions.create(
+            model=model_name, messages=messages, temperature=0.3, max_tokens=600
+        )
+        return {"answer": resp.choices[0].message.content.strip(), "model": model_name}
+    except Exception as exc:
+        logger.error("dataset-chat LLM error: %s", exc)
         raise HTTPException(status_code=500, detail=str(exc))
 
 
