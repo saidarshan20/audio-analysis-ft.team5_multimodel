@@ -57,6 +57,7 @@ const ImageAnalysisView = ({ imgResult, imgZipResult, imgTokens, imgDuration, im
   const [compareSelection, setCompareSelection] = useState<string[]>([]);
 
 
+  const zipClusterLabelMap: Record<number, string> = {};
   imgZipResult?.result.cluster_summaries?.forEach(summary => {
     zipClusterLabelMap[summary.cluster_id] = summary.description;
   });
