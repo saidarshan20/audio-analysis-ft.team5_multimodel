@@ -16,6 +16,8 @@ import {
   fetchVideoDemoMetadata,
   uploadDatasetTeam4,
   getPreviewTeam4,
+  fetchDatasetForAnalysis,
+  FetchProgressEvent,
   TextAnalysisResult,
   CodeAnalysisResult,
   MultiImageAnalysisResponse,
@@ -149,6 +151,7 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
   const [loading, setLoading]         = useState(false);
   const [analysisStep, setAnalysisStep] = useState<string>('');
   const [progressMsg, setProgressMsg] = useState<string>('');
+  const [fetchProgress, setFetchProgress] = useState<FetchProgressEvent | null>(null);
 
   // Result state
   const [textResult,    setTextResult]    = useState<TextAnalysisResult    | null>(null);
@@ -189,6 +192,7 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
     setVideoResult(null);
     setCsvResult(null);
     setCsvIsSample(false);
+    setFetchProgress(null);
     setSelectedFiles([]);
     setShowHistory(false);
   };
@@ -376,49 +380,61 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
     }
   };
 
-  const handleAnalyzeCatalogDataset = async (dataset: any, records: any[]) => {
-    if (records.length === 0) {
-      toast.error('No records available to analyze');
+  const handleAnalyzeCatalogDataset = async (dataset: any) => {
+    if (!dataset.id) {
+      toast.error('This dataset has no resource ID — cannot fetch full data');
       return;
     }
 
     setLoading(true);
-    setAnalysisStep('init');
-    setProgressMsg('Preparing dataset for AI analysis...');
+    setFetchProgress(null);
+    setAnalysisStep('connecting');
     resetResults();
+    setFileType('csv');
+    setActiveTab('upload');
 
     try {
-      // 1. Convert JSON records to CSV blob for the analysis engine
-      const keys = Object.keys(records[0]);
-      const csvContent = [
-        keys.join(','),
-        ...records.map(row => keys.map(k => {
-          const val = row[k] === null || row[k] === undefined ? '' : String(row[k]);
-          return `"${val.replace(/"/g, '""')}"`;
-        }).join(','))
-      ].join('\n');
+      // Step 1 — stream download progress from backend
+      setProgressMsg('Connecting to data.gov.in…');
+      toast.loading('Fetching full dataset from data.gov.in…', { id: 'analysis' });
 
-      const file = new File([csvContent], `${dataset.name.slice(0, 30)}.csv`, { type: 'text/csv' });
-      
-      // 2. Setup state
-      setFileType('csv');
-      setSelectedFiles([file]);
-      setActiveTab('upload');
+      const fetchResult = await fetchDatasetForAnalysis(
+        dataset.id,
+        dataset.name,
+        (e: FetchProgressEvent) => {
+          setFetchProgress(e);
+          setAnalysisStep('downloading');
+          const totalStr = e.total ? ` of ${e.total.toLocaleString()}` : '';
+          setProgressMsg(`Downloading… ${e.rows_fetched.toLocaleString()}${totalStr} rows`);
+        },
+      );
 
-      // 3. Trigger Team 4 pipeline
-      toast.loading(`Fetching ${records.length} rows & analyzing structure…`, { id: 'analysis' });
-      const uploadRes = await uploadDatasetTeam4(file);
-      const res = await getPreviewTeam4(uploadRes.data.filename);
+      // Step 2 — compute full stats (Team 4 reads the file from disk)
+      setAnalysisStep('analyzing');
+      setProgressMsg(`Computing statistics over ${fetchResult.rows_fetched.toLocaleString()} rows…`);
+      toast.loading('Running statistical analysis…', { id: 'analysis' });
 
-      setCsvIsSample(true);   // flag: came from catalog, not a full file upload
+      const res = await getPreviewTeam4(fetchResult.filename);
+
+      setCsvIsSample(fetchResult.truncated);
       setCsvResult(res);
+      setFetchProgress(null);
       saveToHistory('csv', res, `Catalog: ${dataset.name}`);
-      toast.success(`Sample analysis ready — ${records.length} rows from catalog`, { id: 'analysis' });
+
+      const rowsLabel  = fetchResult.rows_fetched.toLocaleString();
+      const totalLabel = fetchResult.total_available?.toLocaleString() ?? 'unknown';
+      toast.success(
+        fetchResult.truncated
+          ? `Analysis ready — ${rowsLabel} of ${totalLabel} rows (100k cap)`
+          : `Full analysis ready — all ${rowsLabel} rows`,
+        { id: 'analysis' },
+      );
     } catch (err: any) {
       toast.error(err.message || 'Analysis failed', { id: 'analysis' });
     } finally {
       setLoading(false);
       setAnalysisStep('');
+      setFetchProgress(null);
     }
   };
 
@@ -619,6 +635,54 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
                         <div className="progress-bar-fill" style={{ height: '100%', background: '#fb8c36', width: analysisStep === 'cloning' || analysisStep === 'extracting' ? '15%' : analysisStep === 'graphing' ? '40%' : analysisStep === 'arch' ? '70%' : analysisStep === 'details' ? '90%' : '0%', transition: 'width 0.8s' }} />
                       </div>
                       <p style={{ fontSize: '11px', color: '#64748b', marginTop: '10px', textAlign: 'center' }}>{progressMsg}</p>
+                    </div>
+                  )}
+
+                  {/* ── Dataset catalog fetch progress ── */}
+                  {loading && fileType === 'csv' && (analysisStep === 'connecting' || analysisStep === 'downloading' || analysisStep === 'analyzing') && (
+                    <div style={{ width: '100%', maxWidth: '520px', marginBottom: '32px' }}>
+                      {/* Step pills */}
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px' }}>
+                        {(['connecting', 'downloading', 'analyzing'] as const).map((step, idx) => {
+                          const order = ['connecting', 'downloading', 'analyzing'];
+                          const currentIdx = order.indexOf(analysisStep);
+                          const isActive = idx === currentIdx;
+                          const isDone   = idx < currentIdx;
+                          const label    = step === 'connecting' ? 'Connect' : step === 'downloading' ? 'Download' : 'Analyze';
+                          return (
+                            <div key={step} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', color: isActive ? '#fb8c36' : isDone ? '#4ade80' : '#64748b', fontSize: '12px', fontWeight: isActive ? 600 : 400, transition: 'all 0.3s' }}>
+                              <div style={{ width: '22px', height: '22px', borderRadius: '50%', border: `1.5px solid ${isActive ? '#fb8c36' : isDone ? '#4ade80' : '#334155'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px' }}>
+                                {isDone ? '✓' : isActive ? <Loader2 size={10} className="animate-spin" /> : idx + 1}
+                              </div>
+                              <span>{label}</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+
+                      {/* Progress bar — driven by real row count from stream */}
+                      <div style={{ height: '6px', background: '#0f172a', borderRadius: '3px', overflow: 'hidden', border: '1px solid #1e293b' }}>
+                        <div style={{
+                          height: '100%',
+                          borderRadius: '3px',
+                          background: 'linear-gradient(90deg, #fb8c36, #f97316)',
+                          transition: 'width 0.4s ease',
+                          width: analysisStep === 'connecting' ? '5%'
+                               : analysisStep === 'analyzing'  ? '95%'
+                               : `${Math.max(5, Math.min(90, fetchProgress?.pct ?? 0))}%`,
+                        }} />
+                      </div>
+
+                      {/* Live row counter */}
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '8px', fontSize: '11px', color: '#64748b' }}>
+                        <span>{progressMsg}</span>
+                        {fetchProgress && analysisStep === 'downloading' && (
+                          <span style={{ color: '#fb8c36', fontVariantNumeric: 'tabular-nums' }}>
+                            {fetchProgress.rows_fetched.toLocaleString()}
+                            {fetchProgress.total ? ` / ${fetchProgress.total.toLocaleString()}` : ''} rows
+                          </span>
+                        )}
+                      </div>
                     </div>
                   )}
 

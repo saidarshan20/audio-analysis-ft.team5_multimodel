@@ -37,6 +37,83 @@ export async function fetchDatasetSample(indexId: string): Promise<{ records: an
   return response.json();
 }
 
+export interface FetchForAnalysisResult {
+  filename: string;
+  rows_fetched: number;
+  total_available: number | null;
+  truncated: boolean;
+}
+
+export interface FetchProgressEvent {
+  rows_fetched: number;
+  total: number | null;
+  pct: number;
+}
+
+/**
+ * Downloads the full dataset from data.gov.in into Team 4's workspace server-to-server.
+ * Streams NDJSON progress events — call onProgress to update UI in real time.
+ * Throws on error events from the backend.
+ */
+export async function fetchDatasetForAnalysis(
+  indexId: string,
+  datasetName: string,
+  onProgress?: (e: FetchProgressEvent) => void,
+  maxRows = 100_000,
+): Promise<FetchForAnalysisResult> {
+  const response = await fetch(`${BASE_URL}/team5/datasets/fetch-for-analysis`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ index_id: indexId, dataset_name: datasetName, max_rows: maxRows }),
+  });
+
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({ detail: 'Unknown error' }));
+    throw new Error(err.detail || `Fetch failed: ${response.status}`);
+  }
+
+  const reader = response.body?.getReader();
+  if (!reader) throw new Error('No response stream');
+
+  const decoder = new TextDecoder();
+  let buffer = '';
+  let result: FetchForAnalysisResult | null = null;
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split('\n');
+    buffer = lines.pop() ?? '';
+
+    for (const line of lines) {
+      if (!line.trim()) continue;
+      try {
+        const event = JSON.parse(line);
+        if (event.type === 'progress') {
+          onProgress?.({ rows_fetched: event.rows_fetched, total: event.total, pct: event.pct });
+        } else if (event.type === 'complete') {
+          result = {
+            filename:        event.filename,
+            rows_fetched:    event.rows_fetched,
+            total_available: event.total_available,
+            truncated:       event.truncated,
+          };
+        } else if (event.type === 'error') {
+          throw new Error(event.message);
+        }
+      } catch (e) {
+        if (e instanceof SyntaxError) continue; // malformed line — skip
+        throw e;
+      }
+    }
+  }
+
+  if (!result) throw new Error('Dataset fetch completed without a result event.');
+  return result;
+}
+
 /**
  * Triggers a full CSV download for a data.gov.in dataset.
  * The backend paginates through the API and streams the file —

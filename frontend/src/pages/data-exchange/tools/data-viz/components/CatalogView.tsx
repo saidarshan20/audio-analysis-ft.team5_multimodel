@@ -5,7 +5,7 @@ import DatasetDetailsHub from './DatasetDetailsHub';
 
 interface Props {
   onSelect?: (id: string) => void;
-  onAnalyzeDataset?: (dataset: DatasetEntry, records: any[]) => void;
+  onAnalyzeDataset?: (dataset: DatasetEntry) => void;
 }
 
 const PAGE_SIZE = 50;

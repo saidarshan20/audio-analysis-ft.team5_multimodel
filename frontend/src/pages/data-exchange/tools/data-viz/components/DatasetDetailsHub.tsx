@@ -15,7 +15,7 @@ import { DatasetEntry, fetchDatasetSample, chatAboutDataset, downloadDatasetCSV 
 interface Props {
   dataset: DatasetEntry;
   onClose: () => void;
-  onAnalyze?: (dataset: DatasetEntry, records: any[]) => void;
+  onAnalyze?: (dataset: DatasetEntry) => void;
 }
 
 const DatasetDetailsHub: React.FC<Props> = ({ dataset, onClose, onAnalyze }) => {
@@ -152,9 +152,10 @@ const DatasetDetailsHub: React.FC<Props> = ({ dataset, onClose, onAnalyze }) => 
               <button
                 className="xt-continue-btn"
                 style={{ width: '100%', justifyContent: 'center', gap: '10px' }}
-                onClick={() => setActiveTab('preview')}
+                onClick={() => onAnalyze?.(dataset)}
+                disabled={!dataset.id}
               >
-                <TableIcon size={16} /> Load Sample &amp; Analyze
+                <TableIcon size={16} /> Analyze Full Dataset
               </button>
               {dataset.id && (
                 <button
@@ -207,15 +208,15 @@ const DatasetDetailsHub: React.FC<Props> = ({ dataset, onClose, onAnalyze }) => 
               <div className="hub-table-wrap">
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
                   <span style={{ fontSize: '11px', color: '#94a3b8' }}>
-                    {sampleData.length} sample rows — not the full dataset
+                    Previewing {sampleData.length} rows — analysis runs on the full dataset
                   </span>
                   <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
                     <button
                       className="xt-tab active"
                       style={{ fontSize: '11px', padding: '6px 12px', background: 'rgba(251, 140, 54, 0.1)', color: '#fb8c36' }}
-                      onClick={() => onAnalyze?.(dataset, sampleData)}
+                      onClick={() => onAnalyze?.(dataset)}
                     >
-                      Explore Sample
+                      Analyze Full Dataset
                     </button>
                     {dataset.id && (
                       <button

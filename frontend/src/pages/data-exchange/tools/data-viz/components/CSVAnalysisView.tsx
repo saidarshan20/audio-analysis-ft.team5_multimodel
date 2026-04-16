@@ -249,7 +249,7 @@ const CSVAnalysisView = ({ result, isSample = false, sampleOf }: Props) => {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', marginTop: '1.5rem', animation: 'fadeIn 0.5s ease-out' }}>
 
-      {/* ── Sample Warning Banner ── */}
+      {/* ── Truncation Warning Banner — only shown when dataset exceeded 100k row cap ── */}
       {isSample && (
         <div style={{
           display: 'flex', alignItems: 'flex-start', gap: '12px',
@@ -259,11 +259,12 @@ const CSVAnalysisView = ({ result, isSample = false, sampleOf }: Props) => {
         }}>
           <span style={{ fontSize: '18px', lineHeight: 1 }}>⚠️</span>
           <div style={{ fontSize: '13px', lineHeight: 1.5 }}>
-            <strong style={{ color: '#fbbf24' }}>Sample analysis — not the full dataset.</strong>
+            <strong style={{ color: '#fbbf24' }}>Analysis capped at 100,000 rows.</strong>
             <span style={{ color: '#94a3b8', marginLeft: '6px' }}>
-              Stats and charts are based on {result.total_rows.toLocaleString()} sampled rows
-              {sampleOf ? ` of ~${sampleOf.toLocaleString()} total` : ' from the data.gov.in catalog'}.
-              Download the full dataset for authoritative analysis.
+              This dataset has more than 100k rows. Stats and charts are based on the first{' '}
+              {result.total_rows.toLocaleString()} rows fetched.
+              {sampleOf ? ` Full dataset has ~${sampleOf.toLocaleString()} rows.` : ''}
+              {' '}Use <strong style={{ color: '#fb8c36' }}>Download Full Dataset</strong> for the complete data.
             </span>
           </div>
         </div>

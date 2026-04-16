@@ -677,9 +677,171 @@ async def get_dataset_sample(index_id: str, limit: int = 500):
 
 
 # ──────────────────────────────────────────────
+#  Dataset Full Fetch → writes to Team 4 workspace for real analysis
+# ──────────────────────────────────────────────
+import csv as _csv
+import re as _re
+import time as _time
+import uuid as _uuid
+from pathlib import Path as _Path
+
+ANALYSIS_MAX_ROWS = 100_000   # stat-grade ceiling; pandas handles this fine
+FETCH_PAGE_SIZE   = 2_000     # rows per data.gov.in request
+
+# Team 4's raw upload directory (mirror of services.py line 11)
+_T4_DIR = _Path(__file__).resolve().parents[2] / "shared_workspace" / "1_raw_uploads"
+_T4_DIR.mkdir(parents=True, exist_ok=True)
+
+
+class FetchForAnalysisRequest(BaseModel):
+    index_id: str
+    dataset_name: str
+    max_rows: int = ANALYSIS_MAX_ROWS
+
+
+@router.post("/datasets/fetch-for-analysis")
+async def fetch_dataset_for_analysis(payload: FetchForAnalysisRequest):
+    """
+    Streams NDJSON progress events while downloading the full dataset from
+    data.gov.in server-to-server and writing it into Team 4's shared workspace.
+
+    Event types emitted (one JSON object per line):
+      {"type": "progress", "rows_fetched": int, "total": int|null, "pct": int}
+      {"type": "complete", "filename": str, "rows_fetched": int,
+                           "total_available": int|null, "truncated": bool}
+      {"type": "error",   "message": str}
+    """
+    settings = get_settings()
+    api_key = settings.data_gov_api_key
+    if not api_key:
+        # Emit a single error event — client reads it from the stream
+        async def _api_key_error():
+            yield json.dumps({"type": "error", "message": "DATA_GOV_API_KEY not configured on server"}) + "\n"
+        return StreamingResponse(_api_key_error(), media_type="application/x-ndjson")
+
+    max_rows = min(payload.max_rows, ANALYSIS_MAX_ROWS)
+    safe_base = _re.sub(r"[^\w\-]", "_", payload.dataset_name)[:50]
+    filename  = f"{safe_base}_{_uuid.uuid4().hex[:8]}.csv"
+    file_path = _T4_DIR / filename
+    base_url  = f"https://api.data.gov.in/resource/{payload.index_id}"
+
+    async def _stream():
+        rows_written    = 0
+        total_available = None
+        header_written  = False
+        page_errors     = 0
+        MAX_PAGE_ERRORS = 3   # tolerate transient failures; abort after 3 consecutive
+
+        try:
+            with open(file_path, "w", newline="", encoding="utf-8") as fh:
+                writer = None
+
+                # Per-page timeout of 20s; overall operation bounded by max_rows / PAGE_SIZE pages
+                async with httpx.AsyncClient(timeout=httpx.Timeout(connect=10, read=20, write=10, pool=5)) as client:
+                    offset = 0
+                    while rows_written < max_rows:
+                        page_limit = min(FETCH_PAGE_SIZE, max_rows - rows_written)
+                        params = {
+                            "api-key": api_key,
+                            "format":  "json",
+                            "limit":   page_limit,
+                            "offset":  offset,
+                        }
+                        try:
+                            resp = await client.get(base_url, params=params)
+                            resp.raise_for_status()
+                            data = resp.json()
+                            page_errors = 0   # reset on success
+                        except httpx.TimeoutException as exc:
+                            page_errors += 1
+                            logger.warning("Page timeout (offset=%d, attempt=%d): %s", offset, page_errors, exc)
+                            if page_errors >= MAX_PAGE_ERRORS:
+                                if rows_written == 0:
+                                    file_path.unlink(missing_ok=True)
+                                    yield json.dumps({"type": "error", "message": f"data.gov.in timed out after {MAX_PAGE_ERRORS} retries. Try again later."}) + "\n"
+                                    return
+                                # Partial data is better than nothing — stop and return what we have
+                                break
+                            await asyncio.sleep(1)
+                            continue
+                        except httpx.HTTPStatusError as exc:
+                            page_errors += 1
+                            status = exc.response.status_code
+                            if status == 404:
+                                yield json.dumps({"type": "error", "message": "Resource not found on data.gov.in. The dataset may have been removed."}) + "\n"
+                                file_path.unlink(missing_ok=True)
+                                return
+                            if page_errors >= MAX_PAGE_ERRORS:
+                                if rows_written == 0:
+                                    file_path.unlink(missing_ok=True)
+                                    yield json.dumps({"type": "error", "message": f"data.gov.in returned HTTP {status} after {MAX_PAGE_ERRORS} retries."}) + "\n"
+                                    return
+                                break
+                            await asyncio.sleep(1)
+                            continue
+
+                        records = data.get("records", [])
+                        if not records:
+                            break
+
+                        if total_available is None:
+                            try:
+                                total_available = int(data.get("total", 0)) or None
+                            except (TypeError, ValueError):
+                                total_available = None
+
+                        if not header_written:
+                            fieldnames = list(records[0].keys())
+                            writer = _csv.DictWriter(fh, fieldnames=fieldnames,
+                                                     extrasaction="ignore", lineterminator="\n")
+                            writer.writeheader()
+                            header_written = True
+
+                        for record in records:
+                            writer.writerow(record)  # type: ignore[union-attr]
+                            rows_written += 1
+
+                        offset += len(records)
+
+                        # Emit a progress event after each page
+                        pct = int((rows_written / min(max_rows, total_available or max_rows)) * 100) if total_available else 0
+                        yield json.dumps({
+                            "type":         "progress",
+                            "rows_fetched": rows_written,
+                            "total":        total_available,
+                            "pct":          min(pct, 99),   # reserve 100% for complete event
+                        }) + "\n"
+
+                        if total_available and offset >= total_available:
+                            break
+
+        except Exception as exc:
+            file_path.unlink(missing_ok=True)
+            logger.error("fetch-for-analysis fatal error: %s", exc)
+            yield json.dumps({"type": "error", "message": str(exc)}) + "\n"
+            return
+
+        if rows_written == 0:
+            file_path.unlink(missing_ok=True)
+            yield json.dumps({"type": "error", "message": "data.gov.in returned no records for this resource."}) + "\n"
+            return
+
+        truncated = total_available is not None and rows_written < total_available
+        yield json.dumps({
+            "type":            "complete",
+            "filename":        filename,
+            "rows_fetched":    rows_written,
+            "total_available": total_available,
+            "truncated":       truncated,
+        }) + "\n"
+
+    return StreamingResponse(_stream(), media_type="application/x-ndjson")
+
+
+# ──────────────────────────────────────────────
 #  Dataset Full CSV Download — paginated proxy stream
 # ──────────────────────────────────────────────
-MAX_DOWNLOAD_ROWS = 50_000   # hard cap to prevent abuse / timeouts
+MAX_DOWNLOAD_ROWS = 100_000  # matches ANALYSIS_MAX_ROWS — consistent cap across both paths
 
 @router.get("/datasets/download/{index_id:path}")
 async def download_dataset_csv(index_id: str, filename: str = "dataset"):
