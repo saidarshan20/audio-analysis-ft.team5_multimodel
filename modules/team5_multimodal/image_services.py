@@ -18,6 +18,8 @@ from PIL import Image
 import matplotlib.pyplot as plt
 import matplotlib
 matplotlib.use('Agg')  # Headless backend for fastAPI
+from pillow_heif import register_heif_opener
+register_heif_opener()
 
 # Machine Learning
 from ultralytics import YOLO
@@ -163,7 +165,7 @@ class ImageAnalysisService:
     def process_images(self, extract_dir: str) -> ZipPipelineResult:
         start_time = time.time()
         root = Path(extract_dir)
-        valid_exts = {".jpg", ".jpeg", ".png", ".bmp", ".webp"}
+        valid_exts = {".jpg", ".jpeg", ".png", ".bmp", ".webp", ".heic", ".heif"}
         
         image_files = []
         for path in root.rglob("*"):

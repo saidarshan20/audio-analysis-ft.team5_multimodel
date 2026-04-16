@@ -180,8 +180,15 @@ async def analyze_images_batch(files: list[UploadFile] = File(...)):
         
         # Case B: Multiple individual image files
         else:
-            # Filter for images
-            img_files = [f for f in files if f.content_type and f.content_type.startswith("image/")]
+            # Filter for images (including HEIC/HEIF even if MIME type is missing/generic)
+            img_files = []
+            for f in files:
+                ext = f.filename.lower()
+                is_img = (f.content_type and f.content_type.startswith("image/"))
+                is_heif = ext.endswith(".heic") or ext.endswith(".heif")
+                if is_img or is_heif:
+                    img_files.append(f)
+
             if not img_files:
                 raise HTTPException(status_code=400, detail="No valid images or ZIP archive found.")
             
