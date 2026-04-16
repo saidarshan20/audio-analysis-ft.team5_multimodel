@@ -164,6 +164,25 @@ class DetectedObject(BaseModel):
     confidence: float
     bbox: list[float]  # [x_min, y_min, x_max, y_max]
 
+class GPSData(BaseModel):
+    lat: float | None = None
+    lng: float | None = None
+    altitude: float | None = None
+
+class TechnicalMetadata(BaseModel):
+    make: str | None = None
+    model: str | None = None
+    lens: str | None = None
+    focal_length: str | None = None
+    focal_length_35mm: str | None = None
+    aperture: str | None = None
+    shutter_speed: str | None = None
+    iso: str | None = None
+    datetime: str | None = None
+    gps: GPSData | None = None
+    width: int | None = None
+    height: int | None = None
+
 class ClusterPoint(BaseModel):
     filename: str
     cluster_id: int
@@ -172,6 +191,7 @@ class ClusterPoint(BaseModel):
     objects: list[DetectedObject]
     description: str | None = None
     annotated_image_path: str | None = None
+    metadata: TechnicalMetadata | None = None
 
 class ZipPipelineResult(BaseModel):
     clusters: list[ClusterPoint]

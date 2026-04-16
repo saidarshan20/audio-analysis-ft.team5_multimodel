@@ -14,7 +14,7 @@ import json
 from pathlib import Path
 
 import numpy as np
-from PIL import Image
+from PIL import Image, ExifTags
 import matplotlib.pyplot as plt
 import matplotlib
 matplotlib.use('Agg')  # Headless backend for fastAPI
@@ -35,7 +35,7 @@ from msrest.authentication import CognitiveServicesCredentials
 
 from modules.team5_multimodal.config import get_settings
 from modules.team5_multimodal.models import (
-    DetectedObject, ClusterPoint, ZipPipelineResult, ClusterInfo
+    DetectedObject, ClusterPoint, ZipPipelineResult, ClusterInfo, TechnicalMetadata, GPSData
 )
 
 logger = logging.getLogger(__name__)
@@ -82,6 +82,70 @@ class ImageAnalysisService:
 
         # Initialize Azure Client if keys exist (Skipped for Local BLIP)
         self.cv_client = None
+
+    def _get_decimal_from_dms(self, dms, ref):
+        if not dms or not ref: return None
+        try:
+            degrees = float(dms[0])
+            minutes = float(dms[1])
+            seconds = float(dms[2])
+            decimal = degrees + (minutes / 60.0) + (seconds / 3600.0)
+            if ref in ['S', 'W']: decimal = -decimal
+            return decimal
+        except (IndexError, TypeError, ValueError):
+            return None
+
+    def _extract_exif_metadata(self, img_path: str) -> TechnicalMetadata | None:
+        """Extract Apple-style technical metadata and GPS from image files."""
+        try:
+            img = Image.open(img_path)
+            exif = img.getexif()
+            if not exif:
+                return TechnicalMetadata(width=img.width, height=img.height)
+
+            meta = TechnicalMetadata(width=img.width, height=img.height)
+            
+            # 1. Basic Info
+            meta.make = str(exif.get(ExifTags.Base.Make, "")).strip() or None
+            meta.model = str(exif.get(ExifTags.Base.Model, "")).strip() or None
+            meta.datetime = str(exif.get(ExifTags.Base.DateTime, "")).strip() or None
+
+            # 2. Detailed Specs (IFD 34665)
+            exif_ifd = exif.get_ifd(ExifTags.IFD.Exif)
+            if exif_ifd:
+                meta.iso = str(exif_ifd.get(ExifTags.Base.ISOSpeedRatings, "")) or None
+                meta.aperture = f"f/{exif_ifd.get(ExifTags.Base.FNumber)}" if exif_ifd.get(ExifTags.Base.FNumber) else None
+                
+                exp_time = exif_ifd.get(ExifTags.Base.ExposureTime)
+                if exp_time:
+                    try:
+                        f_exp = float(exp_time)
+                        if f_exp < 1.0:
+                            meta.shutter_speed = f"1/{round(1.0/f_exp)}"
+                        else:
+                            meta.shutter_speed = f"{f_exp}"
+                    except (ValueError, ZeroDivisionError):
+                        meta.shutter_speed = str(exp_time)
+
+                meta.focal_length = f"{exif_ifd.get(ExifTags.Base.FocalLength)}mm" if exif_ifd.get(ExifTags.Base.FocalLength) else None
+                meta.focal_length_35mm = f"{exif_ifd.get(ExifTags.Base.FocalLengthIn35mmFilm)}mm" if exif_ifd.get(ExifTags.Base.FocalLengthIn35mmFilm) else None
+                meta.lens = str(exif_ifd.get(ExifTags.Base.LensModel, "")).strip() or None
+
+            # 3. GPS Info (IFD 34853)
+            gps_ifd = exif.get_ifd(ExifTags.IFD.GPSInfo)
+            if gps_ifd:
+                # GPS tags are often best accessed by their integer IDs to avoid 'dict' attribute errors
+                # Ref IDs: 1: LatRef, 2: Lat, 3: LngRef, 4: Lng, 6: Alt
+                lat = self._get_decimal_from_dms(gps_ifd.get(2), gps_ifd.get(1))
+                lng = self._get_decimal_from_dms(gps_ifd.get(4), gps_ifd.get(3))
+                alt = float(gps_ifd.get(6, 0)) if gps_ifd.get(6) else None
+                if lat is not None and lng is not None:
+                    meta.gps = GPSData(lat=lat, lng=lng, altitude=alt)
+
+            return meta
+        except Exception as e:
+            logger.warning(f"Metadata extraction failed for {img_path}: {e}")
+            return None
 
     def extract_zip(self, zip_bytes: bytes) -> str:
         """Extracts zip blob into shared_workspace/1_raw_uploads/"""
@@ -231,6 +295,9 @@ class ImageAnalysisService:
 
             embeddings.append(emb)
 
+            # --- Technical Metadata ---
+            tech_meta = self._extract_exif_metadata(str_path)
+
             # --- Azure Vision (Optional) ---
             desc = self.get_image_description(str_path)
 
@@ -238,7 +305,8 @@ class ImageAnalysisService:
                 "filename": img_path.name,
                 "objects": objs,
                 "description": desc,
-                "annotated_path": rel_annotated_path
+                "annotated_path": rel_annotated_path,
+                "tech_meta": tech_meta
             })
 
         # 2. KMeans Clustering - Smart K-Estimation via Silhouette Score
@@ -268,10 +336,13 @@ class ImageAnalysisService:
             labels = kmeans.fit_predict(X)
 
         # 3. UMAP Dimensionality Reduction
-        # UMAP needs sufficient data for spectral initialization; default to random for small sets
-        if len(X) > 1:
+        # UMAP requires n_neighbors >= 2 AND n_neighbors < n_samples,
+        # so we need at least 3 samples. Handle smaller sets with trivial layouts.
+        if len(X) >= 3:
             reducer = umap.UMAP(n_neighbors=min(15, len(X)-1), n_components=2, random_state=42, init="random")
             coords = reducer.fit_transform(X)
+        elif len(X) == 2:
+            coords = np.array([[0.0, 0.0], [1.0, 0.0]])
         else:
             coords = np.array([[0.0, 0.0]])
 
@@ -286,7 +357,8 @@ class ImageAnalysisService:
                     umap_y=float(coords[i][1]),
                     objects=metadata_list[i]["objects"],
                     description=metadata_list[i]["description"],
-                    annotated_image_path=metadata_list[i]["annotated_path"]
+                    annotated_image_path=metadata_list[i]["annotated_path"],
+                    metadata=metadata_list[i]["tech_meta"]
                 )
             )
 

@@ -137,8 +137,6 @@ const MOCK_CODE_RESULT: CodeAnalysisResult = {
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-const BASE_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8000';
-
 const DataVizPage = ({ onBack }: { onBack: () => void }) => {
   const [activeTab, setActiveTab] = useState<DatasetTab>('catalog');
 

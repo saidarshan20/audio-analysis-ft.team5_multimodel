@@ -1,14 +1,16 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
 import {
   BarChart2, Image as ImageIcon, Sparkles, Layers, Search,
-  MessageCircle, Loader2, Send, SearchCheck, Upload, Play, Columns, ArrowRight, X, AlertCircle,
-  Clock, Zap, Cpu
+  MessageCircle, Loader2, Send, SearchCheck, Upload, ArrowRight, X,
+  Clock, Zap, Cpu, MapPin, Camera
 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   MultiImageAnalysisResponse, ImageZipAnalysisResponse, ImageQAResponse, ImageSearchResult,
   askAboutImage, askAboutExistingImage, searchImages, askAboutImageCollection,
-  ImageCollectionQAResponse, GroundedImageRecord
+  ImageCollectionQAResponse
 } from '../services';
 
 export interface VisualRecord {
@@ -21,7 +23,249 @@ export interface VisualRecord {
   annotated_image_path: string | null;
   object_count: number;
   object_details: { label: string; confidence: number; bbox: number[] }[];
+  metadata?: {
+    make?: string;
+    model?: string;
+    lens?: string;
+    focal_length?: string;
+    focal_length_35mm?: string;
+    aperture?: string;
+    shutter_speed?: string;
+    iso?: string;
+    datetime?: string;
+    gps?: { lat: number; lng: number; altitude?: number };
+    width?: number;
+    height?: number;
+  };
 }
+
+// Fix for Leaflet default icon issues in Vite/Next environments
+const fixLeafletIcons = () => {
+  delete (L.Icon.Default.prototype as any)._getIconUrl;
+  L.Icon.Default.mergeOptions({
+    iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
+    iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
+    shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
+  });
+};
+
+if (typeof window !== 'undefined') {
+  fixLeafletIcons();
+}
+
+/**
+ * ImageMetadataPanel - A premium "Apple Photos" style info panel
+ */
+const ImageMetadataPanel = ({ record, onClose }: { record: VisualRecord, onClose: () => void }) => {
+  const mapRef = useRef<HTMLDivElement>(null);
+  const mapInstance = useRef<L.Map | null>(null);
+
+  useEffect(() => {
+    if (record.metadata?.gps?.lat && record.metadata?.gps?.lng && mapRef.current && !mapInstance.current) {
+      const { lat, lng } = record.metadata.gps;
+      
+      // Initialize map
+      mapInstance.current = L.map(mapRef.current, {
+        zoomControl: false,
+        attributionControl: false
+      }).setView([lat, lng], 13);
+
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+      }).addTo(mapInstance.current);
+
+      L.marker([lat, lng]).addTo(mapInstance.current);
+
+      // Add zoom control to top right
+      L.control.zoom({ position: 'topright' }).addTo(mapInstance.current);
+    }
+
+    return () => {
+      if (mapInstance.current) {
+        mapInstance.current.remove();
+        mapInstance.current = null;
+      }
+    };
+  }, [record]);
+
+  const meta = record.metadata;
+
+  return (
+    <div className="metadata-modal-overlay" onClick={onClose}>
+      <div className="metadata-modal-content" onClick={e => e.stopPropagation()}>
+        <div className="metadata-modal-header">
+          <div className="header-info">
+            <h3>{record.filename}</h3>
+            <p>{meta?.datetime ? new Date(meta.datetime.replace(/:/g, (m, i) => i < 10 && i % 3 === 2 ? '-' : m)).toLocaleString() : 'Date Unknown'}</p>
+          </div>
+          <button className="close-btn" onClick={onClose}><X size={20} /></button>
+        </div>
+
+        <div className="metadata-modal-body">
+          <div className="image-preview-pane">
+            {record.annotated_image_path ? (
+              <img src={`${import.meta.env.VITE_API_URL ?? 'http://localhost:8000'}/${record.annotated_image_path}`} alt={record.filename} />
+            ) : (
+              <div className="no-image"><ImageIcon size={48} /><span>No Preview</span></div>
+            )}
+          </div>
+
+          <div className="info-sidebar">
+            {/* EXIF Quick Strip */}
+            <div className="exif-strip">
+              <div className="exif-item">
+                <span className="label">ISO</span>
+                <span className="value">{meta?.iso || '--'}</span>
+              </div>
+              <div className="exif-item">
+                <span className="label">FOCAL</span>
+                <span className="value">{meta?.focal_length || '--'}</span>
+              </div>
+              <div className="exif-item">
+                <span className="label">APERTURE</span>
+                <span className="value">{meta?.aperture || '--'}</span>
+              </div>
+              <div className="exif-item">
+                <span className="label">SHUTTER</span>
+                <span className="value">{meta?.shutter_speed || '--'}s</span>
+              </div>
+            </div>
+
+            {/* Device Info */}
+            <div className="info-section">
+              <div className="section-title"><Camera size={14} /> Device & Lens</div>
+              <div className="info-grid">
+                <div className="grid-item">
+                  <span className="label">Make</span>
+                  <span className="value">{meta?.make || 'Unknown'}</span>
+                </div>
+                <div className="grid-item">
+                  <span className="label">Model</span>
+                  <span className="value">{meta?.model || 'Unknown'}</span>
+                </div>
+                <div className="grid-item full">
+                  <span className="label">Lens</span>
+                  <span className="value">{meta?.lens || 'Unknown'}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* AI Insights */}
+            <div className="info-section">
+              <div className="section-title"><Sparkles size={14} /> Visual Intelligence</div>
+              <div className="caption-box">{record.caption}</div>
+              <div className="tags-cloud">
+                {record.objects.map((obj, i) => (
+                  <span key={i} className="chip">{obj}</span>
+                ))}
+              </div>
+            </div>
+
+            {/* Location Map */}
+            {meta?.gps && (
+              <div className="info-section location-section">
+                <div className="section-title"><MapPin size={14} /> Location Details</div>
+                <div className="map-container" ref={mapRef}></div>
+                <div className="coords">
+                  {meta.gps.lat.toFixed(6)}, {meta.gps.lng.toFixed(6)}
+                  {meta.gps.altitude && ` • ${Math.round(meta.gps.altitude)}m Alt`}
+                </div>
+              </div>
+            )}
+            
+            {!meta?.gps && (
+              <div className="info-section no-gps">
+                <div className="section-title"><MapPin size={14} /> Location</div>
+                <p>No GPS data found in this image.</p>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+/**
+ * GlobalCollectionMap - Visualizes all images with GPS data on a single interactive map
+ */
+const GlobalCollectionMap = ({ 
+  records, 
+  onSelectRecord 
+}: { 
+  records: VisualRecord[], 
+  onSelectRecord: (filename: string) => void 
+}) => {
+  const mapRef = useRef<HTMLDivElement>(null);
+  const mapInstance = useRef<L.Map | null>(null);
+  const geoTaggedRecords = records.filter(r => r.metadata?.gps?.lat && r.metadata?.gps?.lng);
+
+  useEffect(() => {
+    if (mapRef.current && !mapInstance.current && geoTaggedRecords.length > 0) {
+      // Calculate center based on all points
+      const lats = geoTaggedRecords.map(r => r.metadata!.gps!.lat);
+      const lngs = geoTaggedRecords.map(r => r.metadata!.gps!.lng);
+      const centerLat = lats.reduce((a, b) => a + (b as number), 0) / lats.length;
+      const centerLng = lngs.reduce((a, b) => a + (b as number), 0) / lngs.length;
+
+      mapInstance.current = L.map(mapRef.current, {
+        zoomControl: false,
+        attributionControl: false
+      }).setView([centerLat, centerLng], 12);
+
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+      }).addTo(mapInstance.current);
+
+      geoTaggedRecords.forEach(r => {
+        const marker = L.marker([r.metadata!.gps!.lat as number, r.metadata!.gps!.lng as number]).addTo(mapInstance.current!);
+        marker.bindPopup(`
+          <div style="font-family: inherit; padding: 5px; min-width: 120px;">
+            <strong style="display:block;margin-bottom:8px;font-size:12px;">${r.filename}</strong>
+            <button id="marker-btn-${r.filename.replace(/[^a-zA-Z0-9]/g, '_')}" style="background:#fb8c36;color:white;border:none;padding:6px 10px;border-radius:6px;cursor:pointer;font-size:10px;width:100%;font-weight:600;">View Intelligence</button>
+          </div>
+        `);
+        
+        marker.on('popupopen', () => {
+          const btnId = `marker-btn-${r.filename.replace(/[^a-zA-Z0-9]/g, '_')}`;
+          const btn = document.getElementById(btnId);
+          if (btn) {
+            btn.onclick = () => {
+              onSelectRecord(r.filename);
+            };
+          }
+        });
+      });
+
+      L.control.zoom({ position: 'topright' }).addTo(mapInstance.current);
+      
+      // Fit bounds if multiple points
+      if (geoTaggedRecords.length > 1) {
+        const bounds = L.latLngBounds(geoTaggedRecords.map(r => [r.metadata!.gps!.lat as number, r.metadata!.gps!.lng as number]));
+        mapInstance.current.fitBounds(bounds, { padding: [40, 40] });
+      }
+    }
+
+    return () => {
+      if (mapInstance.current) {
+        mapInstance.current.remove();
+        mapInstance.current = null;
+      }
+    };
+  }, [geoTaggedRecords, onSelectRecord]);
+
+  if (geoTaggedRecords.length === 0) {
+    return (
+      <div className="no-gps-collection" style={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,0.03)', color: 'var(--t-muted)', textAlign: 'center', padding: '40px' }}>
+        <MapPin size={48} style={{ opacity: 0.2, marginBottom: '20px' }} />
+        <h5 style={{ margin: '0 0 10px 0', color: 'var(--t-secondary)', fontSize: '16px' }}>Geospatial Data Not Detected</h5>
+        <p style={{ fontSize: '14px', maxWidth: '320px', lineHeight: 1.5 }}>None of the analyzed images in this collection contain valid coordinate tags. View the "UMAP Projection" for semantic clustering instead.</p>
+      </div>
+    );
+  }
+
+  return <div ref={mapRef} style={{ width: '100%', height: '100%', borderRadius: 'inherit' }} />;
+};
 
 interface Props {
   imgResult: MultiImageAnalysisResponse | null;
@@ -55,6 +299,7 @@ const ImageAnalysisView = ({ imgResult, imgZipResult, imgTokens, imgDuration, im
   const [collectionLoading, setCollectionLoading] = useState(false);
   const [collectionAnswer, setCollectionAnswer] = useState<ImageCollectionQAResponse | null>(null);
   const [compareSelection, setCompareSelection] = useState<string[]>([]);
+  const [vizMode, setVizMode] = useState<'semantic' | 'geographic'>('semantic');
 
 
   const zipClusterLabelMap: Record<number, string> = {};
@@ -83,6 +328,7 @@ const ImageAnalysisView = ({ imgResult, imgZipResult, imgTokens, imgDuration, im
         annotated_image_path: point.annotated_image_path,
         object_count: point.objects.length,
         object_details: point.objects,
+        metadata: point.metadata,
       }))
     : imgResult
       ? imgResult.results.map(result => {
@@ -408,15 +654,76 @@ const ImageAnalysisView = ({ imgResult, imgZipResult, imgTokens, imgDuration, im
 
     <div className="viz-row">
       <div className="scatter-box result-card">
-        <h4><BarChart2 size={20} /> Multi-Dimensional Semantic Analysis</h4>
-        <p className="viz-desc">Visualizing semantic relationships across your image collection using advanced clustering algorithms.</p>
-        <div style={{ marginTop: '20px', background: 'var(--bg-root)', padding: '20px', borderRadius: '16px', border: '1px solid var(--border-mid)', display: 'flex', justifyContent: 'center', boxShadow: 'inset 0 2px 10px rgba(0,0,0,0.5)' }}>
-          <img
-            src={`${import.meta.env.VITE_API_URL ?? 'http://localhost:8000'}/${imgZipResult.result?.plot_file_path}`}
-            alt="Cluster Plot"
-            style={{ maxWidth: '100%', maxHeight: '400px', borderRadius: '8px', objectFit: 'contain' }}
-            onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
-          />
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+          <h4>
+            {vizMode === 'semantic' ? (
+              <><BarChart2 size={18} /> Multi-Dimensional Semantic Analysis</>
+            ) : (
+              <><MapPin size={18} /> Geospatial Intelligence Distribution</>
+            )}
+          </h4>
+          <div className="tab-pill-container" style={{ display: 'flex', background: 'var(--bg-root)', padding: '3px', borderRadius: '10px', border: '1px solid var(--border-mid)' }}>
+            <button 
+              onClick={() => setVizMode('semantic')}
+              style={{ 
+                padding: '5px 12px', 
+                fontSize: '11px', 
+                borderRadius: '7px', 
+                border: 'none', 
+                background: vizMode === 'semantic' ? 'var(--bg-elevated)' : 'transparent',
+                color: vizMode === 'semantic' ? '#fb8c36' : 'var(--t-secondary)',
+                cursor: 'pointer',
+                fontWeight: 600,
+                transition: 'all 0.2s'
+              }}
+            >
+              Semantic
+            </button>
+            <button 
+              onClick={() => setVizMode('geographic')}
+              style={{ 
+                padding: '5px 12px', 
+                fontSize: '11px', 
+                borderRadius: '7px', 
+                border: 'none', 
+                background: vizMode === 'geographic' ? 'var(--bg-elevated)' : 'transparent',
+                color: vizMode === 'geographic' ? '#fb8c36' : 'var(--t-secondary)',
+                cursor: 'pointer',
+                fontWeight: 600,
+                transition: 'all 0.2s'
+              }}
+            >
+              Geographic
+            </button>
+          </div>
+        </div>
+        
+        <p className="viz-desc">
+          {vizMode === 'semantic' 
+            ? 'Visualizing semantic relationships across your image collection using advanced clustering algorithms.'
+            : 'Mapping the physical distribution of geolocated evidence across coordinates extracted from technical metadata.'
+          }
+        </p>
+
+        <div style={{ marginTop: '20px', background: 'var(--bg-root)', height: '400px', borderRadius: '16px', border: '1px solid var(--border-mid)', position: 'relative', overflow: 'hidden', boxShadow: 'inset 0 2px 10px rgba(0,0,0,0.5)' }}>
+          {vizMode === 'semantic' ? (
+            <div style={{ width: '100%', height: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+              <img
+                src={`${import.meta.env.VITE_API_URL ?? 'http://localhost:8000'}/${imgZipResult.result?.plot_file_path}`}
+                alt="Cluster Plot"
+                style={{ maxWidth: '100%', maxHeight: '100%', borderRadius: '8px', objectFit: 'contain' }}
+                onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+              />
+            </div>
+          ) : (
+            <GlobalCollectionMap 
+              records={visualRecords} 
+              onSelectRecord={(filename) => {
+                const rec = imgZipResult.result.clusters.find(c => c.filename === filename);
+                if (rec) setSelectedClusterPoint(rec);
+              }}
+            />
+          )}
         </div>
       </div>
       <div className="clusters-box result-card">
@@ -542,6 +849,16 @@ const ImageAnalysisView = ({ imgResult, imgZipResult, imgTokens, imgDuration, im
                   <Search size={14} /> {c.objects?.length || 0} Objects
                 </span>
                 <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                  <button
+                    className="qa-send-btn"
+                    style={{ height: '28px', width: 'auto', padding: '0 10px', fontSize: '11px', gap: '6px', background: 'rgba(96, 165, 250, 0.1)', border: '1px solid rgba(96, 165, 250, 0.2)' }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedClusterPoint(c);
+                    }}
+                  >
+                    <MapPin size={12} color="#60a5fa" /> Info & Map
+                  </button>
                   <button
                     className="qa-send-btn"
                     style={{ height: '28px', width: 'auto', padding: '0 10px', fontSize: '11px', gap: '6px' }}
@@ -981,7 +1298,24 @@ const ImageAnalysisView = ({ imgResult, imgZipResult, imgTokens, imgDuration, im
   </div>
 )}
 
-    </div>
+    {/* Metadata & Map Modal */}
+    {selectedClusterPoint && (
+      <ImageMetadataPanel 
+        record={visualRecords.find(r => r.filename === selectedClusterPoint.filename) || {
+          filename: selectedClusterPoint.filename,
+          caption: selectedClusterPoint.description || '',
+          objects: selectedClusterPoint.objects.map((o: any) => o.label),
+          cluster: selectedClusterPoint.cluster_id,
+          cluster_id: selectedClusterPoint.cluster_id,
+          annotated_image_path: selectedClusterPoint.annotated_image_path,
+          object_count: selectedClusterPoint.objects.length,
+          object_details: selectedClusterPoint.objects,
+          metadata: selectedClusterPoint.metadata
+        }} 
+        onClose={() => setSelectedClusterPoint(null)} 
+      />
+    )}
+  </div>
   );
 };
 

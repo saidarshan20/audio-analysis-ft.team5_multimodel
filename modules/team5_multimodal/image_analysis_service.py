@@ -177,10 +177,15 @@ class ImageAnalysisService:
         n_samples = len(data)
 
         # Dimensionality Reduction (UMAP)
-        if n_samples > 1:
+        # UMAP requires n_neighbors >= 2 AND n_neighbors < n_samples,
+        # so we need at least 3 samples for a valid reduction.
+        if n_samples >= 3:
             n_neighbors = min(n_samples - 1, 15)
             reducer = umap.UMAP(n_neighbors=n_neighbors, min_dist=0.1, n_components=2, random_state=42, init='random')
             projection = reducer.fit_transform(data)
+        elif n_samples == 2:
+            # Trivial 2-point layout: spread along x-axis
+            projection = np.array([[0.0, 0.0], [1.0, 0.0]])
         else:
             projection = np.array([[0.0, 0.0]])
 

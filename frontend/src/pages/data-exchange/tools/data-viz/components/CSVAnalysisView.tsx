@@ -1,8 +1,7 @@
-import React, { useState, useMemo } from 'react';
-import { 
-  BarChart2, Table, Layout, Info, ArrowUpRight, 
-  ArrowDownRight, Hash, Type, AlertCircle, TrendingUp,
-  ChevronDown, ChevronUp, Download
+import React, { useState } from 'react';
+import {
+  BarChart2, Table, Layout, Info,
+  Hash, Type, TrendingUp
 } from 'lucide-react';
 import { CSVAnalysisResult, ColumnStat, getChartDataTeam4, ChartDataResponse } from '../services';
 

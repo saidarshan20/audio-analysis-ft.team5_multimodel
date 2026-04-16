@@ -1,12 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  X, 
-  Database, 
-  Calendar, 
-  Layers, 
-  MessageSquare, 
-  Table as TableIcon, 
-  ChevronRight, 
+  X,
+  Database,
+  Calendar,
+  Layers,
+  MessageSquare,
+  Table as TableIcon,
   Send,
   Loader2,
   FileSpreadsheet

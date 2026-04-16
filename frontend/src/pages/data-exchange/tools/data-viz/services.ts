@@ -12,6 +12,9 @@ export interface DatasetEntry {
   desc: string;
   category: string;
   org: string;
+  id?: string;
+  fields?: Array<{ name: string; type?: string; description?: string }>;
+  updated?: string;
 }
 
 export interface DatasetPage {
@@ -197,6 +200,20 @@ export interface ImageZipAnalysisResponse {
       objects: Array<{ label: string; confidence: number; bbox: number[] }>;
       description: string | null;
       annotated_image_path: string | null;
+      metadata?: {
+        make?: string;
+        model?: string;
+        lens?: string;
+        focal_length?: string;
+        focal_length_35mm?: string;
+        aperture?: string;
+        shutter_speed?: string;
+        iso?: string;
+        datetime?: string;
+        gps?: { lat: number; lng: number; altitude?: number };
+        width?: number;
+        height?: number;
+      };
     }>;
     cluster_summaries: Array<{
       cluster_id: number;
@@ -521,6 +538,9 @@ export interface AudioFeatures {
   waveform: WaveformData;
   spectrogram: SpectrogramData;
   energy: EnergyData;
+  tempo?: number;
+  spectral_centroid_mean?: number;
+  mel_spectrogram?: SpectrogramData;
 }
 
 export interface AudioAnalysisResult {
@@ -528,12 +548,34 @@ export interface AudioAnalysisResult {
   segments: SpeakerSegment[];
   transcript_text: string;
   features?: AudioFeatures;
+  language?: string;
+  speaker_metrics?: Record<string, { speaking_time: number; word_count: number; turn_count: number; dominance_ratio?: number; wpm?: number; participation_ratio?: number }>;
+  interruption_count?: number;
+  audio_quality?: {
+    overall?: number;
+    overall_score?: number;
+    rating?: string;
+    summary?: string;
+    snr_db?: number;
+    snr?: number;
+    clipping?: number;
+    silence_ratio?: number;
+    composite_percent?: number;
+    metrics?: { snr: number; loudness: number; clarity: number; noise: number };
+  };
   text_analysis: {
     summary: string;
     sentiment: { positive: number; negative: number; neutral: number; overall_label: string };
     entities: Array<{ id: string; label: string; type: string }>;
     timeline: Array<{ date: string; description: string }>;
     locations: Array<{ name: string; lat: number; lng: number }>;
+    action_items?: string[];
+    decisions?: string[];
+    emotion?: string;
+    tone?: string;
+    domain?: string;
+    conversation_score?: number;
+    top_keyphrases?: string[];
   } | null;
 }
 

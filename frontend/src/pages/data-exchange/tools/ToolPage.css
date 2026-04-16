@@ -1361,3 +1361,272 @@
 .spin {
   animation: spin 1s linear infinite;
 }
+
+
+/* ── Image Metadata Panel (Apple Photos-style modal) ────────────────────── */
+.metadata-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(2, 6, 23, 0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.metadata-modal-content {
+  background: #0f172a;
+  border: 1px solid #1e293b;
+  border-radius: 20px;
+  width: 100%;
+  max-width: 1020px;
+  max-height: 90vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 40px 80px -16px rgba(0, 0, 0, 0.7);
+}
+
+.metadata-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 24px;
+  border-bottom: 1px solid #1e293b;
+  background: #1e293b;
+  flex-shrink: 0;
+}
+
+.metadata-modal-header .header-info h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  color: #f1f5f9;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 600px;
+}
+
+.metadata-modal-header .header-info p {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: #64748b;
+}
+
+.metadata-modal-header .close-btn {
+  background: rgba(255,255,255,0.06);
+  border: 1px solid #334155;
+  color: #94a3b8;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.15s, color 0.15s;
+}
+
+.metadata-modal-header .close-btn:hover {
+  background: rgba(239, 68, 68, 0.15);
+  color: #f87171;
+  border-color: rgba(239, 68, 68, 0.3);
+}
+
+.metadata-modal-body {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+.image-preview-pane {
+  flex: 1;
+  background: #020617;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  overflow: hidden;
+}
+
+.image-preview-pane img {
+  max-width: 100%;
+  max-height: 70vh;
+  object-fit: contain;
+  border-radius: 8px;
+}
+
+.image-preview-pane .no-image {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  color: #334155;
+}
+
+.image-preview-pane .no-image span {
+  font-size: 13px;
+  color: #475569;
+}
+
+.info-sidebar {
+  width: 340px;
+  flex-shrink: 0;
+  overflow-y: auto;
+  border-left: 1px solid #1e293b;
+  background: #0f172a;
+  display: flex;
+  flex-direction: column;
+}
+
+/* EXIF quick strip */
+.exif-strip {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  border-bottom: 1px solid #1e293b;
+}
+
+.exif-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 14px 10px;
+  border-right: 1px solid #1e293b;
+  text-align: center;
+}
+
+.exif-item:last-child {
+  border-right: none;
+}
+
+.exif-item .label {
+  font-size: 9px;
+  font-weight: 700;
+  color: #475569;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.exif-item .value {
+  font-size: 13px;
+  font-weight: 700;
+  color: #f1f5f9;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Info sections */
+.info-section {
+  padding: 16px;
+  border-bottom: 1px solid #1e293b;
+}
+
+.info-section:last-child {
+  border-bottom: none;
+}
+
+.section-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: #64748b;
+  margin-bottom: 12px;
+}
+
+.info-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.grid-item {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.grid-item.full {
+  grid-column: 1 / -1;
+}
+
+.grid-item .label {
+  font-size: 9px;
+  font-weight: 700;
+  color: #475569;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.grid-item .value {
+  font-size: 12px;
+  color: #cbd5e1;
+  font-weight: 500;
+}
+
+.caption-box {
+  font-size: 13px;
+  line-height: 1.6;
+  color: #94a3b8;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid #1e293b;
+  border-radius: 10px;
+  padding: 12px;
+  margin-bottom: 10px;
+  font-style: italic;
+}
+
+.tags-cloud {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+/* Leaflet map container */
+.map-container {
+  width: 100%;
+  height: 180px;
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid #1e293b;
+  margin-bottom: 8px;
+}
+
+.coords {
+  font-size: 11px;
+  color: #64748b;
+  font-family: monospace;
+  text-align: center;
+}
+
+.no-gps p {
+  font-size: 12px;
+  color: #475569;
+  margin: 0;
+}
+
+.location-section {
+  padding-bottom: 20px;
+}
+
+/* ── Responsive: stack modal on small screens ── */
+@media (max-width: 700px) {
+  .metadata-modal-body {
+    flex-direction: column;
+  }
+  .info-sidebar {
+    width: 100%;
+    border-left: none;
+    border-top: 1px solid #1e293b;
+    max-height: 50vh;
+  }
+}

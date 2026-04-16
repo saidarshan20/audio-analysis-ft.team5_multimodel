@@ -275,9 +275,9 @@ const AudioAnalysisView = ({ result, file }: Props) => {
                           </div>
                           {m && (
                             <div style={{ paddingLeft: '20px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                              <span style={{ fontSize: '10px', color: '#64748b' }}>Dom: {(m.dominance_ratio * 100).toFixed(0)}%</span>
-                              <span style={{ fontSize: '10px', color: '#64748b' }}>WPM: {Math.round(m.wpm)}</span>
-                              <span style={{ fontSize: '10px', color: '#64748b' }}>Part: {(m.participation_ratio * 100).toFixed(0)}%</span>
+                              <span style={{ fontSize: '10px', color: '#64748b' }}>Dom: {((m.dominance_ratio ?? 0) * 100).toFixed(0)}%</span>
+                              <span style={{ fontSize: '10px', color: '#64748b' }}>WPM: {Math.round(m.wpm ?? 0)}</span>
+                              <span style={{ fontSize: '10px', color: '#64748b' }}>Part: {((m.participation_ratio ?? 0) * 100).toFixed(0)}%</span>
                             </div>
                           )}
                         </div>
@@ -438,7 +438,7 @@ const AudioAnalysisView = ({ result, file }: Props) => {
                 </div>
                 <div style={{ padding: '1rem', background: 'rgba(30,41,59,0.5)', borderRadius: '8px', border: '1px solid #1e293b' }}>
                   <div style={{ fontSize: '10px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>Spectral Centroid</div>
-                  <div style={{ fontSize: '18px', fontWeight: 700, color: '#e2e8f0' }}>{Math.round(result.features.spectral_centroid_mean)} <span style={{ fontSize: '12px', fontWeight: 400, color: '#64748b' }}>Hz</span></div>
+                  <div style={{ fontSize: '18px', fontWeight: 700, color: '#e2e8f0' }}>{Math.round(result.features.spectral_centroid_mean ?? 0)} <span style={{ fontSize: '12px', fontWeight: 400, color: '#64748b' }}>Hz</span></div>
                 </div>
                 <div style={{ padding: '1rem', background: 'rgba(30,41,59,0.5)', borderRadius: '8px', border: '1px solid #1e293b' }}>
                   <div style={{ fontSize: '10px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>Sample Rate</div>
