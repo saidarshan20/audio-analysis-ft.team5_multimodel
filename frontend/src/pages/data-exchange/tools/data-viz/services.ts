@@ -305,6 +305,7 @@ export interface ImageSearchResult {
   caption: string;
   relevance_score: number;
   reason: string;
+  matched_on: string[];
 }
 
 export interface ImageSearchResponse {
@@ -312,6 +313,27 @@ export interface ImageSearchResponse {
   query: string;
   total_searched: number;
   results: ImageSearchResult[];
+}
+
+export interface GroundedImageRecord {
+  filename: string;
+  caption: string;
+  objects: string[];
+  cluster: number;
+  cluster_description?: string;
+}
+
+export interface CollectionAnswerEvidence {
+  filename: string;
+  reason: string;
+}
+
+export interface ImageCollectionQAResponse {
+  status: string;
+  question: string;
+  answer: string;
+  supporting_results: CollectionAnswerEvidence[];
+  follow_up_suggestions: string[];
 }
 
 /**
@@ -358,17 +380,35 @@ export async function askAboutImage(file: File, question: string): Promise<Image
  */
 export async function searchImages(
   query: string,
-  captions: Array<{ filename: string; caption: string }>
+  images: GroundedImageRecord[]
 ): Promise<ImageSearchResponse> {
   const response = await fetch(`${BASE_URL}/team5/image-search`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ query, captions }),
+    body: JSON.stringify({ query, images }),
   });
 
   if (!response.ok) {
     const err = await response.json().catch(() => ({ detail: 'Unknown error' }));
     throw new Error(err.detail || `Image search failed with status ${response.status}`);
+  }
+
+  return response.json();
+}
+
+export async function askAboutImageCollection(
+  question: string,
+  images: GroundedImageRecord[]
+): Promise<ImageCollectionQAResponse> {
+  const response = await fetch(`${BASE_URL}/team5/image-collection-ask`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ question, images }),
+  });
+
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({ detail: 'Unknown error' }));
+    throw new Error(err.detail || `Collection Q&A failed with status ${response.status}`);
   }
 
   return response.json();

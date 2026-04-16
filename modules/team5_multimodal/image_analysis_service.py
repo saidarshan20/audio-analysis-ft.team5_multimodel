@@ -13,6 +13,7 @@ import base64
 import io
 import json
 import logging
+from collections import Counter
 import numpy as np
 from PIL import Image
 from ultralytics import YOLO
@@ -240,28 +241,111 @@ class ImageAnalysisService:
             logger.error("Groq image Q&A failed: %s", e)
             raise RuntimeError(f"Failed to get answer: {str(e)}")
 
+    # ─────────────────── Collection-Level Reasoning ───────────────────
+
+    def ask_about_collection(self, question: str, images: list[dict]) -> dict:
+        """Answer questions about a batch of images using captions, objects, and cluster context."""
+        if not images:
+            return {
+                "answer": "No analyzed images were provided.",
+                "supporting_results": [],
+                "follow_up_suggestions": [],
+            }
+
+        dataset_lines = []
+        for idx, image in enumerate(images, start=1):
+            objects = ", ".join(image.get("objects", [])[:8]) or "none"
+            cluster_desc = image.get("cluster_description") or image.get("cluster") or "Unknown cluster"
+            caption = image.get("caption") or "No caption"
+            dataset_lines.append(
+                f"{idx}. {image['filename']} | Cluster: {cluster_desc} | Objects: {objects} | Caption: {caption}"
+            )
+
+        try:
+            response = ImageAnalysisService._groq_client.chat.completions.create(
+                model=self.settings.groq_model,
+                messages=[
+                    {
+                        "role": "system",
+                        "content": (
+                            "You analyze collections of images using metadata only. "
+                            "Answer the user's question using the provided captions, detected objects, and cluster labels. "
+                            "Return ONLY valid JSON with this schema: "
+                            "{\"answer\":\"...\","
+                            "\"supporting_results\":[{\"filename\":\"...\",\"reason\":\"...\"}],"
+                            "\"follow_up_suggestions\":[\"...\",\"...\"]}. "
+                            "Use at most 5 supporting_results and at most 3 follow_up_suggestions."
+                        ),
+                    },
+                    {
+                        "role": "user",
+                        "content": (
+                            f"Question: {question}\n\n"
+                            f"Image collection:\n" + "\n".join(dataset_lines)
+                        ),
+                    },
+                ],
+                response_format={"type": "json_object"},
+                max_tokens=900,
+                temperature=0.2,
+            )
+            return json.loads(response.choices[0].message.content.strip())
+        except Exception as e:
+            logger.error("Groq collection Q&A failed: %s", e)
+
+        object_counts = Counter()
+        cluster_counts = Counter()
+        for image in images:
+            object_counts.update(image.get("objects", []))
+            cluster_counts.update([image.get("cluster_description") or image.get("cluster") or "Unknown cluster"])
+
+        dominant_cluster = cluster_counts.most_common(1)[0][0] if cluster_counts else "Unknown cluster"
+        top_objects = ", ".join(label for label, _ in object_counts.most_common(3)) or "no standout objects"
+        return {
+            "answer": (
+                f"I couldn't run the full collection reasoning model, but this batch appears centered on "
+                f"{dominant_cluster} scenes with frequent objects like {top_objects}."
+            ),
+            "supporting_results": [
+                {"filename": image["filename"], "reason": image.get("caption", "Included as collection evidence.")}
+                for image in images[:3]
+            ],
+            "follow_up_suggestions": [
+                "Which cluster should I inspect first?",
+                "Which images are the strongest matches?",
+            ],
+        }
+
     # ─────────────────── Point 3: Advanced Search ───────────────────
 
-    def search_images(self, query: str, captions: list[dict]) -> list[dict]:
-        """Advanced search using Groq. Ranks images by relevance to query."""
-        if not captions:
+    def search_images(self, query: str, images: list[dict]) -> list[dict]:
+        """Advanced grounded search using captions, objects, and cluster themes."""
+        if not images:
             return []
 
-        captions_text = "\n".join(f"{i+1}. [{c['filename']}]: {c['caption']}" for i, c in enumerate(captions))
+        image_lines = []
+        for i, image in enumerate(images, start=1):
+            objects = ", ".join(image.get("objects", [])[:10]) or "none"
+            cluster_desc = image.get("cluster_description") or image.get("cluster") or "Unknown cluster"
+            caption = image.get("caption") or "No caption"
+            image_lines.append(
+                f"{i}. [{image['filename']}] | Cluster: {cluster_desc} | Objects: {objects} | Caption: {caption}"
+            )
 
         try:
             response = ImageAnalysisService._groq_client.chat.completions.create(
                 model=self.settings.groq_model,
                 messages=[
                     {"role": "system", "content": (
-                        "You are an intelligent semantic image search engine. "
-                        "The user might search in English or other languages (e.g., Hindi/Urdu like 'kutta' for dog). "
-                        "Rank the provided image descriptions by how well they match the query's meaning. "
+                        "You are an intelligent grounded image search engine. "
+                        "The user might search in English or other languages. "
+                        "Rank results using ALL available evidence: captions, detected objects, and cluster themes. "
                         "You MUST return a valid JSON object with a 'results' key. "
-                        "Schema: {\"results\": [{\"filename\": \"...\", \"relevance_score\": 1-10, \"reason\": \"...\"}]}. "
+                        "Schema: {\"results\": [{\"filename\": \"...\", \"relevance_score\": 1-10, "
+                        "\"reason\": \"...\", \"matched_on\": [\"caption\", \"objects\", \"cluster\"]}]}. "
                         "Score 1-10 (10 = perfect match). ONLY include images with score >= 3."
                     )},
-                    {"role": "user", "content": f"Search Query: \"{query}\"\n\nImage Descriptions:\n{captions_text}"}
+                    {"role": "user", "content": f"Search Query: \"{query}\"\n\nImage Records:\n" + "\n".join(image_lines)}
                 ],
                 response_format={"type": "json_object"},
                 max_tokens=1000,
@@ -276,12 +360,23 @@ class ImageAnalysisService:
                 logger.error("JSON Search Decode Error. Raw content: %s", content)
                 raise je
 
-            caption_map = {c['filename']: c['caption'] for c in captions}
+            image_map = {image['filename']: image for image in images}
             for item in ranked:
-                item['caption'] = caption_map.get(item['filename'], '')
-            
+                source = image_map.get(item['filename'], {})
+                item['caption'] = source.get('caption', '')
+                item['matched_on'] = item.get('matched_on', [])
+
             ranked.sort(key=lambda x: x.get('relevance_score', 0), reverse=True)
             return ranked
         except Exception as e:
             logger.error("Groq search failed: %s", e)
-            return [{"filename": c['filename'], "caption": c['caption'], "relevance_score": 5, "reason": "Search unavailable"} for c in captions]
+            return [
+                {
+                    "filename": image['filename'],
+                    "caption": image.get('caption', ''),
+                    "relevance_score": 5,
+                    "reason": "Search unavailable",
+                    "matched_on": [],
+                }
+                for image in images
+            ]

@@ -283,7 +283,38 @@ async def ask_about_image(
 
 class ImageSearchRequest(BaseModel):
     query: str
-    captions: list[dict]
+    images: list[dict]
+
+
+class ImageCollectionAskRequest(BaseModel):
+    question: str
+    images: list[dict]
+
+
+@router.post("/image-collection-ask")
+async def ask_about_image_collection(payload: ImageCollectionAskRequest):
+    """
+    Collection-level Q&A:
+    Answer questions about an analyzed batch using captions, objects, and cluster labels.
+    """
+    if not payload.question or not payload.question.strip():
+        raise HTTPException(status_code=400, detail="Question cannot be empty.")
+
+    if not payload.images:
+        raise HTTPException(status_code=400, detail="No analyzed images provided.")
+
+    service = TeammateImageAnalysisService()
+
+    try:
+        result = service.ask_about_collection(payload.question.strip(), payload.images)
+        return {
+            "status": "success",
+            "question": payload.question.strip(),
+            **result,
+        }
+    except Exception as exc:
+        logger.exception("Collection image Q&A failed")
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 
 @router.post("/image-search")
@@ -295,17 +326,17 @@ async def search_images(payload: ImageSearchRequest):
     if not payload.query or not payload.query.strip():
         raise HTTPException(status_code=400, detail="Search query cannot be empty.")
 
-    if not payload.captions:
-        raise HTTPException(status_code=400, detail="No image captions provided.")
+    if not payload.images:
+        raise HTTPException(status_code=400, detail="No analyzed images provided.")
 
     service = TeammateImageAnalysisService()
 
     try:
-        ranked_results = service.search_images(payload.query.strip(), payload.captions)
+        ranked_results = service.search_images(payload.query.strip(), payload.images)
         return {
             "status": "success",
             "query": payload.query.strip(),
-            "total_searched": len(payload.captions),
+            "total_searched": len(payload.images),
             "results": ranked_results
         }
     except Exception as exc:

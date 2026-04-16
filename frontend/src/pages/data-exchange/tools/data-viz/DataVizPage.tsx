@@ -16,14 +16,19 @@ import {
   analyzeGithubRepo,
   analyzeImagesBatch,
   askAboutImage,
+  askAboutImageCollection,
   askAboutExistingImage,
   searchImages,
   analyzeAudio,
   analyzeVideo,
+  fetchDatasets,
+  GroundedImageRecord,
+  DatasetEntry,
   TextAnalysisResult,
   CodeAnalysisResult,
   MultiImageAnalysisResponse,
   ImageZipAnalysisResponse,
+  ImageCollectionQAResponse,
   ImageQAResponse,
   ImageSearchResult,
   AudioAnalysisResponse,
@@ -39,21 +44,30 @@ type HistoryItem = {
   data: TextAnalysisResult | CodeAnalysisResult | MultiImageAnalysisResponse;
 };
 
+type ZipClusterPoint = ImageZipAnalysisResponse['result']['clusters'][number];
+
+type VisualRecord = GroundedImageRecord & {
+  annotated_image_path?: string | null;
+  cluster_id: number;
+  object_count: number;
+  object_details: Array<{ label: string; confidence: number; bbox?: number[] }>;
+};
+
 // ── Mermaid compiler (gitdiagram-style) ──────────────────────────────────────
 
 const MID_PREFIX = 'nd_';
 const safeId = (id: string) => MID_PREFIX + id.replace(/[^a-zA-Z0-9]/g, '_');
 
 // 6-tone dark-theme palette cycling by group
-const GROUP_TONES = ['toneBlue','toneAmber','toneMint','toneRose','toneIndigo','toneTeal'];
+const GROUP_TONES = ['toneBlue', 'toneAmber', 'toneMint', 'toneRose', 'toneIndigo', 'toneTeal'];
 
 const SHAPE_DELIMITERS: Record<string, [string, string]> = {
   database: ['[("', '")]'],
-  circle:   ['(("', '"))'],
-  hexagon:  ['{{\"', '"}}'],
-  queue:    ['[/"', '"/]'],
+  circle: ['(("', '"))'],
+  hexagon: ['{{\"', '"}}'],
+  queue: ['[/"', '"/]'],
   document: ['["', '"]'],
-  box:      ['["', '"]'],
+  box: ['["', '"]'],
 };
 
 function mermaidNode(n: any, indent: string): string {
@@ -106,7 +120,7 @@ const generateMermaidGraph = (arch: any): string => {
     const src = safeId(e.source);
     const tgt = safeId(e.target);
     const lbl = e.label ? `|"${(e.label ?? '').replace(/"/g, "'")}"| ` : '';
-    const arrow = e.style === 'dashed' ? '-.->': '-->';
+    const arrow = e.style === 'dashed' ? '-.->' : '-->';
     chart += `  ${src} ${arrow}${lbl}${tgt}\n`;
   });
 
@@ -139,47 +153,15 @@ type DatasetTab = 'catalog' | 'upload';
 type FileType = 'csv' | 'text' | 'pdf' | 'images' | 'images-zip' | 'videos' | 'music' | 'code';
 
 const FILE_TYPES: { id: FileType; label: string; desc: string; icon: any }[] = [
-  { id: 'csv',    label: 'CSV Data',  desc: 'Tabular data & spreadsheets', icon: FileSpreadsheet },
-  { id: 'text',   label: 'Text File', desc: 'Plain text & documents',     icon: FileText },
-  { id: 'pdf',    label: 'PDF Doc',   desc: 'PDF reports & exports',      icon: Search }, 
+  { id: 'csv', label: 'CSV Data', desc: 'Tabular data & spreadsheets', icon: FileSpreadsheet },
+  { id: 'text', label: 'Text File', desc: 'Plain text & documents', icon: FileText },
+  { id: 'pdf', label: 'PDF Doc', desc: 'PDF reports & exports', icon: Search },
   { id: 'images-zip', label: 'Visual Intelligence', desc: 'Single image, Batch, or ZIP', icon: ImageIcon },
-  { id: 'code',   label: 'Codebase',  desc: 'ZIP repo analysis',          icon: Code2 },
-  { id: 'videos', label: 'Videos',    desc: 'Video streams & files',      icon: Video },
-  { id: 'music',  label: 'Audio',     desc: 'Voice & sound analysis',     icon: Music },
+  { id: 'code', label: 'Codebase', desc: 'ZIP repo analysis', icon: Code2 },
+  { id: 'videos', label: 'Videos', desc: 'Video streams & files', icon: Video },
+  { id: 'music', label: 'Audio', desc: 'Voice & sound analysis', icon: Music },
 ];
 
-const DATASETS = [
-  {
-    name: 'Details of Beneficiaries under Saakshar Bharat Programme (karkkum Bharatham Thittam) by Districts in Tamil Nadu from 2010-11 to 2017-18',
-    desc: 'Details of Beneficiaries under Saakshar Bharat Programme (karkkum Bharatham Thittam) by Districts in Tamil Nadu from 2010-11 to 2017-18',
-    category: 'Adult Education',
-  },
-  {
-    name: 'Enrolment in school education from 1950-51 to 2009-10',
-    desc: 'No description available',
-    category: 'Adult Education',
-  },
-  {
-    name: 'District-wise Number of Recognised Schools in India',
-    desc: 'Statistical data on school infrastructure across all districts in India',
-    category: 'Education',
-  },
-  {
-    name: 'Customer Purchase Behavior Analytics',
-    desc: 'Shopping patterns and purchase history across categories',
-    category: 'Commerce',
-  },
-  {
-    name: 'Sales Performance Data Q4 2025',
-    desc: 'Regional sales data with trend indicators and forecasts',
-    category: 'Business',
-  },
-  {
-    name: 'Product Inventory Records',
-    desc: 'Real-time inventory tracking data with stock levels',
-    category: 'Operations',
-  },
-];
 
 const DataVizPage = ({ onBack }: { onBack: () => void }) => {
   const [activeTab, setActiveTab] = useState<DatasetTab>('catalog');
@@ -190,15 +172,24 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
   const [fileType, setFileType] = useState<FileType>('images-zip');
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [githubUrl, setGithubUrl] = useState('');
-  
+
   // -- Analysis State --
   const [loading, setLoading] = useState(false);
   const [analysisStep, setAnalysisStep] = useState<string>('');
   const [progressMsg, setProgressMsg] = useState<string>('');
   const [textResult, setTextResult] = useState<TextAnalysisResult | null>(null);
   const [codeResult, setCodeResult] = useState<CodeAnalysisResult | null>(null);
+  const [chatMsgs, setChatMsgs] = useState<{ role: 'user' | 'assistant'; content: string }[]>([]);
+  const [chatInput, setChatInput] = useState('');
+  const [chatLoading, setChatLoading] = useState(false);
+  const chatEndRef = useRef<HTMLDivElement>(null);
+  const qaRef = useRef<HTMLDivElement>(null);
+  const collectionQaRef = useRef<HTMLDivElement>(null);
   const [imgResult, setImgResult] = useState<MultiImageAnalysisResponse | null>(null);
   const [imgZipResult, setImgZipResult] = useState<ImageZipAnalysisResponse | null>(null);
+  const [imgTokens, setImgTokens] = useState({ input: 0, output: 0, total: 0 });
+  const [imgDuration, setImgDuration] = useState(0);
+  const [imgModel, setImgModel] = useState('');
   const [selectedClusterPoint, setSelectedClusterPoint] = useState<any | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<number | null>(null);
   const [history, setHistory] = useState<HistoryItem[]>(() => {
@@ -229,19 +220,188 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
   const [searchLoading, setSearchLoading] = useState(false);
   const [searchResults, setSearchResults] = useState<ImageSearchResult[]>([]);
   const [showSearchResults, setShowSearchResults] = useState(false);
-  const [imgTokens, setImgTokens] = useState({ input: 0, output: 0, total: 0 });
-  const [imgDuration, setImgDuration] = useState(0);
-  const [imgModel, setImgModel] = useState('');
+  const [collectionQuestion, setCollectionQuestion] = useState('');
+  const [collectionLoading, setCollectionLoading] = useState(false);
+  const [collectionAnswer, setCollectionAnswer] = useState<ImageCollectionQAResponse | null>(null);
+  const [compareSelection, setCompareSelection] = useState<string[]>([]);
 
   // ── Audio State ──
   const [audioResult, setAudioResult] = useState<AudioAnalysisResponse | null>(null);
 
+  // ── Catalog State ──
+  const [datasets, setDatasets] = useState<DatasetEntry[]>([]);
+  const [datasetsTotal, setDatasetsTotal] = useState(0);
+  const [datasetsLoading, setDatasetsLoading] = useState(false);
+  const [datasetsOffset, setDatasetsOffset] = useState(0);
+
+  const loadDatasets = async (query: string, offset: number) => {
+    setDatasetsLoading(true);
+    try {
+      const page = await fetchDatasets(query, offset, 20);
+      setDatasetsTotal(page.total);
+      setDatasets(prev => offset === 0 ? page.results : [...prev, ...page.results]);
+      setDatasetsOffset(offset);
+    } catch {
+      // silently keep existing results
+    } finally {
+      setDatasetsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    const t = setTimeout(() => loadDatasets(search, 0), search ? 400 : 0);
+    return () => clearTimeout(t);
+  }, [search]);
+
+  useEffect(() => {
+    if (activeTab === 'catalog' && datasets.length === 0) {
+      loadDatasets('', 0);
+    }
+  }, [activeTab]);
+
   // ── Video State ──
   const [videoResult, setVideoResult] = useState<VideoAnalysisResult | null>(null);
+  const [expandedVidObject, setExpandedVidObject] = useState<string | null>(null);
+  const [activeHighlight, setActiveHighlight] = useState<{ second: number; box: number[] } | null>(null);
+  const [subtitleUrl, setSubtitleUrl] = useState<string | null>(null);
+  const [videoTab, setVideoTab] = useState<'video' | 'audio' | 'text'>('video');
+  const videoRef = useRef<HTMLVideoElement>(null);
+
+  // Create VTT subtitle object URL when result arrives
+  useEffect(() => {
+    if (videoResult?.transcript?.vtt_content) {
+      const blob = new Blob([videoResult.transcript.vtt_content], { type: 'text/vtt' });
+      const url = URL.createObjectURL(blob);
+      setSubtitleUrl(url);
+      return () => URL.revokeObjectURL(url);
+    }
+    setSubtitleUrl(null);
+  }, [videoResult]);
+
+  const zipClusterLabelMap: Record<number, string> = {};
+  imgZipResult?.result.cluster_summaries?.forEach(summary => {
+    zipClusterLabelMap[summary.cluster_id] = summary.description;
+  });
+
+  const projectionClusterMap: Record<string, number> = {};
+  imgResult?.projection?.forEach(point => {
+    projectionClusterMap[point.filename] = point.cluster;
+  });
+
+  const singleClusterLabelMap: Record<number, string> = {};
+  imgResult?.clusters?.forEach(cluster => {
+    singleClusterLabelMap[cluster.cluster_id] = cluster.description;
+  });
+
+  const visualRecords: VisualRecord[] = imgZipResult
+    ? imgZipResult.result.clusters.map(point => ({
+        filename: point.filename,
+        caption: point.description || '',
+        objects: point.objects.map(obj => obj.label),
+        cluster: point.cluster_id,
+        cluster_id: point.cluster_id,
+        cluster_description: zipClusterLabelMap[point.cluster_id] || `Group ${point.cluster_id}`,
+        annotated_image_path: point.annotated_image_path,
+        object_count: point.objects.length,
+        object_details: point.objects,
+      }))
+    : imgResult
+      ? imgResult.results.map(result => {
+          const clusterId = projectionClusterMap[result.filename] ?? 0;
+          return {
+            filename: result.filename,
+            caption: result.caption,
+            objects: result.detections.map(detection => detection.label),
+            cluster: clusterId,
+            cluster_id: clusterId,
+            cluster_description: singleClusterLabelMap[clusterId] || `Group ${clusterId}`,
+            annotated_image_path: null,
+            object_count: result.detections.length,
+            object_details: result.detections.map(detection => ({
+              label: detection.label,
+              confidence: detection.confidence,
+              bbox: [detection.x1, detection.y1, detection.x2, detection.y2],
+            })),
+          };
+        })
+      : [];
+
+  const collectionPrompts = [
+    'Which images should I review first?',
+    'Summarize the main themes in this batch.',
+    'Which images look unusual compared with the rest?',
+  ];
+
+  const totalObjects = visualRecords.reduce((sum, record) => sum + record.object_count, 0);
+  const objectCounts = visualRecords.reduce<Record<string, number>>((acc, record) => {
+    record.objects.forEach(label => {
+      acc[label] = (acc[label] || 0) + 1;
+    });
+    return acc;
+  }, {});
+  const topObjects = Object.entries(objectCounts).sort((a, b) => b[1] - a[1]).slice(0, 5);
+  const clusterCounts = imgZipResult?.result.cluster_summaries?.length
+    ? imgZipResult.result.cluster_summaries
+    : imgResult?.clusters ?? [];
+  const dominantCluster = clusterCounts.slice().sort((a, b) => b.count - a.count)[0] ?? null;
+  const lowObjectCoverage = visualRecords.filter(record => record.object_count === 0).length;
+  const averageObjectsPerImage = visualRecords.length ? (totalObjects / visualRecords.length) : 0;
+  const coveragePercent = visualRecords.length ? Math.round(((visualRecords.length - lowObjectCoverage) / visualRecords.length) * 100) : 0;
+
+  const getRecordByFilename = (filename: string) => visualRecords.find(record => record.filename === filename) || null;
+
+  const openRecordByFilename = (filename: string) => {
+    if (!imgZipResult) return;
+    const point = imgZipResult.result.clusters.find(cluster => cluster.filename === filename);
+    if (point) setSelectedClusterPoint(point);
+  };
+
+  const toggleCompareSelection = (filename: string) => {
+    setCompareSelection(prev => {
+      if (prev.includes(filename)) {
+        return prev.filter(item => item !== filename);
+      }
+      if (prev.length >= 2) {
+        toast.info('Compare supports two images at a time. Replacing the oldest selection.');
+        return [prev[1], filename];
+      }
+      return [...prev, filename];
+    });
+  };
+
+  const selectedCompareRecords = compareSelection
+    .map(filename => getRecordByFilename(filename))
+    .filter((record): record is VisualRecord => Boolean(record));
+
+  const [leftCompare, rightCompare] = selectedCompareRecords;
+  const sharedObjects = leftCompare && rightCompare
+    ? leftCompare.objects.filter(label => rightCompare.objects.includes(label)).filter((label, index, arr) => arr.indexOf(label) === index)
+    : [];
+  const leftOnlyObjects = leftCompare && rightCompare
+    ? leftCompare.objects.filter(label => !rightCompare.objects.includes(label)).filter((label, index, arr) => arr.indexOf(label) === index)
+    : [];
+  const rightOnlyObjects = leftCompare && rightCompare
+    ? rightCompare.objects.filter(label => !leftCompare.objects.includes(label)).filter((label, index, arr) => arr.indexOf(label) === index)
+    : [];
+  const compareNarrative = leftCompare && rightCompare
+    ? `${leftCompare.filename} is grounded in ${leftCompare.cluster_description}, while ${rightCompare.filename} sits in ${rightCompare.cluster_description}. ${
+        sharedObjects.length
+          ? `They overlap on ${sharedObjects.join(', ')}.`
+          : 'They do not share detected object labels.'
+      } ${
+        leftOnlyObjects.length
+          ? `${leftCompare.filename} stands out with ${leftOnlyObjects.slice(0, 4).join(', ')}.`
+          : ''
+      } ${
+        rightOnlyObjects.length
+          ? `${rightCompare.filename} stands out with ${rightOnlyObjects.slice(0, 4).join(', ')}.`
+          : ''
+      }`.trim()
+    : '';
 
   const handleImageQA = async () => {
     if (!qaQuestion.trim()) return;
-    
+
     setQaLoading(true);
     try {
       let res: ImageQAResponse;
@@ -267,19 +427,12 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
     if (!searchQuery.trim()) return;
     setSearchLoading(true);
     try {
-      let captions: Array<{ filename: string; caption: string }> = [];
-      if (imgResult) {
-        captions = imgResult.results.map(r => ({ filename: r.filename, caption: r.caption }));
-      } else if (imgZipResult) {
-        captions = imgZipResult.result.clusters.map(c => ({ filename: c.filename, caption: c.description || "" }));
-      }
-
-      if (captions.length === 0) {
+      if (visualRecords.length === 0) {
         toast.error("No image metadata available to search");
         return;
       }
 
-      const res = await searchImages(searchQuery.trim(), captions);
+      const res = await searchImages(searchQuery.trim(), visualRecords);
       setSearchResults(res.results);
       setShowSearchResults(true);
       toast.success(`Found ${res.results.length} matching images`);
@@ -287,6 +440,27 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
       toast.error(err.message || 'Search failed');
     } finally {
       setSearchLoading(false);
+    }
+  };
+
+  const handleCollectionQA = async (presetQuestion?: string) => {
+    const question = (presetQuestion || collectionQuestion).trim();
+    if (!question) return;
+    if (visualRecords.length === 0) {
+      toast.error('Analyze a batch of images first');
+      return;
+    }
+
+    setCollectionLoading(true);
+    try {
+      const res = await askAboutImageCollection(question, visualRecords);
+      setCollectionQuestion(question);
+      setCollectionAnswer(res);
+      toast.success('Collection insights ready');
+    } catch (err: any) {
+      toast.error(err.message || 'Collection Q&A failed');
+    } finally {
+      setCollectionLoading(false);
     }
   };
 
@@ -307,7 +481,14 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
     // Clear current results
     setTextResult(null);
     setCodeResult(null);
+    setChatMsgs([]); setChatInput('');
     setImgResult(null);
+    setImgZipResult(null);
+    setCollectionAnswer(null);
+    setCollectionQuestion('');
+    setCompareSelection([]);
+    setSearchResults([]);
+    setShowSearchResults(false);
 
     // Filter type to restorer
     if (item.type === 'code' || item.type === 'github') {
@@ -437,10 +618,52 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
     }
   };
 
-  const filtered = DATASETS.filter(d =>
-    d.name.toLowerCase().includes(search.toLowerCase()) ||
-    d.desc.toLowerCase().includes(search.toLowerCase())
-  );
+
+  const buildCodeContext = (r: CodeAnalysisResult): string => {
+    const lines: string[] = [];
+    lines.push(`PROJECT: ${r.architecture?.title || r.filename}`);
+    lines.push(`SUMMARY: ${r.architecture?.summary || ''}`);
+    lines.push(`TECH STACK: ${(r.architecture?.tech_stack || []).join(', ')}`);
+    lines.push(`PATTERNS: ${(r.architecture?.detected_patterns || []).join(', ')}`);
+    (r.architecture?.nodes || []).slice(0, 15).forEach(n =>
+      lines.push(`COMPONENT: ${n.label} (${n.type}) — ${n.description || ''} [${n.path || ''}]`)
+    );
+    (r.details?.key_files || []).slice(0, 8).forEach(f =>
+      lines.push(`FILE: ${f.file_path} — ${f.summary}`)
+    );
+    (r.details?.tech_debt || []).slice(0, 5).forEach(d => lines.push(`DEBT: ${d}`));
+    (r.details?.security_risks || []).slice(0, 5).forEach(s => lines.push(`RISK: ${s}`));
+    return lines.join('\n');
+  };
+
+  const handleCodeChat = async () => {
+    if (!chatInput.trim() || !codeResult || chatLoading) return;
+    const question = chatInput.trim();
+    const userMsg = { role: 'user' as const, content: question };
+    setChatMsgs(prev => [...prev, userMsg]);
+    setChatInput('');
+    setChatLoading(true);
+    setTimeout(() => chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 50);
+    try {
+      const BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:8000';
+      const res = await fetch(`${BASE}/team5/code-chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          question,
+          context: buildCodeContext(codeResult),
+          history: chatMsgs.slice(-6),
+        }),
+      });
+      const data = await res.json();
+      setChatMsgs(prev => [...prev, { role: 'assistant', content: data.answer || 'No response.' }]);
+    } catch {
+      setChatMsgs(prev => [...prev, { role: 'assistant', content: 'Error contacting AI. Please try again.' }]);
+    } finally {
+      setChatLoading(false);
+      setTimeout(() => chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 50);
+    }
+  };
 
   const onFilesSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
@@ -470,10 +693,10 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
 
   const handleContinue = async () => {
     const usingGithub = fileType === 'code' && githubUrl.trim().length > 5;
-    
+
     if (selectedFiles.length === 0 && !usingGithub) {
-       toast.error("Please select a file or provide a valid GitHub URL");
-       return;
+      toast.error("Please select a file or provide a valid GitHub URL");
+      return;
     }
 
     setLoading(true);
@@ -481,9 +704,20 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
     setProgressMsg('Initializing analysis pipeline...');
     setTextResult(null);
     setCodeResult(null);
+    setChatMsgs([]); setChatInput('');
     setImgResult(null);
     setImgZipResult(null);
+    setImgTokens({ input: 0, output: 0, total: 0 });
+    setImgDuration(0);
+    setImgModel('');
     setSelectedClusterPoint(null);
+    setSelectedCategory(null);
+    setCollectionAnswer(null);
+    setCollectionQuestion('');
+    setCompareSelection([]);
+    setSearchResults([]);
+    setShowSearchResults(false);
+    setQaAnswer(null);
 
     const onProgress = (step: string, msg: string) => {
       setAnalysisStep(step);
@@ -529,7 +763,7 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
         toast.loading(`Processing Visual Intel Batch...`, { id: 'analysis' });
         const res = await analyzeImagesBatch(files);
         setImgZipResult(res);
-        
+
         // --- Store Performance Metrics ---
         if (res.result?.metadata) {
           setImgDuration(res.result.metadata.total_duration_sec);
@@ -540,7 +774,7 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
           });
           setImgModel(res.result.metadata.model);
         }
-        
+
         toast.success(`Analysis complete! Processed ${res.processed_count} images.`, { id: 'analysis' });
       } else if (fileType === 'music') {
         toast.loading('Transcribing & analyzing audio...', { id: 'analysis' });
@@ -612,22 +846,48 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
                 onChange={e => setSearch(e.target.value)}
               />
             </div>
-            <p className="xt-count">Found {filtered.length > 3 ? '1913' : filtered.length} datasets</p>
+            <p className="xt-count">
+              {datasetsLoading && datasets.length === 0
+                ? 'Loading datasets…'
+                : `Found ${datasetsTotal.toLocaleString()} datasets`}
+            </p>
             <div className="xt-dataset-list">
-              {filtered.map(d => (
-                <div
-                  key={d.name}
-                  className={`xt-dataset-row${selected === d.name ? ' selected' : ''}`}
-                  onClick={() => setSelected(d.name)}
-                >
-                  <div className="xt-dataset-info">
-                    <span className="xt-dataset-name">{d.name}</span>
-                    <span className="xt-dataset-desc">{d.desc}</span>
+              {datasetsLoading && datasets.length === 0
+                ? Array.from({ length: 6 }).map((_, i) => (
+                  <div key={i} className="xt-dataset-row" style={{ opacity: 0.4, pointerEvents: 'none' }}>
+                    <div className="xt-dataset-info">
+                      <span className="xt-dataset-name" style={{ background: 'var(--border-bright)', borderRadius: 4, color: 'transparent', userSelect: 'none' }}>Loading dataset title placeholder</span>
+                      <span className="xt-dataset-desc" style={{ background: 'var(--border-mid)', borderRadius: 4, color: 'transparent', userSelect: 'none' }}>Loading description text here…</span>
+                    </div>
+                    <span className="xt-dataset-badge" style={{ background: 'var(--border-bright)', color: 'transparent' }}>Category</span>
                   </div>
-                  <span className="xt-dataset-badge">{d.category}</span>
-                </div>
-              ))}
+                ))
+                : datasets.map((d, i) => (
+                  <div
+                    key={`${d.name}-${i}`}
+                    className={`xt-dataset-row${selected === d.name ? ' selected' : ''}`}
+                    onClick={() => setSelected(d.name)}
+                  >
+                    <div className="xt-dataset-info">
+                      <span className="xt-dataset-name">{d.name}</span>
+                      <span className="xt-dataset-desc">{d.desc}</span>
+                    </div>
+                    <span className="xt-dataset-badge">{d.category}</span>
+                  </div>
+                ))}
             </div>
+            {datasets.length > 0 && datasets.length < datasetsTotal && (
+              <div style={{ display: 'flex', justifyContent: 'center', marginTop: '16px' }}>
+                <button
+                  className="xt-tab"
+                  style={{ background: 'rgba(96, 165, 250, 0.1)', color: '#60a5fa', border: '1px solid rgba(96, 165, 250, 0.2)', padding: '8px 24px', cursor: datasetsLoading ? 'not-allowed' : 'pointer', opacity: datasetsLoading ? 0.6 : 1 }}
+                  onClick={() => !datasetsLoading && loadDatasets(search, datasetsOffset + 20)}
+                  disabled={datasetsLoading}
+                >
+                  {datasetsLoading ? 'Loading…' : `Load More (${datasets.length} / ${datasetsTotal.toLocaleString()})`}
+                </button>
+              </div>
+            )}
           </div>
         )}
 
@@ -636,8 +896,8 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
               <div />
               {history.length > 0 && !textResult && !codeResult && !imgResult && !imgZipResult && (
-                <button 
-                  className="xt-tab" 
+                <button
+                  className="xt-tab"
                   style={{ background: 'rgba(96, 165, 250, 0.1)', color: '#60a5fa', border: '1px solid rgba(96, 165, 250, 0.2)' }}
                   onClick={() => setShowHistory(!showHistory)}
                 >
@@ -651,28 +911,28 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
                 <h3 style={{ fontSize: '14px', marginBottom: '12px', color: '#fb8c36' }}>Local Analysis History</h3>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                   {history.map(item => (
-                    <div 
-                      key={item.id} 
-                      className="history-item" 
+                    <div
+                      key={item.id}
+                      className="history-item"
                       onClick={() => loadHistoryItem(item)}
-                      style={{ 
-                        background: '#1e293b', 
-                        padding: '10px 15px', 
-                        borderRadius: '8px', 
-                        cursor: 'pointer', 
-                        display: 'flex', 
-                        justifyContent: 'space-between', 
+                      style={{
+                        background: 'var(--border-mid)',
+                        padding: '10px 15px',
+                        borderRadius: '8px',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        justifyContent: 'space-between',
                         alignItems: 'center',
-                        border: '1px solid #334155'
+                        border: '1px solid var(--border-bright)'
                       }}
                     >
                       <div>
                         <div style={{ fontWeight: '600', fontSize: '13px' }}>{item.label}</div>
-                        <div style={{ fontSize: '10px', color: '#94a3b8' }}>
+                        <div style={{ fontSize: '10px', color: 'var(--t-secondary)' }}>
                           {item.type.toUpperCase()} • {new Date(item.timestamp).toLocaleString()}
                         </div>
                       </div>
-                      <button 
+                      <button
                         onClick={(e) => deleteHistoryItem(item.id, e)}
                         style={{ background: 'transparent', border: 'none', color: '#f87171', cursor: 'pointer', padding: '5px' }}
                       >
@@ -685,16 +945,16 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
             )}
 
             {!textResult && !codeResult && !imgResult && !imgZipResult && !audioResult && !videoResult ? (
-              <div className="wizard-container" style={{boxShadow: 'none', border: 'none', background: 'transparent', padding: '0px 0'}}>
+              <div className="wizard-container" style={{ boxShadow: 'none', border: 'none', background: 'transparent', padding: '0px 0' }}>
                 {/* Step 1: Type Selection */}
-                <div className="wizard-header" style={{textAlign: 'left', marginBottom: '24px'}}>
-                  <h2 style={{fontSize: '20px', fontWeight: 700}}>1. Select Analysis Type</h2>
-                  <p style={{color: '#94a3b8'}}>Choose the format of the data you want to analyze with AI.</p>
+                <div className="wizard-header" style={{ textAlign: 'left', marginBottom: '24px' }}>
+                  <h2 style={{ fontSize: '20px', fontWeight: 700 }}>1. Select Analysis Type</h2>
+                  <p style={{ color: 'var(--t-secondary)' }}>Choose the format of the data you want to analyze with AI.</p>
                 </div>
                 <div className="type-grid">
                   {FILE_TYPES.map(type => (
-                    <div 
-                      key={type.id} 
+                    <div
+                      key={type.id}
                       className={`type-card${fileType === type.id ? ' active' : ''}`}
                       onClick={() => setFileType(type.id)}
                     >
@@ -708,15 +968,15 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
                 </div>
 
                 {/* Step 2: Action Area */}
-                <div className="wizard-header" style={{textAlign: 'left', marginBottom: '24px', marginTop: '40px'}}>
-                  <h2 style={{fontSize: '20px', fontWeight: 700}}>2. Provide Dataset</h2>
-                  <p style={{color: '#94a3b8'}}>Upload your own files or use a curated sample for demonstration.</p>
+                <div className="wizard-header" style={{ textAlign: 'left', marginBottom: '24px', marginTop: '40px' }}>
+                  <h2 style={{ fontSize: '20px', fontWeight: 700 }}>2. Provide Dataset</h2>
+                  <p style={{ color: 'var(--t-secondary)' }}>Upload your own files or use a curated sample for demonstration.</p>
                 </div>
-                
+
                 <div className="action-grid" style={{ gridTemplateColumns: fileType === 'code' ? '1fr 1fr 200px' : '1fr 200px' }}>
-                  <div 
-                    className={`action-area ${loading && selectedFiles.length > 0 ? 'active-loading' : ''}`} 
-                    onClick={() => !loading && fileInputRef.current?.click()} 
+                  <div
+                    className={`action-area ${loading && selectedFiles.length > 0 ? 'active-loading' : ''}`}
+                    onClick={() => !loading && fileInputRef.current?.click()}
                   >
                     <input
                       type="file"
@@ -728,8 +988,8 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
                         fileType === 'music'
                           ? '.mp3,.wav,.m4a,.ogg,.flac,audio/*'
                           : fileType === 'videos'
-                          ? '.mp4,.mov,.avi,.mkv,.webm,video/*'
-                          : '.txt,.pdf,.zip,image/*'
+                            ? '.mp4,.mov,.avi,.mkv,.webm,video/*'
+                            : '.txt,.pdf,.zip,image/*'
                       }
                     />
                     <div className="action-icon">
@@ -738,13 +998,13 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
                     <div className="action-title">
                       {selectedFiles.length > 0 ? `${selectedFiles.length} file(s) selected` : 'Upload local files'}
                     </div>
-                    <p style={{fontSize: '13px', color: '#94a3b8', marginTop: '4px'}}>
+                    <p style={{ fontSize: '13px', color: 'var(--t-secondary)', marginTop: '4px' }}>
                       {fileType === 'music' ? 'Supports .mp3, .wav, .m4a, .ogg, .flac' : fileType === 'videos' ? 'Supports .mp4, .mov, .avi, .mkv' : 'Supports .zip, .txt, .pdf, images'}
                     </p>
                   </div>
 
                   {fileType === 'code' && (
-                    <div 
+                    <div
                       className={`action-area ${loading && githubUrl.trim().length > 5 ? 'active-loading' : ''}`}
                       style={{ cursor: 'default' }}
                     >
@@ -752,7 +1012,7 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
                         {loading && githubUrl.trim().length > 5 ? <Loader2 size={32} className="animate-spin" /> : <Code2 size={32} />}
                       </div>
                       <div className="action-title">GitHub Repository</div>
-                      <input 
+                      <input
                         type="url"
                         className="xt-search-input"
                         placeholder="https://github.com/..."
@@ -760,9 +1020,9 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
                         onChange={(e) => setGithubUrl(e.target.value)}
                         style={{ width: '100%', height: '42px', fontSize: '13px' }}
                       />
-                      <button 
-                        onClick={() => setGithubUrl('https://github.com/tiangolo/fastapi')} 
-                        style={{marginTop: '12px', fontSize: '12px', color: '#fb8c36', background: 'transparent', border: 'none', cursor: 'pointer', padding: 0, textDecoration: 'underline'}}
+                      <button
+                        onClick={() => setGithubUrl('https://github.com/tiangolo/fastapi')}
+                        style={{ marginTop: '12px', fontSize: '12px', color: '#fb8c36', background: 'transparent', border: 'none', cursor: 'pointer', padding: 0, textDecoration: 'underline' }}
                       >
                         Try: tiangolo/fastapi
                       </button>
@@ -774,77 +1034,77 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
                       <Database size={32} />
                     </div>
                     <div className="action-title">Quick Demo</div>
-                    <button className="sample-file-btn" onClick={handleUseSample} disabled={loading} style={{width: '100%', padding: '12px', marginTop: '8px'}}>
+                    <button className="sample-file-btn" onClick={handleUseSample} disabled={loading} style={{ width: '100%', padding: '12px', marginTop: '8px' }}>
                       Use Sample
                     </button>
                   </div>
                 </div>
 
                 {/* Step 3: Footer */}
-                <div className="wizard-footer" style={{marginTop: '40px', flexDirection: 'column', alignItems: 'center'}}>
+                <div className="wizard-footer" style={{ marginTop: '40px', flexDirection: 'column', alignItems: 'center' }}>
                   {loading && (fileType === 'code') && (
-                    <div className="analysis-progress-simple" style={{width: '100%', maxWidth: '550px', marginBottom: '32px'}}>
-                       <div className="progress-steps" style={{display: 'flex', justifyContent: 'space-between', marginBottom: '14px', position: 'relative'}}>
-                          {['Cloning', 'Graphing', 'Architecture', 'Analysis'].map((step, idx) => {
-                             const steps = ['cloning', 'graphing', 'arch', 'details'];
-                             const currentIdx = steps.indexOf(analysisStep);
-                             const isActive = idx === currentIdx;
-                             const isDone = idx < currentIdx;
-                             
-                             return (
-                               <div key={idx} style={{
-                                 color: isActive ? '#fb8c36' : isDone ? '#4ade80' : '#64748b',
-                                 fontSize: '12px',
-                                 fontWeight: isActive ? 600 : 400,
-                                 display: 'flex',
-                                 flexDirection: 'column',
-                                 alignItems: 'center',
-                                 gap: '6px',
-                                 flex: 1,
-                                 transition: 'all 0.3s ease'
-                               }}>
-                                 <div style={{
-                                   width: '20px', 
-                                   height: '20px', 
-                                   borderRadius: '50%', 
-                                   border: `1.5px solid ${isActive ? '#fb8c36' : isDone ? '#4ade80' : '#334155'}`,
-                                   display: 'flex',
-                                   alignItems: 'center',
-                                   justifyContent: 'center',
-                                   fontSize: '10px',
-                                   background: isActive ? 'rgba(251, 140, 54, 0.05)' : 'transparent',
-                                 }}>
-                                   {isDone ? '✓' : isActive ? <Loader2 size={10} className="animate-spin" /> : idx + 1}
-                                 </div>
-                                 <span>{step}</span>
-                               </div>
-                             )
-                          })}
-                       </div>
-                       <div className="progress-bar-bg" style={{height: '4px', background: '#020617', borderRadius: '2px', overflow: 'hidden', border: '1px solid #1e293b'}}>
-                          <div className="progress-bar-fill" style={{
-                            height: '100%', 
-                            background: '#fb8c36', 
-                            width: analysisStep === 'cloning' || analysisStep === 'extracting' ? '15%' : analysisStep === 'graphing' ? '40%' : analysisStep === 'arch' ? '70%' : analysisStep === 'details' ? '90%' : '0%',
-                            transition: 'width 0.8s'
-                          }}></div>
-                       </div>
-                       <p style={{fontSize: '11px', color: '#64748b', marginTop: '10px', textAlign: 'center'}}>{progressMsg}</p>
+                    <div className="analysis-progress-simple" style={{ width: '100%', maxWidth: '550px', marginBottom: '32px' }}>
+                      <div className="progress-steps" style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '14px', position: 'relative' }}>
+                        {['Cloning', 'Graphing', 'Architecture', 'Analysis'].map((step, idx) => {
+                          const steps = ['cloning', 'graphing', 'arch', 'details'];
+                          const currentIdx = steps.indexOf(analysisStep);
+                          const isActive = idx === currentIdx;
+                          const isDone = idx < currentIdx;
+
+                          return (
+                            <div key={idx} style={{
+                              color: isActive ? '#fb8c36' : isDone ? '#4ade80' : 'var(--t-muted)',
+                              fontSize: '12px',
+                              fontWeight: isActive ? 600 : 400,
+                              display: 'flex',
+                              flexDirection: 'column',
+                              alignItems: 'center',
+                              gap: '6px',
+                              flex: 1,
+                              transition: 'all 0.3s ease'
+                            }}>
+                              <div style={{
+                                width: '20px',
+                                height: '20px',
+                                borderRadius: '50%',
+                                border: `1.5px solid ${isActive ? '#fb8c36' : isDone ? '#4ade80' : 'var(--border-bright)'}`,
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                fontSize: '10px',
+                                background: isActive ? 'rgba(251, 140, 54, 0.05)' : 'transparent',
+                              }}>
+                                {isDone ? '✓' : isActive ? <Loader2 size={10} className="animate-spin" /> : idx + 1}
+                              </div>
+                              <span>{step}</span>
+                            </div>
+                          )
+                        })}
+                      </div>
+                      <div className="progress-bar-bg" style={{ height: '4px', background: 'var(--bg-root)', borderRadius: '2px', overflow: 'hidden', border: '1px solid var(--border-mid)' }}>
+                        <div className="progress-bar-fill" style={{
+                          height: '100%',
+                          background: '#fb8c36',
+                          width: analysisStep === 'cloning' || analysisStep === 'extracting' ? '15%' : analysisStep === 'graphing' ? '40%' : analysisStep === 'arch' ? '70%' : analysisStep === 'details' ? '90%' : '0%',
+                          transition: 'width 0.8s'
+                        }}></div>
+                      </div>
+                      <p style={{ fontSize: '11px', color: 'var(--t-muted)', marginTop: '10px', textAlign: 'center' }}>{progressMsg}</p>
                     </div>
                   )}
 
-                  <button 
-                    className="continue-btn" 
+                  <button
+                    className="continue-btn"
                     onClick={handleContinue}
                     disabled={loading || (selectedFiles.length === 0 && !(fileType === 'code' && githubUrl.trim().length > 5))}
                     style={{
-                      maxWidth: '220px', 
-                      padding: '12px 24px', 
-                      display: 'flex', 
-                      alignItems: 'center', 
-                      justifyContent: 'center', 
+                      maxWidth: '220px',
+                      padding: '12px 24px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
                       gap: '10px',
-                      background: loading ? '#1e293b' : 'var(--brand-orange)',
+                      background: loading ? 'var(--border-mid)' : 'var(--brand-orange)',
                       opacity: loading ? 0.8 : 1,
                       boxShadow: loading ? 'none' : '0 4px 12px rgba(251, 140, 54, 0.2)'
                     }}
@@ -868,14 +1128,14 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
                 <div className="results-header">
                   <h3>Analysis Results</h3>
                   <div style={{ display: 'flex', gap: '10px' }}>
-                    <button 
-                      className="xt-tab" 
+                    <button
+                      className="xt-tab"
                       style={{ background: 'rgba(96, 165, 250, 0.1)', color: '#60a5fa', border: '1px solid rgba(96, 165, 250, 0.2)' }}
                       onClick={handleDownloadResult}
                     >
                       Download JSON
                     </button>
-                    <button className="xt-upload-btn" onClick={() => { setTextResult(null); setCodeResult(null); setImgResult(null); setImgZipResult(null); setAudioResult(null); setVideoResult(null); setSelectedFiles([]); setShowHistory(false); }}>
+                    <button className="xt-upload-btn" onClick={() => { setTextResult(null); setCodeResult(null); setChatMsgs([]); setChatInput(''); setImgResult(null); setImgZipResult(null); setImgTokens({ input: 0, output: 0, total: 0 }); setImgDuration(0); setImgModel(''); setAudioResult(null); setVideoResult(null); setExpandedVidObject(null); setActiveHighlight(null); setVideoTab('video'); setSelectedFiles([]); setShowHistory(false); setSelectedCategory(null); setSelectedClusterPoint(null); setCollectionAnswer(null); setCollectionQuestion(''); setCompareSelection([]); setSearchResults([]); setShowSearchResults(false); setQaAnswer(null); }}>
                       Analyze Another File
                     </button>
                   </div>
@@ -960,15 +1220,15 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
                     {/* ── Architecture Map: full-width, zoomable, right after metrics ── */}
                     {(codeResult.architecture?.nodes?.length ?? 0) > 0 && (
                       <div className="result-card" style={{ padding: 0, overflow: 'hidden' }}>
-                        <div style={{ padding: '20px 24px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid #1e293b' }}>
+                        <div style={{ padding: '20px 24px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--border-mid)' }}>
                           <h4 style={{ margin: 0, color: '#fb8c36', fontSize: '16px', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8 }}>
                             <Network size={18} /> System Architecture Map
                           </h4>
-                          <span style={{ fontSize: 11, color: '#475569' }}>
+                          <span style={{ fontSize: 11, color: 'var(--t-muted)' }}>
                             {codeResult.architecture.groups?.length ?? 0} groups · {codeResult.architecture.nodes.length} nodes · {codeResult.architecture.edges?.length ?? 0} edges
                           </span>
                         </div>
-                        <div style={{ height: 540, background: '#020617' }}>
+                        <div style={{ height: 540, background: 'var(--bg-root)' }}>
                           <MermaidDiagram chart={generateMermaidGraph(codeResult.architecture)} />
                         </div>
                       </div>
@@ -976,99 +1236,99 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
 
                     {/* ── Summary + Patterns + Tech stack | Process Flow ── */}
                     <div className="viz-row">
-                        <div className="result-card" style={{ flex: 1 }}>
-                          <div className="summary-section">
-                            <h4><Code2 size={20} /> {codeResult.architecture?.title}</h4>
-                            <p>{codeResult.architecture?.summary}</p>
-                          </div>
+                      <div className="result-card" style={{ flex: 1 }}>
+                        <div className="summary-section">
+                          <h4><Code2 size={20} /> {codeResult.architecture?.title}</h4>
+                          <p>{codeResult.architecture?.summary}</p>
+                        </div>
 
-                          {/* Tech stack chips */}
-                          {(codeResult.architecture?.tech_stack?.length ?? 0) > 0 && (
-                            <div style={{ marginTop: '16px', display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                              {codeResult.architecture.tech_stack.map((t, i) => (
-                                <span key={i} className="chip" style={{ background: 'rgba(99,102,241,0.1)', color: '#a5b4fc', borderColor: 'rgba(99,102,241,0.3)', padding: '4px 10px', fontSize: '11px' }}>
-                                  {t}
+                        {/* Tech stack chips */}
+                        {(codeResult.architecture?.tech_stack?.length ?? 0) > 0 && (
+                          <div style={{ marginTop: '16px', display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                            {codeResult.architecture.tech_stack.map((t, i) => (
+                              <span key={i} className="chip" style={{ background: 'rgba(99,102,241,0.1)', color: '#a5b4fc', borderColor: 'rgba(99,102,241,0.3)', padding: '4px 10px', fontSize: '11px' }}>
+                                {t}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+
+                        {codeResult.architecture?.detected_patterns && codeResult.architecture.detected_patterns.length > 0 && (
+                          <div style={{ marginTop: '16px' }}>
+                            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                              {codeResult.architecture.detected_patterns.map((p, i) => (
+                                <span key={i} className="chip" style={{ background: 'rgba(251, 140, 54, 0.1)', color: '#fb8c36', borderColor: 'rgba(251, 140, 54, 0.3)', padding: '4px 10px', fontSize: '11px' }}>
+                                  <Sparkles size={10} /> {p}
                                 </span>
                               ))}
                             </div>
-                          )}
+                          </div>
+                        )}
 
-                          {codeResult.architecture?.detected_patterns && codeResult.architecture.detected_patterns.length > 0 && (
-                            <div style={{ marginTop: '16px' }}>
-                              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                                {codeResult.architecture.detected_patterns.map((p, i) => (
-                                  <span key={i} className="chip" style={{ background: 'rgba(251, 140, 54, 0.1)', color: '#fb8c36', borderColor: 'rgba(251, 140, 54, 0.3)', padding: '4px 10px', fontSize: '11px' }}>
-                                    <Sparkles size={10} /> {p}
-                                  </span>
+                        {/* Node cards grouped by group */}
+                        {(() => {
+                          const nodes = codeResult.architecture?.nodes ?? [];
+                          const groups = codeResult.architecture?.groups ?? [];
+                          if (nodes.length === 0) return null;
+                          const groupMap = Object.fromEntries(groups.map(g => [g.id, g.label]));
+                          const TONE_COLORS: Record<string, string> = {
+                            toneBlue: '#3b82f6', toneAmber: '#f59e0b', toneMint: '#10b981',
+                            toneRose: '#f43f5e', toneIndigo: '#6366f1', toneTeal: '#14b8a6',
+                          };
+                          const groupColor = (gid: string) => {
+                            const idx = groups.findIndex(g => g.id === gid);
+                            return Object.values(TONE_COLORS)[idx % 6] ?? 'var(--t-muted)';
+                          };
+                          // group nodes by group_id
+                          const sections: { label: string; color: string; nodes: any[] }[] = [];
+                          groups.forEach(g => {
+                            const members = nodes.filter(n => n.group_id === g.id);
+                            if (members.length) sections.push({ label: g.label, color: groupColor(g.id), nodes: members });
+                          });
+                          const ungrouped = nodes.filter(n => !n.group_id || !groupMap[n.group_id]);
+                          if (ungrouped.length) sections.push({ label: 'Other', color: 'var(--t-muted)', nodes: ungrouped });
+
+                          return sections.map(sec => (
+                            <div key={sec.label} style={{ marginTop: '24px' }}>
+                              <h4 style={{ color: sec.color, fontSize: '13px', fontWeight: 700, marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <span style={{ width: '10px', height: '10px', borderRadius: '2px', background: sec.color, display: 'inline-block' }} />
+                                {sec.label}
+                              </h4>
+                              <div className="components-grid">
+                                {sec.nodes.map(n => (
+                                  <div key={n.id} className="comp-item" style={{ borderColor: sec.color + '33' }}>
+                                    <strong style={{ color: 'var(--t-primary)' }}>{n.label}</strong>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '6px 0 8px' }}>
+                                      <span style={{ fontSize: '10px', color: 'var(--t-secondary)', fontWeight: 700 }}>{n.type}</span>
+                                      {n.shape && n.shape !== 'box' && <span style={{ color: sec.color, fontSize: '10px', fontWeight: 700 }}>{n.shape}</span>}
+                                    </div>
+                                    <p style={{ color: 'var(--t-secondary)', fontSize: '12px', margin: 0 }}>{n.description}</p>
+                                    {n.path && (
+                                      <div style={{ marginTop: '10px' }}>
+                                        <span className="chip" style={{ fontSize: '10px', padding: '2px 8px', color: sec.color, borderColor: sec.color + '44' }}>{n.path.split('/').pop()}</span>
+                                      </div>
+                                    )}
+                                  </div>
                                 ))}
                               </div>
                             </div>
-                          )}
-                          
-                          {/* Node cards grouped by group */}
-                          {(() => {
-                            const nodes = codeResult.architecture?.nodes ?? [];
-                            const groups = codeResult.architecture?.groups ?? [];
-                            if (nodes.length === 0) return null;
-                            const groupMap = Object.fromEntries(groups.map(g => [g.id, g.label]));
-                            const TONE_COLORS: Record<string, string> = {
-                              toneBlue: '#3b82f6', toneAmber: '#f59e0b', toneMint: '#10b981',
-                              toneRose: '#f43f5e', toneIndigo: '#6366f1', toneTeal: '#14b8a6',
-                            };
-                            const groupColor = (gid: string) => {
-                              const idx = groups.findIndex(g => g.id === gid);
-                              return Object.values(TONE_COLORS)[idx % 6] ?? '#64748b';
-                            };
-                            // group nodes by group_id
-                            const sections: { label: string; color: string; nodes: any[] }[] = [];
-                            groups.forEach(g => {
-                              const members = nodes.filter(n => n.group_id === g.id);
-                              if (members.length) sections.push({ label: g.label, color: groupColor(g.id), nodes: members });
-                            });
-                            const ungrouped = nodes.filter(n => !n.group_id || !groupMap[n.group_id]);
-                            if (ungrouped.length) sections.push({ label: 'Other', color: '#64748b', nodes: ungrouped });
+                          ));
+                        })()}
 
-                            return sections.map(sec => (
-                              <div key={sec.label} style={{ marginTop: '24px' }}>
-                                <h4 style={{ color: sec.color, fontSize: '13px', fontWeight: 700, marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                  <span style={{ width: '10px', height: '10px', borderRadius: '2px', background: sec.color, display: 'inline-block' }} />
-                                  {sec.label}
-                                </h4>
-                                <div className="components-grid">
-                                  {sec.nodes.map(n => (
-                                    <div key={n.id} className="comp-item" style={{ borderColor: sec.color + '33' }}>
-                                      <strong style={{ color: '#f1f5f9' }}>{n.label}</strong>
-                                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '6px 0 8px' }}>
-                                        <span style={{ fontSize: '10px', color: '#94a3b8', fontWeight: 700 }}>{n.type}</span>
-                                        {n.shape && n.shape !== 'box' && <span style={{ color: sec.color, fontSize: '10px', fontWeight: 700 }}>{n.shape}</span>}
-                                      </div>
-                                      <p style={{ color: '#94a3b8', fontSize: '12px', margin: 0 }}>{n.description}</p>
-                                      {n.path && (
-                                        <div style={{ marginTop: '10px' }}>
-                                          <span className="chip" style={{ fontSize: '10px', padding: '2px 8px', color: sec.color, borderColor: sec.color + '44' }}>{n.path.split('/').pop()}</span>
-                                        </div>
-                                      )}
-                                    </div>
-                                  ))}
-                                </div>
-                              </div>
-                            ));
-                          })()}
+                      </div>
 
+                      {/* Process Flow — alongside summary */}
+                      <div className="result-card" style={{ width: '300px', flexShrink: 0 }}>
+                        <h4 style={{ color: '#fb8c36', marginTop: 0, fontSize: '16px', fontWeight: 700 }}>Process Flow</h4>
+                        <div className="timeline-list">
+                          {codeResult.details?.flow?.map(f => (
+                            <div key={f.step} className="timeline-item" style={{ border: 'none', background: 'transparent', paddingLeft: 0 }}>
+                              <span className="date" style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '1px' }}>Step {f.step}</span>
+                              <span className="desc" style={{ display: 'block', marginTop: '4px', lineHeight: 1.5, color: 'var(--t-secondary)', fontSize: '12px' }}>{f.description}</span>
+                            </div>
+                          ))}
                         </div>
-
-                        {/* Process Flow — alongside summary */}
-                        <div className="result-card" style={{ width: '300px', flexShrink: 0 }}>
-                          <h4 style={{ color: '#fb8c36', marginTop: 0, fontSize: '16px', fontWeight: 700 }}>Process Flow</h4>
-                          <div className="timeline-list">
-                            {codeResult.details?.flow?.map(f => (
-                              <div key={f.step} className="timeline-item" style={{ border: 'none', background: 'transparent', paddingLeft: 0 }}>
-                                <span className="date" style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '1px' }}>Step {f.step}</span>
-                                <span className="desc" style={{ display: 'block', marginTop: '4px', lineHeight: 1.5, color: '#94a3b8', fontSize: '12px' }}>{f.description}</span>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
+                      </div>
                     </div>
 
                     {/* ── Components full-width ── */}
@@ -1080,14 +1340,14 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
                         toneBlue: '#3b82f6', toneAmber: '#f59e0b', toneMint: '#10b981',
                         toneRose: '#f43f5e', toneIndigo: '#6366f1', toneTeal: '#14b8a6',
                       };
-                      const groupColor = (gid: string) => Object.values(TONE_COLORS)[groups.findIndex(g => g.id === gid) % 6] ?? '#64748b';
+                      const groupColor = (gid: string) => Object.values(TONE_COLORS)[groups.findIndex(g => g.id === gid) % 6] ?? 'var(--t-muted)';
                       const sections: { label: string; color: string; nodes: any[] }[] = [];
                       groups.forEach(g => {
                         const members = nodes.filter(n => n.group_id === g.id);
                         if (members.length) sections.push({ label: g.label, color: groupColor(g.id), nodes: members });
                       });
                       const ungrouped = nodes.filter(n => !n.group_id || !groupMap[n.group_id]);
-                      if (ungrouped.length) sections.push({ label: 'Other', color: '#64748b', nodes: ungrouped });
+                      if (ungrouped.length) sections.push({ label: 'Other', color: 'var(--t-muted)', nodes: ungrouped });
 
                       return (
                         <div className="result-card">
@@ -1101,12 +1361,12 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
                               <div className="components-grid">
                                 {sec.nodes.map(n => (
                                   <div key={n.id} className="comp-item" style={{ borderColor: sec.color + '33' }}>
-                                    <strong style={{ color: '#f1f5f9', fontSize: '13px' }}>{n.label}</strong>
+                                    <strong style={{ color: 'var(--t-primary)', fontSize: '13px' }}>{n.label}</strong>
                                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '4px 0 6px' }}>
-                                      <span style={{ fontSize: '10px', color: '#94a3b8' }}>{n.type}</span>
+                                      <span style={{ fontSize: '10px', color: 'var(--t-secondary)' }}>{n.type}</span>
                                       {n.shape && n.shape !== 'box' && <span style={{ color: sec.color, fontSize: '10px', fontWeight: 700 }}>{n.shape}</span>}
                                     </div>
-                                    <p style={{ color: '#94a3b8', fontSize: '12px', margin: 0 }}>{n.description}</p>
+                                    <p style={{ color: 'var(--t-secondary)', fontSize: '12px', margin: 0 }}>{n.description}</p>
                                     {n.path && <span className="chip" style={{ marginTop: 8, fontSize: '10px', padding: '2px 8px', color: sec.color, borderColor: sec.color + '44', display: 'inline-block' }}>{n.path.split('/').pop()}</span>}
                                   </div>
                                 ))}
@@ -1129,9 +1389,9 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
                               return (
                                 <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', background: 'rgba(255,255,255,0.02)', padding: '8px 12px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)' }}>
                                   <span style={{ color: '#60a5fa', fontWeight: 600 }}>{srcNode?.label ?? e.source}</span>
-                                  <ArrowRight size={11} color={e.style === 'dashed' ? '#64748b' : '#fb8c36'} />
+                                  <ArrowRight size={11} color={e.style === 'dashed' ? 'var(--t-muted)' : '#fb8c36'} />
                                   <span style={{ color: '#4ade80', fontWeight: 600 }}>{tgtNode?.label ?? e.target}</span>
-                                  {e.label && <span style={{ color: '#64748b', fontStyle: 'italic', marginLeft: 'auto', fontSize: '10px' }}>{e.label}</span>}
+                                  {e.label && <span style={{ color: 'var(--t-muted)', fontStyle: 'italic', marginLeft: 'auto', fontSize: '10px' }}>{e.label}</span>}
                                 </div>
                               );
                             })}
@@ -1141,7 +1401,7 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
                       {codeResult.details?.tech_debt && codeResult.details.tech_debt.length > 0 && (
                         <div className="result-card" style={{ flex: 1, border: '1px solid rgba(244,114,182,0.3)' }}>
                           <h4 style={{ color: '#f472b6', marginTop: 0, fontSize: '15px', fontWeight: 700 }}>Technical Debt</h4>
-                          <ul style={{ margin: '10px 0 0', paddingLeft: '18px', color: '#cbd5e1', fontSize: '12px', lineHeight: 1.6 }}>
+                          <ul style={{ margin: '10px 0 0', paddingLeft: '18px', color: 'var(--t-secondary)', fontSize: '12px', lineHeight: 1.6 }}>
                             {codeResult.details.tech_debt.map((dt, i) => <li key={i}>{dt}</li>)}
                           </ul>
                         </div>
@@ -1149,13 +1409,13 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
                       {codeResult.details?.security_risks && codeResult.details.security_risks.length > 0 && (
                         <div className="result-card" style={{ flex: 1, border: '1px solid rgba(239,68,68,0.3)' }}>
                           <h4 style={{ color: '#f87171', marginTop: 0, fontSize: '15px', fontWeight: 700 }}>Security Risks</h4>
-                          <ul style={{ margin: '10px 0 0', paddingLeft: '18px', color: '#cbd5e1', fontSize: '12px', lineHeight: 1.6 }}>
+                          <ul style={{ margin: '10px 0 0', paddingLeft: '18px', color: 'var(--t-secondary)', fontSize: '12px', lineHeight: 1.6 }}>
                             {codeResult.details.security_risks.map((sr, i) => <li key={i}>{sr}</li>)}
                           </ul>
                         </div>
                       )}
                     </div>
-                    
+
                     {/* ── Key files ── */}
                     {codeResult.details?.key_files && codeResult.details.key_files.length > 0 && (
                       <div className="result-card">
@@ -1165,13 +1425,13 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
                             <div key={i} className="key-file-card">
                               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
                                 <FileText size={14} color="#fb8c36" />
-                                <div style={{ fontWeight: '700', color: '#f1f5f9', fontSize: '13px' }}>{kf.file_path}</div>
+                                <div style={{ fontWeight: '700', color: 'var(--t-primary)', fontSize: '13px' }}>{kf.file_path}</div>
                               </div>
-                              <p style={{ color: '#94a3b8', fontSize: '12px', marginBottom: '12px', lineHeight: 1.5 }}>{kf.summary}</p>
+                              <p style={{ color: 'var(--t-secondary)', fontSize: '12px', marginBottom: '12px', lineHeight: 1.5 }}>{kf.summary}</p>
                               {kf.key_functions && kf.key_functions.length > 0 && (
                                 <div style={{ background: 'rgba(0,0,0,0.2)', padding: '10px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.03)' }}>
                                   <div style={{ fontSize: '10px', color: '#fb8c36', textTransform: 'uppercase', marginBottom: '6px', letterSpacing: '1px', fontWeight: 800 }}>Methods</div>
-                                  <ul style={{ margin: 0, paddingLeft: '14px', color: '#cbd5e1', fontSize: '11px', lineHeight: 1.5 }}>
+                                  <ul style={{ margin: 0, paddingLeft: '14px', color: 'var(--t-secondary)', fontSize: '11px', lineHeight: 1.5 }}>
                                     {kf.key_functions.map((func, j) => <li key={j}>{func}</li>)}
                                   </ul>
                                 </div>
@@ -1181,6 +1441,64 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
                         </div>
                       </div>
                     )}
+
+                    {/* ── Codebase Chat ── */}
+                    <div className="result-card" style={{ marginTop: '8px' }}>
+                      <h4 style={{ marginTop: 0, marginBottom: '12px', fontSize: '14px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <MessageCircle size={16} color="#fb8c36" /> Ask About This Codebase
+                      </h4>
+                      <div style={{ maxHeight: '280px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '10px' }}>
+                        {chatMsgs.length === 0 && (
+                          <p style={{ color: 'var(--t-muted)', fontSize: '12px', margin: 0 }}>
+                            Ask anything — architecture decisions, data flows, security risks, tech debt…
+                          </p>
+                        )}
+                        {chatMsgs.map((m, i) => (
+                          <div key={i} style={{
+                            alignSelf: m.role === 'user' ? 'flex-end' : 'flex-start',
+                            maxWidth: '85%',
+                            background: m.role === 'user' ? 'rgba(251,140,54,0.15)' : 'rgba(255,255,255,0.05)',
+                            border: `1px solid ${m.role === 'user' ? 'rgba(251,140,54,0.3)' : 'rgba(255,255,255,0.08)'}`,
+                            borderRadius: '10px',
+                            padding: '8px 12px',
+                            fontSize: '12px',
+                            color: 'var(--t-primary)',
+                            lineHeight: 1.5,
+                          }}>
+                            {m.content}
+                          </div>
+                        ))}
+                        {chatLoading && (
+                          <div style={{ alignSelf: 'flex-start', color: 'var(--t-muted)', fontSize: '12px' }}>Thinking…</div>
+                        )}
+                        <div ref={chatEndRef} />
+                      </div>
+                      <div style={{ display: 'flex', gap: '8px' }}>
+                        <input
+                          type="text"
+                          value={chatInput}
+                          onChange={e => setChatInput(e.target.value)}
+                          onKeyDown={e => e.key === 'Enter' && !e.shiftKey && handleCodeChat()}
+                          placeholder="e.g. How does authentication work?"
+                          disabled={chatLoading}
+                          style={{
+                            flex: 1, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)',
+                            borderRadius: '8px', padding: '8px 12px', color: 'var(--t-primary)', fontSize: '12px', outline: 'none',
+                          }}
+                        />
+                        <button
+                          onClick={handleCodeChat}
+                          disabled={chatLoading || !chatInput.trim()}
+                          style={{
+                            background: '#fb8c36', border: 'none', borderRadius: '8px', padding: '8px 14px',
+                            color: '#fff', fontSize: '12px', fontWeight: 600, cursor: chatLoading ? 'not-allowed' : 'pointer',
+                            opacity: chatLoading || !chatInput.trim() ? 0.5 : 1,
+                          }}
+                        >
+                          {chatLoading ? '…' : 'Ask'}
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 )}
 
@@ -1228,7 +1546,7 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
                       {imgResult.results?.map((res, i) => (
                         <div key={i} className="img-card result-card">
                           <div className="img-thumbnail">
-                            <ImageIcon size={24} color="#334155" />
+                            <ImageIcon size={24} color="var(--border-bright)" />
                             <span className="filename-small">{res.filename}</span>
                           </div>
                           <div className="img-details">
@@ -1288,15 +1606,72 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
                       ))}
                     </div>
 
+                    <div className="result-card" style={{ marginBottom: '24px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', gap: '16px', alignItems: 'flex-start', marginBottom: '18px', flexWrap: 'wrap' }}>
+                        <div>
+                          <h4 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '10px' }}>
+                            <Sparkles size={18} color="#fb8c36" /> Batch Summary Insights
+                          </h4>
+                          <p className="viz-desc" style={{ marginTop: '8px' }}>
+                            Quick collection-level takeaways generated from captions, detections, and cluster groupings.
+                          </p>
+                        </div>
+                        <button
+                          className="qa-send-btn"
+                          style={{ width: 'auto', padding: '0 14px', fontSize: '12px' }}
+                          disabled={collectionLoading || visualRecords.length === 0}
+                          onClick={() => {
+                            handleCollectionQA('Summarize the main themes, notable outliers, and strongest review priorities in this image batch.');
+                            setTimeout(() => collectionQaRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 100);
+                          }}
+                        >
+                          {collectionLoading ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
+                          AI Summary
+                        </button>
+                      </div>
+
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px' }}>
+                        {[
+                          {
+                            label: 'Dominant theme',
+                            value: dominantCluster?.description || 'Not enough data',
+                            sub: dominantCluster ? `${dominantCluster.count} images in the largest cluster` : 'Waiting on clustering',
+                          },
+                          {
+                            label: 'Top detected objects',
+                            value: topObjects.length ? topObjects.slice(0, 3).map(([label]) => label).join(', ') : 'No objects detected',
+                            sub: topObjects.length ? `${topObjects[0][1]} occurrences for the top label` : 'No detections yet',
+                          },
+                          {
+                            label: 'Detection coverage',
+                            value: `${coveragePercent}%`,
+                            sub: `${visualRecords.length - lowObjectCoverage}/${visualRecords.length || 0} images contain detections`,
+                          },
+                          {
+                            label: 'Object richness',
+                            value: `${averageObjectsPerImage.toFixed(1)} avg`,
+                            sub: `${totalObjects} total objects across ${visualRecords.length || 0} images`,
+                          },
+                        ].map((insight, idx) => (
+                          <div key={idx} style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-mid)', borderRadius: '14px', padding: '16px' }}>
+                            <div style={{ color: 'var(--t-secondary)', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '10px' }}>{insight.label}</div>
+                            <div style={{ color: 'var(--t-primary)', fontSize: '16px', fontWeight: 700, lineHeight: 1.4 }}>{insight.value}</div>
+                            <div style={{ color: 'var(--t-muted)', fontSize: '12px', marginTop: '8px' }}>{insight.sub}</div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+
                     <div className="viz-row">
                       <div className="scatter-box result-card">
                         <h4><BarChart2 size={20} /> Multi-Dimensional Semantic Analysis</h4>
                         <p className="viz-desc">Visualizing semantic relationships across your image collection using advanced clustering algorithms.</p>
-                        <div style={{ marginTop: '20px', background: '#020617', padding: '20px', borderRadius: '16px', border: '1px solid #1e293b', display: 'flex', justifyContent: 'center', boxShadow: 'inset 0 2px 10px rgba(0,0,0,0.5)' }}>
-                          <img 
-                            src={`${import.meta.env.VITE_API_URL ?? 'http://localhost:8000'}/${imgZipResult.result?.plot_file_path}`} 
-                            alt="Cluster Plot" 
-                            style={{ maxWidth: '100%', maxHeight: '400px', borderRadius: '8px', objectFit: 'contain' }} 
+                        <div style={{ marginTop: '20px', background: 'var(--bg-root)', padding: '20px', borderRadius: '16px', border: '1px solid var(--border-mid)', display: 'flex', justifyContent: 'center', boxShadow: 'inset 0 2px 10px rgba(0,0,0,0.5)' }}>
+                          <img
+                            src={`${import.meta.env.VITE_API_URL ?? 'http://localhost:8000'}/${imgZipResult.result?.plot_file_path}`}
+                            alt="Cluster Plot"
+                            style={{ maxWidth: '100%', maxHeight: '400px', borderRadius: '8px', objectFit: 'contain' }}
                             onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
                           />
                         </div>
@@ -1335,8 +1710,8 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
                           <p className="theme-subtext" style={{ fontSize: '13px', marginTop: '4px' }}>AI-organized content themes. Click to filter the gallery below.</p>
                         </div>
                         {selectedCategory !== null && (
-                          <button 
-                            className="qa-send-btn" 
+                          <button
+                            className="qa-send-btn"
                             style={{ background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', border: '1px solid rgba(239, 68, 68, 0.2)', padding: '6px 12px', height: 'auto', fontSize: '12px' }}
                             onClick={() => setSelectedCategory(null)}
                           >
@@ -1347,11 +1722,11 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
 
                       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '20px' }}>
                         {imgZipResult.result?.cluster_summaries?.map((sum, i) => (
-                          <div 
-                            key={i} 
+                          <div
+                            key={i}
                             className={`ai-intel-card ${selectedCategory === sum.cluster_id ? 'active-category' : ''}`}
-                            style={{ 
-                              cursor: 'pointer', 
+                            style={{
+                              cursor: 'pointer',
                               transition: 'all 0.3s ease',
                               border: selectedCategory === sum.cluster_id ? '2px solid #fb8c36' : undefined,
                               background: selectedCategory === sum.cluster_id ? 'rgba(251, 140, 54, 0.05)' : undefined
@@ -1360,10 +1735,10 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
                           >
                             <div style={{ padding: '20px' }}>
                               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
-                                <div style={{ 
-                                  width: '40px', 
-                                  height: '40px', 
-                                  borderRadius: '12px', 
+                                <div style={{
+                                  width: '40px',
+                                  height: '40px',
+                                  borderRadius: '12px',
                                   background: `var(--cluster-${sum.cluster_id % 5})`,
                                   display: 'flex',
                                   alignItems: 'center',
@@ -1388,24 +1763,24 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
                       <h3 className="theme-heading" style={{ marginBottom: '24px', fontSize: '20px', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '12px' }}>
                         <ImageIcon size={24} color="#60a5fa" /> Annotated Detection Gallery
                       </h3>
-                      
+
                       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '24px' }}>
                         {imgZipResult.result?.clusters?.filter(c => selectedCategory === null || c.cluster_id === selectedCategory).map((c, i) => (
                           <div key={i} className="premium-gallery-card" onClick={() => setSelectedClusterPoint(c)} style={{ cursor: 'pointer' }}>
                             <div style={{ overflow: 'hidden', position: 'relative' }}>
                               {c.annotated_image_path ? (
-                                <img 
+                                <img
                                   className="premium-gallery-img"
-                                  src={`${import.meta.env.VITE_API_URL ?? 'http://localhost:8000'}/${c.annotated_image_path}`} 
+                                  src={`${import.meta.env.VITE_API_URL ?? 'http://localhost:8000'}/${c.annotated_image_path}`}
                                   alt={c.filename}
                                   onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
                                 />
                               ) : (
-                                <div className="premium-gallery-img" style={{ background: '#1e293b', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748b', fontSize: '12px' }}>No Tracking Data</div>
+                                <div className="premium-gallery-img" style={{ background: 'var(--border-mid)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--t-muted)', fontSize: '12px' }}>No Tracking Data</div>
                               )}
                               <div style={{ position: 'absolute', top: '12px', right: '12px' }}>
-                                <span className="premium-cluster-badge" style={{ 
-                                  color: '#fff', 
+                                <span className="premium-cluster-badge" style={{
+                                  color: '#fff',
                                   background: `var(--cluster-${c.cluster_id % 5})`,
                                   border: `1px solid rgba(255,255,255,0.3)`,
                                   backdropFilter: 'blur(4px)',
@@ -1423,18 +1798,30 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
                                 <span className="theme-subtext" style={{ fontSize: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
                                   <Search size={14} /> {c.objects?.length || 0} Objects
                                 </span>
-                                <button 
-                                  className="qa-send-btn" 
-                                  style={{ height: '28px', width: 'auto', padding: '0 10px', fontSize: '11px', gap: '6px' }}
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setSelectedImageForQA({ path: c.annotated_image_path || '', filename: c.filename });
-                                    setQaAnswer(null);
-                                    window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
-                                  }}
-                                >
-                                  <MessageCircle size={12} /> Ask AI
-                                </button>
+                                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                  <button
+                                    className="qa-send-btn"
+                                    style={{ height: '28px', width: 'auto', padding: '0 10px', fontSize: '11px', gap: '6px' }}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      toggleCompareSelection(c.filename);
+                                    }}
+                                  >
+                                    {compareSelection.includes(c.filename) ? 'Selected' : 'Compare'}
+                                  </button>
+                                  <button
+                                    className="qa-send-btn"
+                                    style={{ height: '28px', width: 'auto', padding: '0 10px', fontSize: '11px', gap: '6px' }}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setSelectedImageForQA({ path: c.annotated_image_path || '', filename: c.filename });
+                                      setQaAnswer(null);
+                                      setTimeout(() => qaRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 100);
+                                    }}
+                                  >
+                                    <MessageCircle size={12} /> Ask AI
+                                  </button>
+                                </div>
                               </div>
                             </div>
                           </div>
@@ -1453,7 +1840,7 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
 
                     <div className="ai-intel-grid">
                       {/* ── Image Q&A Card ── */}
-                      <div className="ai-intel-card">
+                      <div className="ai-intel-card" ref={qaRef}>
                         <div className="ai-intel-card-header">
                           <div className="ai-intel-icon qa-icon">
                             <MessageCircle size={20} />
@@ -1469,11 +1856,11 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
                             <div className="qa-upload-zone" style={{ borderColor: '#60a5fa', background: 'rgba(96, 165, 250, 0.05)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 15px', cursor: 'default' }}>
                               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                                 <ImageIcon size={18} color="#60a5fa" />
-                                <span style={{ color: '#f8fafc', fontSize: '13px', fontWeight: 600 }}>{selectedImageForQA.filename}</span>
+                                <span style={{ color: 'var(--t-primary)', fontSize: '13px', fontWeight: 600 }}>{selectedImageForQA.filename}</span>
                               </div>
-                              <button 
+                              <button
                                 onClick={() => setSelectedImageForQA(null)}
-                                style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: '11px', textDecoration: 'underline' }}
+                                style={{ background: 'transparent', border: 'none', color: 'var(--t-secondary)', cursor: 'pointer', fontSize: '11px', textDecoration: 'underline' }}
                               >
                                 Switch to Upload
                               </button>
@@ -1499,8 +1886,8 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
                                 </div>
                               ) : (
                                 <>
-                                  <Upload size={18} color="#94a3b8" />
-                                  <span style={{ color: '#94a3b8', fontSize: '13px' }}>Click to select an image</span>
+                                  <Upload size={18} color="var(--t-secondary)" />
+                                  <span style={{ color: 'var(--t-secondary)', fontSize: '13px' }}>Click to select an image</span>
                                 </>
                               )}
                             </div>
@@ -1586,9 +1973,9 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
                                   const pt = imgZipResult.result.clusters.find(c => c.filename === sr.filename);
                                   if (pt?.annotated_image_path) imgPath = `${BASE_URL}/${pt.annotated_image_path}`;
                                 }
-                                
+
                                 return (
-                                  <div key={idx} className="search-result-item" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                                  <div key={idx} className="search-result-item" style={{ display: 'flex', flexDirection: 'column', gap: '12px', cursor: imgZipResult ? 'pointer' : 'default' }} onClick={() => imgZipResult && openRecordByFilename(sr.filename)}>
                                     {imgPath && (
                                       <div className="search-result-thumb" style={{ width: '100%', height: '180px', borderRadius: '10px', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.1)' }}>
                                         <img src={imgPath} alt={sr.filename} style={{ width: '100%', height: '100%', objectFit: 'cover', cursor: 'pointer', transition: 'transform 0.3s' }} onMouseOver={(e) => (e.currentTarget.style.transform = 'scale(1.05)')} onMouseOut={(e) => (e.currentTarget.style.transform = 'scale(1)')} />
@@ -1605,6 +1992,37 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
                                       <div className="search-result-info" style={{ marginTop: '8px' }}>
                                         <strong style={{ display: 'block', fontSize: '13px' }}>{sr.filename}</strong>
                                         <span className="search-result-reason" style={{ fontSize: '11px', display: 'block', marginTop: '4px' }}>{sr.reason}</span>
+                                        {sr.matched_on?.length > 0 && (
+                                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '8px' }}>
+                                            {sr.matched_on.map(signal => (
+                                              <span key={signal} className="chip theme-chip" style={{ fontSize: '10px' }}>{signal}</span>
+                                            ))}
+                                          </div>
+                                        )}
+                                        <div style={{ display: 'flex', gap: '8px', marginTop: '10px' }}>
+                                          <button
+                                            className="qa-send-btn"
+                                            style={{ height: '28px', width: 'auto', padding: '0 10px', fontSize: '11px' }}
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              toggleCompareSelection(sr.filename);
+                                            }}
+                                          >
+                                            {compareSelection.includes(sr.filename) ? 'Selected' : 'Compare'}
+                                          </button>
+                                          {imgZipResult && (
+                                            <button
+                                              className="qa-send-btn"
+                                              style={{ height: '28px', width: 'auto', padding: '0 10px', fontSize: '11px' }}
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                openRecordByFilename(sr.filename);
+                                              }}
+                                            >
+                                              Open
+                                            </button>
+                                          )}
+                                        </div>
                                       </div>
                                     </div>
                                   </div>
@@ -1614,13 +2032,209 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
                           )}
 
                           {showSearchResults && searchResults.length === 0 && (
-                            <p style={{ color: '#94a3b8', fontSize: '13px', textAlign: 'center', marginTop: '16px' }}>
+                            <p style={{ color: 'var(--t-secondary)', fontSize: '13px', textAlign: 'center', marginTop: '16px' }}>
                               No images matched your query.
                             </p>
                           )}
                         </div>
                       </div>
+
+                      <div className="ai-intel-card" ref={collectionQaRef} style={{ gridColumn: '1 / -1', width: '100%' }}>
+                        <div className="ai-intel-card-header">
+                          <div className="ai-intel-icon qa-icon">
+                            <Sparkles size={20} />
+                          </div>
+                          <div>
+                            <h4>Collection Q&A</h4>
+                            <p>Ask questions about the whole analyzed batch, not just one image.</p>
+                          </div>
+                        </div>
+
+                        <div className="ai-intel-body">
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '12px' }}>
+                            {collectionPrompts.map(prompt => (
+                              <button
+                                key={prompt}
+                                className="qa-send-btn"
+                                style={{ width: 'auto', padding: '0 12px', fontSize: '11px', height: '32px' }}
+                                disabled={collectionLoading || visualRecords.length === 0}
+                                onClick={() => handleCollectionQA(prompt)}
+                              >
+                                {prompt}
+                              </button>
+                            ))}
+                          </div>
+
+                          <div className="qa-input-row">
+                            <input
+                              type="text"
+                              className="qa-question-input"
+                              placeholder="e.g. 'Which images should I review first for safety issues?'"
+                              value={collectionQuestion}
+                              onChange={(e) => setCollectionQuestion(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter' && collectionQuestion.trim()) {
+                                  e.preventDefault();
+                                  handleCollectionQA();
+                                }
+                              }}
+                            />
+                            <button
+                              className="qa-send-btn"
+                              disabled={!collectionQuestion.trim() || collectionLoading || visualRecords.length === 0}
+                              onClick={() => handleCollectionQA()}
+                            >
+                              {collectionLoading ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
+                            </button>
+                          </div>
+
+                          {collectionAnswer && (
+                            <div className="qa-answer-box" style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                              <div>
+                                <div className="qa-answer-label">
+                                  <Sparkles size={12} color="#fb8c36" />
+                                  Batch Answer
+                                </div>
+                                <p>{collectionAnswer.answer}</p>
+                              </div>
+
+                              {collectionAnswer.supporting_results?.length > 0 && (
+                                <div>
+                                  <div className="qa-answer-label">
+                                    <SearchCheck size={12} color="#60a5fa" />
+                                    Supporting Images
+                                  </div>
+                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '10px' }}>
+                                    {collectionAnswer.supporting_results.map(item => (
+                                      <button
+                                        key={item.filename}
+                                        style={{ textAlign: 'left', background: 'var(--bg-elevated)', border: '1px solid var(--border-mid)', borderRadius: '10px', padding: '10px 12px', cursor: imgZipResult ? 'pointer' : 'default' }}
+                                        onClick={() => imgZipResult && openRecordByFilename(item.filename)}
+                                      >
+                                        <div style={{ color: 'var(--t-primary)', fontSize: '13px', fontWeight: 700 }}>{item.filename}</div>
+                                        <div style={{ color: 'var(--t-secondary)', fontSize: '12px', marginTop: '4px' }}>{item.reason}</div>
+                                      </button>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+
+                              {collectionAnswer.follow_up_suggestions?.length > 0 && (
+                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                                  {collectionAnswer.follow_up_suggestions.map(prompt => (
+                                    <button
+                                      key={prompt}
+                                      className="qa-send-btn"
+                                      style={{ width: 'auto', padding: '0 12px', fontSize: '11px', height: '30px' }}
+                                      onClick={() => {
+                                        setCollectionQuestion(prompt);
+                                        handleCollectionQA(prompt);
+                                      }}
+                                    >
+                                      {prompt}
+                                    </button>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      </div>
                     </div>
+                  </div>
+                )}
+
+                {(imgResult || imgZipResult) && (
+                  <div className="result-card" style={{ marginTop: '24px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '16px', flexWrap: 'wrap', marginBottom: '18px' }}>
+                      <div>
+                        <h4 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '10px' }}>
+                          <ArrowRight size={18} color="#60a5fa" /> Side-by-Side Compare
+                        </h4>
+                        <p className="viz-desc" style={{ marginTop: '8px' }}>
+                          Select any two images from the gallery or search results to compare themes, clusters, and detected objects.
+                        </p>
+                      </div>
+                      <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                        <span className="theme-subtext" style={{ fontSize: '12px' }}>{compareSelection.length}/2 selected</span>
+                        {compareSelection.length > 0 && (
+                          <button
+                            className="qa-send-btn"
+                            style={{ width: 'auto', padding: '0 12px', fontSize: '11px', height: '30px' }}
+                            onClick={() => setCompareSelection([])}
+                          >
+                            Clear
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    {selectedCompareRecords.length < 2 ? (
+                      <div style={{ padding: '24px', border: '1px dashed var(--border-bright)', borderRadius: '14px', color: 'var(--t-secondary)', textAlign: 'center' }}>
+                        Pick two images to unlock the comparison panel.
+                      </div>
+                    ) : (
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '18px' }}>
+                        {selectedCompareRecords.map(record => (
+                          <div key={record.filename} style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-mid)', borderRadius: '14px', padding: '16px' }}>
+                            {record.annotated_image_path ? (
+                              <img
+                                src={`${BASE_URL}/${record.annotated_image_path}`}
+                                alt={record.filename}
+                                style={{ width: '100%', height: '180px', objectFit: 'cover', borderRadius: '10px', marginBottom: '14px' }}
+                              />
+                            ) : (
+                              <div style={{ width: '100%', height: '180px', borderRadius: '10px', marginBottom: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--border-mid)', color: 'var(--t-muted)' }}>
+                                Preview unavailable
+                              </div>
+                            )}
+                            <div style={{ color: 'var(--t-primary)', fontWeight: 700, fontSize: '15px' }}>{record.filename}</div>
+                            <div style={{ color: 'var(--t-secondary)', fontSize: '12px', marginTop: '6px' }}>{record.cluster_description}</div>
+                            <p style={{ color: 'var(--t-secondary)', fontSize: '13px', lineHeight: 1.5, marginTop: '12px' }}>{record.caption || 'No caption available.'}</p>
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '12px' }}>
+                              {record.object_details.length > 0 ? record.object_details.map((objectDetail, idx) => (
+                                <span key={`${record.filename}-${objectDetail.label}-${idx}`} className="chip theme-chip" style={{ fontSize: '10px' }}>
+                                  {objectDetail.label} {Math.round(objectDetail.confidence * 100)}%
+                                </span>
+                              )) : (
+                                <span className="theme-subtext" style={{ fontSize: '12px' }}>No detected objects</span>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {selectedCompareRecords.length === 2 && (
+                      <div style={{ marginTop: '18px', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px' }}>
+                        <div style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-mid)', borderRadius: '14px', padding: '16px' }}>
+                          <div style={{ color: 'var(--t-secondary)', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '10px' }}>Shared Objects</div>
+                          <div style={{ color: 'var(--t-primary)', fontSize: '14px', lineHeight: 1.6 }}>
+                            {sharedObjects.length ? sharedObjects.join(', ') : 'No shared object labels'}
+                          </div>
+                        </div>
+                        <div style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-mid)', borderRadius: '14px', padding: '16px' }}>
+                          <div style={{ color: 'var(--t-secondary)', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '10px' }}>
+                            {leftCompare?.filename} only
+                          </div>
+                          <div style={{ color: 'var(--t-primary)', fontSize: '14px', lineHeight: 1.6 }}>
+                            {leftOnlyObjects.length ? leftOnlyObjects.join(', ') : 'No unique object labels'}
+                          </div>
+                        </div>
+                        <div style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-mid)', borderRadius: '14px', padding: '16px' }}>
+                          <div style={{ color: 'var(--t-secondary)', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '10px' }}>
+                            {rightCompare?.filename} only
+                          </div>
+                          <div style={{ color: 'var(--t-primary)', fontSize: '14px', lineHeight: 1.6 }}>
+                            {rightOnlyObjects.length ? rightOnlyObjects.join(', ') : 'No unique object labels'}
+                          </div>
+                        </div>
+                        <div style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-mid)', borderRadius: '14px', padding: '16px' }}>
+                          <div style={{ color: 'var(--t-secondary)', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '10px' }}>Comparison Readout</div>
+                          <div style={{ color: 'var(--t-primary)', fontSize: '14px', lineHeight: 1.6 }}>{compareNarrative}</div>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
 
@@ -1631,70 +2245,152 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
 
                 {/* Video Analysis Result */}
                 {videoResult && (
-                  <div className="code-analysis-view">
-                    {/* Header chips */}
-                    <div className="result-card">
-                      <h4><Video size={18} style={{ display: 'inline', marginRight: '8px' }} />Video Analysis — {selectedFiles[0]?.name}</h4>
-                      <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginTop: '10px' }}>
-                        {[
-                          `⏱ ${Math.round(videoResult.duration_seconds)}s`,
-                          `🎞 ${videoResult.keyframes_analyzed} keyframes`,
-                          `🔍 ${Object.keys(videoResult.detected_objects).length} object types`,
-                        ].map(label => (
-                          <span key={label} style={{ background: 'rgba(99,102,241,0.15)', color: '#818cf8', border: '1px solid rgba(99,102,241,0.3)', fontSize: '12px', padding: '4px 12px', borderRadius: '99px' }}>{label}</span>
-                        ))}
-                      </div>
+                  <div className="video-analysis-view" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+
+                    {/* TABS Navigation */}
+                    <div style={{ display: 'flex', gap: '10px', borderBottom: '1px solid var(--border-mid)', paddingBottom: '10px', marginBottom: '10px' }}>
+                      <button onClick={() => setVideoTab('video')} style={{ padding: '8px 16px', background: videoTab === 'video' ? '#fb8c36' : 'transparent', color: videoTab === 'video' ? '#fff' : 'var(--t-secondary)', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}>🎬 Video Insights</button>
+                      <button onClick={() => setVideoTab('audio')} style={{ padding: '8px 16px', background: videoTab === 'audio' ? '#22d3ee' : 'transparent', color: videoTab === 'audio' ? '#fff' : 'var(--t-secondary)', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}>🎵 Audio Analysis</button>
+                      <button onClick={() => setVideoTab('text')} style={{ padding: '8px 16px', background: videoTab === 'text' ? '#4ade80' : 'transparent', color: videoTab === 'text' ? '#fff' : 'var(--t-secondary)', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}>📝 Text Analysis</button>
                     </div>
 
-                    {/* AI Summary */}
-                    {videoResult.groq_summary && (
-                      <div className="result-card">
-                        <h4 style={{ marginTop: 0 }}>AI Summary</h4>
-                        <p style={{ color: '#cbd5e1', lineHeight: 1.7, margin: 0 }}>{videoResult.groq_summary}</p>
-                      </div>
-                    )}
+                    {/* VIDEO INSIGHTS TAB */}
+                    <div style={{ display: videoTab === 'video' ? 'flex' : 'none', flexDirection: 'column', gap: '20px' }}>
+                      {/* Groq AI Summary */}
+                      {videoResult.groq_summary && (
+                        <div className="result-card" style={{ borderLeft: '4px solid #fb8c36' }}>
+                          <h4 style={{ color: '#fb8c36', marginTop: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>🚀 AI Video Summary (Groq LLM)</h4>
+                          <p style={{ color: 'var(--t-primary)', fontSize: '14px', lineHeight: 1.6, margin: '10px 0 0' }}>{videoResult.groq_summary}</p>
+                          {videoResult.sentiment_analysis && (
+                            <div style={{ marginTop: '15px', padding: '12px', background: 'rgba(56,189,248,0.1)', borderLeft: '4px solid #38bdf8', borderRadius: '4px' }}>
+                              <h5 style={{ margin: '0 0 5px 0', color: '#38bdf8', fontSize: '12px', textTransform: 'uppercase' }}>Video Sentiment</h5>
+                              <p style={{ margin: 0, color: 'var(--t-primary)', fontSize: '13px' }}>{videoResult.sentiment_analysis.replace('Sentiment Analysis:', '')}</p>
+                            </div>
+                          )}
+                          {videoResult.video_caption && (
+                            <div style={{ marginTop: '15px', padding: '12px', background: 'rgba(96,165,250,0.1)', borderLeft: '4px solid #60a5fa', borderRadius: '4px' }}>
+                              <h5 style={{ margin: '0 0 5px 0', color: '#60a5fa', fontSize: '12px', textTransform: 'uppercase' }}>BLIP Video Caption</h5>
+                              <p style={{ margin: 0, color: 'var(--t-primary)', fontSize: '13px', fontStyle: 'italic' }}>"{videoResult.video_caption}"</p>
+                            </div>
+                          )}
+                        </div>
+                      )}
 
-                    {/* Caption + transcript fallback */}
-                    {!videoResult.groq_summary && videoResult.video_caption && (
+                      {/* Video Player */}
                       <div className="result-card">
-                        <h4 style={{ marginTop: 0 }}>Scene Description</h4>
-                        <p style={{ color: '#cbd5e1', lineHeight: 1.7, margin: 0 }}>{videoResult.video_caption}</p>
+                        <h4 style={{ color: '#fb8c36', marginTop: 0, marginBottom: '15px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <Video size={16} /> Object Detection Video (YOLOv8)
+                        </h4>
+                        <p className="viz-desc">Analyzed {videoResult.keyframes_analyzed || '?'} keyframes over {videoResult.duration_seconds || '?'}s duration.</p>
+                        <div style={{ background: 'var(--bg-root)', padding: '10px', borderRadius: '8px', textAlign: 'center', marginTop: '15px', border: '1px solid var(--border-mid)' }}>
+                          <div style={{ position: 'relative', width: '100%', maxWidth: '800px', margin: '0 auto', display: 'inline-block' }}>
+                            <video
+                              ref={videoRef}
+                              controls
+                              playsInline
+                              style={{ width: '100%', borderRadius: '8px', display: 'block' }}
+                              onTimeUpdate={() => {
+                                if (activeHighlight && videoRef.current) {
+                                  if (Math.abs(videoRef.current.currentTime - activeHighlight.second) > 1) {
+                                    setActiveHighlight(null);
+                                  }
+                                }
+                              }}
+                            >
+                              <source src={videoResult.video_url ? `${import.meta.env.VITE_API_URL ?? 'http://localhost:8000'}${videoResult.video_url}` : ''} type="video/mp4" />
+                              {subtitleUrl && <track default kind="subtitles" srcLang="en" label="English" src={subtitleUrl} />}
+                              Your browser does not support the video tag.
+                            </video>
+                            {activeHighlight && activeHighlight.box && activeHighlight.box.length === 4 && (
+                              <div style={{ position: 'absolute', top: `${activeHighlight.box[1]}%`, left: `${activeHighlight.box[0]}%`, width: `${activeHighlight.box[2]}%`, height: `${activeHighlight.box[3]}%`, border: '3px solid #ef4444', borderRadius: '4px', pointerEvents: 'none', boxShadow: '0 0 12px rgba(239,68,68,0.8), inset 0 0 8px rgba(239,68,68,0.5)', zIndex: 10, transition: 'all 0.2s ease-out' }} />
+                            )}
+                          </div>
+                        </div>
                       </div>
-                    )}
 
-                    {/* Objects + CLIP scenes */}
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
-                      {Object.keys(videoResult.detected_objects).length > 0 && (
+                      {/* Objects Tracker */}
+                      {videoResult.object_details && Object.keys(videoResult.object_details).length > 0 && (
                         <div className="result-card">
-                          <h4 style={{ marginTop: 0 }}>Detected Objects</h4>
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '8px' }}>
-                            {Object.entries(videoResult.detected_objects)
-                              .sort(([, a], [, b]) => (b as number) - (a as number))
-                              .slice(0, 12)
-                              .map(([label, count]) => {
-                                const max = Math.max(...Object.values(videoResult.detected_objects) as number[]);
-                                return (
-                                  <div key={label} style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                    <span style={{ color: '#e2e8f0', fontSize: '13px', minWidth: '100px' }}>{label}</span>
-                                    <div style={{ flex: 1, height: '6px', background: '#1e293b', borderRadius: '3px', overflow: 'hidden' }}>
-                                      <div style={{ height: '100%', width: `${((count as number) / max) * 100}%`, background: '#6366f1', borderRadius: '3px' }} />
+                          <h4 style={{ color: '#4ade80', marginTop: 0, fontSize: '13px', marginBottom: '15px' }}>🎯 Object Detection Details Tracker</h4>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                            {Object.entries(videoResult.object_details).map(([objName, occurrences]) => {
+                              const isExpanded = expandedVidObject === objName;
+                              return (
+                                <div key={objName} style={{ background: 'var(--bg-root)', border: '1px solid var(--border-mid)', borderRadius: '8px', overflow: 'hidden' }}>
+                                  <div onClick={() => setExpandedVidObject(isExpanded ? null : objName)} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 15px', cursor: 'pointer', background: isExpanded ? 'var(--bg-elevated)' : 'transparent' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                      <span style={{ color: 'var(--t-primary)', fontWeight: 'bold', textTransform: 'capitalize', fontSize: '14px' }}>{objName}</span>
+                                      <span style={{ background: 'rgba(74,222,128,0.15)', color: '#4ade80', padding: '2px 8px', borderRadius: '12px', fontSize: '11px', fontWeight: 'bold' }}>{occurrences.length} instances tracked</span>
                                     </div>
-                                    <span style={{ color: '#64748b', fontSize: '12px', minWidth: '24px', textAlign: 'right' }}>{count as number}</span>
+                                    <span style={{ color: 'var(--t-secondary)', transform: isExpanded ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }}>▼</span>
                                   </div>
-                                );
-                              })}
+                                  {isExpanded && (
+                                    <div style={{ padding: '15px', borderTop: '1px solid var(--border-mid)', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: '15px', background: 'var(--bg-root)' }}>
+                                      {occurrences.map((occ, i) => (
+                                        <div
+                                          key={i}
+                                          onClick={() => {
+                                            if (videoRef.current) {
+                                              videoRef.current.currentTime = occ.second;
+                                              videoRef.current.play();
+                                              if (occ.box_2d) setActiveHighlight({ second: occ.second, box: occ.box_2d });
+                                            }
+                                          }}
+                                          title="Click to jump to this timestamp"
+                                          style={{ background: 'var(--border-mid)', borderRadius: '6px', padding: '8px', display: 'flex', flexDirection: 'column', gap: '8px', alignItems: 'center', cursor: 'pointer', border: '1px solid transparent', transition: 'border 0.1s' }}
+                                          onMouseEnter={e => (e.currentTarget.style.border = '1px solid #ef4444')}
+                                          onMouseLeave={e => (e.currentTarget.style.border = '1px solid transparent')}
+                                        >
+                                          <div style={{ color: '#fb8c36', fontSize: '11px', fontWeight: 'bold', width: '100%', textAlign: 'center' }}>⏱ t={occ.second}s</div>
+                                          {occ.image ? (
+                                            <div style={{ width: '100px', height: '100px', background: 'var(--bg-elevated)', borderRadius: '4px', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                              <img src={occ.image} alt={objName} style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} />
+                                            </div>
+                                          ) : (
+                                            <div style={{ width: '100px', height: '100px', background: 'var(--bg-elevated)', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--t-muted)', fontSize: '10px' }}>No Image</div>
+                                          )}
+                                          <div style={{ color: 'var(--t-secondary)', fontSize: '10px' }}>Conf: {Math.round(occ.confidence * 100)}%</div>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })}
                           </div>
                         </div>
                       )}
 
+                      {/* Fallback: simple object bar chart when no object_details */}
+                      {!videoResult.object_details && Object.keys(videoResult.detected_objects).length > 0 && (
+                        <div className="result-card">
+                          <h4 style={{ marginTop: 0 }}>Detected Objects</h4>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '8px' }}>
+                            {Object.entries(videoResult.detected_objects).sort(([, a], [, b]) => (b as number) - (a as number)).slice(0, 12).map(([label, count]) => {
+                              const max = Math.max(...Object.values(videoResult.detected_objects) as number[]);
+                              return (
+                                <div key={label} style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                  <span style={{ color: 'var(--t-primary)', fontSize: '13px', minWidth: '100px' }}>{label}</span>
+                                  <div style={{ flex: 1, height: '6px', background: 'var(--border-mid)', borderRadius: '3px', overflow: 'hidden' }}>
+                                    <div style={{ height: '100%', width: `${((count as number) / max) * 100}%`, background: '#6366f1', borderRadius: '3px' }} />
+                                  </div>
+                                  <span style={{ color: 'var(--t-muted)', fontSize: '12px' }}>{count as number}</span>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* CLIP Scenes */}
                       {videoResult.clip_scenes?.length > 0 && (
                         <div className="result-card">
                           <h4 style={{ marginTop: 0 }}>Scene Classification (CLIP)</h4>
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '300px', overflowY: 'auto', marginTop: '8px' }}>
                             {videoResult.clip_scenes.map((s, i) => (
-                              <div key={i} style={{ display: 'flex', gap: '10px', padding: '6px 10px', background: '#0f172a', borderRadius: '6px', border: '1px solid #1e293b', alignItems: 'center' }}>
-                                <span style={{ color: '#475569', fontSize: '11px', flexShrink: 0, minWidth: '28px' }}>{s.second}s</span>
-                                <span style={{ color: '#cbd5e1', fontSize: '13px', flex: 1 }}>{s.scene}</span>
+                              <div key={i} style={{ display: 'flex', gap: '10px', padding: '6px 10px', background: 'var(--bg-elevated)', borderRadius: '6px', border: '1px solid var(--border-mid)', alignItems: 'center' }}>
+                                <span style={{ color: 'var(--t-muted)', fontSize: '11px', minWidth: '28px' }}>{s.second}s</span>
+                                <span style={{ color: 'var(--t-secondary)', fontSize: '13px', flex: 1 }}>{s.scene}</span>
                                 <span style={{ color: '#6366f1', fontSize: '11px' }}>{(s.score * 100).toFixed(0)}%</span>
                               </div>
                             ))}
@@ -1703,25 +2399,111 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
                       )}
                     </div>
 
-                    {/* Transcript */}
-                    {videoResult.transcript?.full_text && (
-                      <div className="result-card">
-                        <h4 style={{ marginTop: 0 }}>Audio Transcript</h4>
-                        <p style={{ color: '#cbd5e1', lineHeight: 1.7, margin: 0 }}>{videoResult.transcript.full_text}</p>
-                      </div>
-                    )}
+                    {/* AUDIO ANALYSIS TAB */}
+                    <div style={{ display: videoTab === 'audio' ? 'flex' : 'none', flexDirection: 'column', gap: '20px' }}>
+                      {videoResult.transcript?.full_text && videoResult.transcript.full_text !== 'No audio track found in this video.' ? (
+                        <>
+                          <div className="result-card" style={{ borderLeft: '4px solid #22d3ee' }}>
+                            <h4 style={{ color: '#22d3ee', marginTop: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              🎤 Whisper Audio Transcript
+                              {videoResult.transcript.language && videoResult.transcript.language !== 'unknown' && (
+                                <span style={{ fontSize: '10px', background: '#164e63', padding: '2px 8px', borderRadius: '12px', color: '#67e8f9' }}>{videoResult.transcript.language.toUpperCase()}</span>
+                              )}
+                            </h4>
+                            <div style={{ background: 'var(--border-mid)', borderRadius: '8px', padding: '15px', margin: '10px 0', fontSize: '13px', color: 'var(--t-primary)', lineHeight: 1.7 }}>{videoResult.transcript.full_text}</div>
+                            {videoResult.transcript.segments && videoResult.transcript.segments.length > 0 && (
+                              <div style={{ marginTop: '15px' }}>
+                                <p style={{ color: 'var(--t-secondary)', fontSize: '11px', marginBottom: '8px' }}>Timestamped Segments:</p>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', maxHeight: '200px', overflowY: 'auto' }}>
+                                  {videoResult.transcript.segments.map((seg, i) => (
+                                    <div key={i} style={{ display: 'flex', gap: '10px', fontSize: '12px', padding: '8px 10px', background: i % 2 === 0 ? 'var(--bg-elevated)' : 'var(--border-mid)', borderRadius: '6px', alignItems: 'flex-start' }}>
+                                      <div style={{ minWidth: '60px', color: '#22d3ee', fontWeight: 'bold', fontSize: '11px' }}>{seg.start}s – {seg.end}s</div>
+                                      <span style={{ color: 'var(--t-primary)', lineHeight: 1.4 }}>{seg.text}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                          {videoResult.transcript.audio_plots && Object.keys(videoResult.transcript.audio_plots).length > 0 && (
+                            <div className="result-card" style={{ borderLeft: '4px solid #f472b6' }}>
+                              <h4 style={{ color: '#f472b6', marginTop: 0, marginBottom: '15px' }}>🎛️ Acoustic Spectral Analysis</h4>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                                {videoResult.transcript.audio_plots.waveform && (
+                                  <div style={{ background: 'var(--bg-root)', padding: '10px', borderRadius: '8px', border: '1px solid var(--border-mid)' }}>
+                                    <h5 style={{ color: 'var(--t-secondary)', fontSize: '11px', margin: '0 0 10px', textTransform: 'uppercase' }}>Waveform Plot</h5>
+                                    <img src={videoResult.transcript.audio_plots.waveform} alt="Waveform" style={{ width: '100%', borderRadius: '4px' }} />
+                                  </div>
+                                )}
+                                {videoResult.transcript.audio_plots.spectrogram && (
+                                  <div style={{ background: 'var(--bg-root)', padding: '10px', borderRadius: '8px', border: '1px solid var(--border-mid)' }}>
+                                    <h5 style={{ color: 'var(--t-secondary)', fontSize: '11px', margin: '0 0 10px', textTransform: 'uppercase' }}>Frequency Spectrogram</h5>
+                                    <img src={videoResult.transcript.audio_plots.spectrogram} alt="Spectrogram" style={{ width: '100%', borderRadius: '4px' }} />
+                                  </div>
+                                )}
+                                {videoResult.transcript.audio_plots.energy && (
+                                  <div style={{ background: 'var(--bg-root)', padding: '10px', borderRadius: '8px', border: '1px solid var(--border-mid)' }}>
+                                    <h5 style={{ color: 'var(--t-secondary)', fontSize: '11px', margin: '0 0 10px', textTransform: 'uppercase' }}>RMS Energy Detection</h5>
+                                    <img src={videoResult.transcript.audio_plots.energy} alt="Energy Graph" style={{ width: '100%', borderRadius: '4px' }} />
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          )}
+                        </>
+                      ) : (
+                        <div className="result-card" style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--t-secondary)' }}>
+                          <p>No audio track was found or transcribed for this video.</p>
+                        </div>
+                      )}
+                    </div>
 
-                    {/* Analyzed video player */}
-                    {videoResult.video_url && (
-                      <div className="result-card">
-                        <h4 style={{ marginTop: 0 }}>Annotated Video</h4>
-                        <video
-                          controls
-                          style={{ width: '100%', borderRadius: '8px', marginTop: '8px', background: '#000' }}
-                          src={`${import.meta.env.VITE_API_URL ?? 'http://localhost:8000'}${videoResult.video_url}`}
-                        />
-                      </div>
-                    )}
+                    {/* TEXT ANALYSIS TAB */}
+                    <div style={{ display: videoTab === 'text' ? 'flex' : 'none', flexDirection: 'column', gap: '20px' }}>
+                      {videoResult.sentiment_analysis && (
+                        <div className="result-card" style={{ borderLeft: '4px solid #38bdf8' }}>
+                          <h4 style={{ color: '#38bdf8', marginTop: 0, marginBottom: '10px' }}>📊 Video Sentiment Analysis</h4>
+                          <p style={{ margin: 0, color: 'var(--t-primary)', fontSize: '14px', background: 'var(--bg-root)', padding: '15px', borderRadius: '8px', border: '1px solid var(--border-mid)' }}>{videoResult.sentiment_analysis.replace('Sentiment Analysis:', '')}</p>
+                        </div>
+                      )}
+                      {videoResult.transcript?.full_text && (
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '15px' }}>
+                          {videoResult.transcript.entities && videoResult.transcript.entities.length > 0 && (
+                            <div style={{ background: 'var(--bg-root)', border: '1px solid var(--border-mid)', borderRadius: '8px', padding: '15px' }}>
+                              <h5 style={{ color: '#4ade80', marginTop: 0, marginBottom: '15px', fontSize: '13px' }}>🏷️ Extracted Entities (SpaCy)</h5>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '300px', overflowY: 'auto' }}>
+                                {videoResult.transcript.entities.map((ent, i) => (
+                                  <div key={i}>
+                                    <span style={{ fontSize: '11px', color: 'var(--t-secondary)', textTransform: 'uppercase', fontWeight: 'bold' }}>{ent.label}</span>
+                                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '6px' }}>
+                                      {ent.items.map((item, j) => <span key={j} style={{ background: 'var(--border-mid)', padding: '4px 10px', borderRadius: '4px', fontSize: '12px', color: 'var(--t-primary)', border: '1px solid var(--border-bright)' }}>{item}</span>)}
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                          {videoResult.transcript.topics && videoResult.transcript.topics.length > 0 && (
+                            <div style={{ background: 'var(--bg-root)', border: '1px solid var(--border-mid)', borderRadius: '8px', padding: '15px' }}>
+                              <h5 style={{ color: '#c084fc', marginTop: 0, marginBottom: '15px', fontSize: '13px' }}>📊 Discussion Topics (BERTopic)</h5>
+                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', maxHeight: '300px', overflowY: 'auto' }}>
+                                {videoResult.transcript.topics.map((top, i) => (
+                                  <div key={i} style={{ background: 'var(--border-mid)', padding: '6px 12px', borderRadius: '6px', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '8px', border: '1px solid var(--border-bright)' }}>
+                                    <span style={{ color: 'var(--t-primary)', fontWeight: 'bold' }}>{top.name}</span>
+                                    <span style={{ background: 'var(--border-bright)', color: 'var(--t-secondary)', padding: '2px 8px', borderRadius: '10px', fontSize: '10px' }}>{top.count} segments</span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                      {!videoResult.sentiment_analysis && !videoResult.transcript?.entities?.length && !videoResult.transcript?.topics?.length && (
+                        <div className="result-card" style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--t-secondary)' }}>
+                          <p>No text analysis data available for this video.</p>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 )}
               </div>
@@ -1731,53 +2513,53 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
       </div>
 
       {selectedClusterPoint && (
-        <div 
+        <div
           style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', background: 'rgba(2, 6, 23, 0.9)', backdropFilter: 'blur(10px)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '40px' }}
           onClick={() => setSelectedClusterPoint(null)}
         >
-          <div 
-            style={{ background: '#0f172a', borderRadius: '16px', border: '1px solid #1e293b', width: '100%', maxWidth: '1000px', maxHeight: '90vh', overflow: 'hidden', display: 'flex', flexDirection: 'column', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)' }}
+          <div
+            style={{ background: 'var(--bg-elevated)', borderRadius: '16px', border: '1px solid var(--border-mid)', width: '100%', maxWidth: '1000px', maxHeight: '90vh', overflow: 'hidden', display: 'flex', flexDirection: 'column', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)' }}
             onClick={(e) => e.stopPropagation()}
           >
-            <div style={{ padding: '20px', borderBottom: '1px solid #1e293b', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#1e293b' }}>
-              <h3 style={{ margin: 0, color: '#f8fafc', fontSize: '18px' }}>{selectedClusterPoint?.filename}</h3>
-              <button 
-                onClick={() => setSelectedClusterPoint(null)} 
-                style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: '28px', padding: 0, lineHeight: 1 }}
+            <div style={{ padding: '20px', borderBottom: '1px solid var(--border-mid)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--border-mid)' }}>
+              <h3 style={{ margin: 0, color: 'var(--t-primary)', fontSize: '18px' }}>{selectedClusterPoint?.filename}</h3>
+              <button
+                onClick={() => setSelectedClusterPoint(null)}
+                style={{ background: 'transparent', border: 'none', color: 'var(--t-secondary)', cursor: 'pointer', fontSize: '28px', padding: 0, lineHeight: 1 }}
               >
                 &times;
               </button>
             </div>
             <div style={{ display: 'flex', flexDirection: 'row', flex: 1, overflow: 'hidden' }}>
-              <div style={{ flex: '1', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#020617', padding: '20px', overflow: 'auto' }}>
-                 {selectedClusterPoint?.annotated_image_path ? (
-                    <img src={`${import.meta.env.VITE_API_URL ?? 'http://localhost:8000'}/${selectedClusterPoint.annotated_image_path}`} alt="Full size" style={{ maxWidth: '100%', maxHeight: '70vh', objectFit: 'contain', borderRadius: '4px' }} />
-                 ) : (
-                    <div style={{ color: '#64748b' }}>No Tracking Data</div>
-                 )}
+              <div style={{ flex: '1', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg-root)', padding: '20px', overflow: 'auto' }}>
+                {selectedClusterPoint?.annotated_image_path ? (
+                  <img src={`${import.meta.env.VITE_API_URL ?? 'http://localhost:8000'}/${selectedClusterPoint.annotated_image_path}`} alt="Full size" style={{ maxWidth: '100%', maxHeight: '70vh', objectFit: 'contain', borderRadius: '4px' }} />
+                ) : (
+                  <div style={{ color: 'var(--t-muted)' }}>No Tracking Data</div>
+                )}
               </div>
-              <div style={{ width: '350px', display: 'flex', flexDirection: 'column', gap: '20px', padding: '20px', overflowY: 'auto', background: '#0f172a', borderLeft: '1px solid #1e293b' }}>
+              <div style={{ width: '350px', display: 'flex', flexDirection: 'column', gap: '20px', padding: '20px', overflowY: 'auto', background: 'var(--bg-elevated)', borderLeft: '1px solid var(--border-mid)' }}>
                 <div>
-                  <span style={{ fontSize: '12px', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '1px', fontWeight: 'bold' }}>AI Caption</span>
-                  <p style={{ margin: '8px 0 0', color: '#f1f5f9', fontSize: '15px', lineHeight: '1.5', background: 'rgba(30, 41, 59, 0.5)', padding: '15px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                  <span style={{ fontSize: '12px', color: 'var(--t-secondary)', textTransform: 'uppercase', letterSpacing: '1px', fontWeight: 'bold' }}>AI Caption</span>
+                  <p style={{ margin: '8px 0 0', color: 'var(--t-primary)', fontSize: '15px', lineHeight: '1.5', background: 'rgba(30, 41, 59, 0.5)', padding: '15px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)' }}>
                     {selectedClusterPoint?.description || "No caption available."}
                   </p>
                 </div>
                 <div>
-                  <span style={{ fontSize: '12px', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '1px', fontWeight: 'bold' }}>Detected Objects ({selectedClusterPoint?.objects?.length || 0})</span>
+                  <span style={{ fontSize: '12px', color: 'var(--t-secondary)', textTransform: 'uppercase', letterSpacing: '1px', fontWeight: 'bold' }}>Detected Objects ({selectedClusterPoint?.objects?.length || 0})</span>
                   <div style={{ marginTop: '8px', display: 'flex', flexWrap: 'wrap', gap: '8px', padding: '15px', background: 'rgba(30, 41, 59, 0.5)', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)' }}>
                     {selectedClusterPoint?.objects?.map((obj: any, idx: number) => (
-                      <span key={idx} style={{ background: '#334155', color: '#f8fafc', padding: '6px 12px', borderRadius: '6px', fontSize: '12px', border: '1px solid #475569' }}>
+                      <span key={idx} style={{ background: 'var(--border-bright)', color: 'var(--t-primary)', padding: '6px 12px', borderRadius: '6px', fontSize: '12px', border: '1px solid var(--t-muted)' }}>
                         {obj.label} <span style={{ color: '#60a5fa', marginLeft: '4px', fontWeight: 'bold' }}>{Math.round(obj.confidence * 100)}%</span>
                       </span>
                     ))}
                   </div>
                 </div>
                 <div>
-                   <span style={{ fontSize: '12px', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '1px', fontWeight: 'bold' }}>Assigned Cluster</span>
-                   <div style={{ marginTop: '8px', padding: '12px 15px', background: `var(--cluster-${(selectedClusterPoint?.cluster_id || 0) % 5})`, color: '#fff', borderRadius: '8px', fontWeight: 'bold', display: 'inline-block', boxShadow: '0 4px 6px rgba(0,0,0,0.1)' }}>
-                     Cluster {selectedClusterPoint?.cluster_id}
-                   </div>
+                  <span style={{ fontSize: '12px', color: 'var(--t-secondary)', textTransform: 'uppercase', letterSpacing: '1px', fontWeight: 'bold' }}>Assigned Cluster</span>
+                  <div style={{ marginTop: '8px', padding: '12px 15px', background: `var(--cluster-${(selectedClusterPoint?.cluster_id || 0) % 5})`, color: '#fff', borderRadius: '8px', fontWeight: 'bold', display: 'inline-block', boxShadow: '0 4px 6px rgba(0,0,0,0.1)' }}>
+                    Cluster {selectedClusterPoint?.cluster_id}
+                  </div>
                 </div>
               </div>
             </div>
@@ -1865,7 +2647,7 @@ const AudioResultView = ({ result, file }: { result: AudioAnalysisResponse['resu
                 </button>
                 <div style={{ flex: 1 }} ref={waveformRef} />
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: '#64748b' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: 'var(--t-muted)' }}>
                 <span>{formatTime(currentTime)}</span>
                 <span>{formatTime(result.features?.duration ?? result.duration)}</span>
               </div>
@@ -1890,10 +2672,10 @@ const AudioResultView = ({ result, file }: { result: AudioAnalysisResponse['resu
                 const isCurrent = currentTime >= seg.start && currentTime <= seg.end;
                 return (
                   <div key={i} onClick={() => seekTo(seg.start)} style={{ display: 'flex', gap: '0.75rem', padding: '0.65rem 0.75rem', borderRadius: '8px', cursor: 'pointer', background: isCurrent ? 'rgba(99,102,241,0.12)' : 'rgba(30,41,59,0.5)', transition: 'background 0.2s', borderLeft: `3px solid ${getSpeakerColor(seg.speaker)}` }}>
-                    <div style={{ flexShrink: 0, width: '40px', fontSize: '11px', color: '#64748b', paddingTop: '2px' }}>{formatTime(seg.start)}</div>
+                    <div style={{ flexShrink: 0, width: '40px', fontSize: '11px', color: 'var(--t-muted)', paddingTop: '2px' }}>{formatTime(seg.start)}</div>
                     <div>
                       <div style={{ fontSize: '11px', fontWeight: 600, color: getSpeakerColor(seg.speaker), marginBottom: '2px' }}>{seg.speaker}</div>
-                      <div style={{ fontSize: '13px', color: '#e2e8f0', lineHeight: 1.5 }}>{seg.text}</div>
+                      <div style={{ fontSize: '13px', color: 'var(--t-primary)', lineHeight: 1.5 }}>{seg.text}</div>
                     </div>
                   </div>
                 );
@@ -1914,13 +2696,13 @@ const AudioResultView = ({ result, file }: { result: AudioAnalysisResponse['resu
             const speakers = Array.from(new Set(result.segments.map(s => s.speaker)));
             return (
               <div className="result-card" style={{ padding: '1rem' }}>
-                <h4 style={{ fontSize: '12px', textTransform: 'uppercase', color: '#64748b', fontWeight: 600, marginBottom: '0.75rem', marginTop: 0, letterSpacing: '0.5px' }}>Speakers</h4>
+                <h4 style={{ fontSize: '12px', textTransform: 'uppercase', color: 'var(--t-muted)', fontWeight: 600, marginBottom: '0.75rem', marginTop: 0, letterSpacing: '0.5px' }}>Speakers</h4>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                   {speakers.map(sp => (
                     <div key={sp} style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px' }}>
                       <div style={{ width: '10px', height: '10px', borderRadius: '50%', flexShrink: 0, background: getSpeakerColor(sp) }} />
-                      <span style={{ color: '#e2e8f0' }}>{sp}</span>
-                      <span style={{ marginLeft: 'auto', color: '#64748b', fontSize: '11px' }}>{result.segments.filter(s => s.speaker === sp).length} segs</span>
+                      <span style={{ color: 'var(--t-primary)' }}>{sp}</span>
+                      <span style={{ marginLeft: 'auto', color: 'var(--t-muted)', fontSize: '11px' }}>{result.segments.filter(s => s.speaker === sp).length} segs</span>
                     </div>
                   ))}
                 </div>
@@ -1932,20 +2714,20 @@ const AudioResultView = ({ result, file }: { result: AudioAnalysisResponse['resu
           {result.text_analysis && (
             <>
               <div className="result-card" style={{ padding: '1rem' }}>
-                <h4 style={{ fontSize: '12px', textTransform: 'uppercase', color: '#64748b', fontWeight: 600, marginBottom: '0.5rem', marginTop: 0, letterSpacing: '0.5px' }}>Executive Summary</h4>
-                <p style={{ fontSize: '13px', color: '#cbd5e1', lineHeight: 1.6, margin: '0 0 1rem' }}>{result.text_analysis.summary}</p>
-                <h4 style={{ fontSize: '12px', textTransform: 'uppercase', color: '#64748b', fontWeight: 600, marginBottom: '0.75rem', marginTop: 0, letterSpacing: '0.5px' }}>Sentiment</h4>
+                <h4 style={{ fontSize: '12px', textTransform: 'uppercase', color: 'var(--t-muted)', fontWeight: 600, marginBottom: '0.5rem', marginTop: 0, letterSpacing: '0.5px' }}>Executive Summary</h4>
+                <p style={{ fontSize: '13px', color: 'var(--t-secondary)', lineHeight: 1.6, margin: '0 0 1rem' }}>{result.text_analysis.summary}</p>
+                <h4 style={{ fontSize: '12px', textTransform: 'uppercase', color: 'var(--t-muted)', fontWeight: 600, marginBottom: '0.75rem', marginTop: 0, letterSpacing: '0.5px' }}>Sentiment</h4>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
-                  <span style={{ padding: '0.2rem 0.6rem', borderRadius: '99px', fontSize: '11px', fontWeight: 600, textTransform: 'capitalize', background: result.text_analysis.sentiment.overall_label === 'positive' ? 'rgba(34,197,94,0.15)' : result.text_analysis.sentiment.overall_label === 'negative' ? 'rgba(239,68,68,0.15)' : 'rgba(148,163,184,0.1)', color: result.text_analysis.sentiment.overall_label === 'positive' ? '#4ade80' : result.text_analysis.sentiment.overall_label === 'negative' ? '#f87171' : '#94a3b8' }}>
+                  <span style={{ padding: '0.2rem 0.6rem', borderRadius: '99px', fontSize: '11px', fontWeight: 600, textTransform: 'capitalize', background: result.text_analysis.sentiment.overall_label === 'positive' ? 'rgba(34,197,94,0.15)' : result.text_analysis.sentiment.overall_label === 'negative' ? 'rgba(239,68,68,0.15)' : 'rgba(148,163,184,0.1)', color: result.text_analysis.sentiment.overall_label === 'positive' ? '#4ade80' : result.text_analysis.sentiment.overall_label === 'negative' ? '#f87171' : 'var(--t-secondary)' }}>
                     {result.text_analysis.sentiment.overall_label}
                   </span>
                 </div>
-                <div style={{ height: '8px', width: '100%', display: 'flex', borderRadius: '4px', overflow: 'hidden', background: '#1e293b' }}>
+                <div style={{ height: '8px', width: '100%', display: 'flex', borderRadius: '4px', overflow: 'hidden', background: 'var(--border-mid)' }}>
                   <div style={{ width: `${result.text_analysis.sentiment.positive * 100}%`, background: '#22c55e' }} />
-                  <div style={{ width: `${result.text_analysis.sentiment.neutral * 100}%`, background: '#475569' }} />
+                  <div style={{ width: `${result.text_analysis.sentiment.neutral * 100}%`, background: 'var(--t-muted)' }} />
                   <div style={{ width: `${result.text_analysis.sentiment.negative * 100}%`, background: '#ef4444' }} />
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '4px', fontSize: '10px', color: '#64748b' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '4px', fontSize: '10px', color: 'var(--t-muted)' }}>
                   <span>+{(result.text_analysis.sentiment.positive * 100).toFixed(0)}%</span>
                   <span>{(result.text_analysis.sentiment.neutral * 100).toFixed(0)}%</span>
                   <span>-{(result.text_analysis.sentiment.negative * 100).toFixed(0)}%</span>
@@ -1954,10 +2736,10 @@ const AudioResultView = ({ result, file }: { result: AudioAnalysisResponse['resu
 
               {result.text_analysis.entities.length > 0 && (
                 <div className="result-card" style={{ padding: '1rem' }}>
-                  <h4 style={{ fontSize: '12px', textTransform: 'uppercase', color: '#64748b', fontWeight: 600, marginBottom: '0.75rem', marginTop: 0, letterSpacing: '0.5px' }}>Entities</h4>
+                  <h4 style={{ fontSize: '12px', textTransform: 'uppercase', color: 'var(--t-muted)', fontWeight: 600, marginBottom: '0.75rem', marginTop: 0, letterSpacing: '0.5px' }}>Entities</h4>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}>
                     {result.text_analysis.entities.slice(0, 15).map((e: any) => (
-                      <span key={e.id} style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '11px', padding: '0.25rem 0.5rem', background: '#1e293b', borderRadius: '6px', border: '1px solid #334155', color: '#cbd5e1' }}>
+                      <span key={e.id} style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '11px', padding: '0.25rem 0.5rem', background: 'var(--border-mid)', borderRadius: '6px', border: '1px solid var(--border-bright)', color: 'var(--t-secondary)' }}>
                         {e.type === 'Person' ? <Hash size={11} /> : e.type === 'Place' ? <MapPin size={11} /> : <Activity size={11} />}
                         {e.label}
                       </span>
@@ -1995,15 +2777,15 @@ const WaveformCanvas = ({ waveform, currentTime, duration }: {
     for (let i = 0; i < n; i++) {
       const amp = Math.abs(waveform.amplitudes[i]);
       const barH = amp * midY * 0.9;
-      ctx.fillStyle = i / n <= progress ? '#818cf8' : '#334155';
+      ctx.fillStyle = i / n <= progress ? '#818cf8' : 'var(--border-bright)';
       ctx.fillRect((i / n) * W, midY - barH, barW - 0.5, barH * 2);
     }
   }, [waveform, currentTime, duration]);
 
   return (
     <div className="result-card" style={{ padding: '1rem' }}>
-      <h4 style={{ fontSize: '12px', textTransform: 'uppercase', color: '#64748b', fontWeight: 600, marginBottom: '0.75rem', marginTop: 0, letterSpacing: '0.5px' }}>Waveform (normalized)</h4>
-      <canvas ref={canvasRef} width={600} height={80} style={{ width: '100%', height: '80px', borderRadius: '6px', background: '#020617' }} />
+      <h4 style={{ fontSize: '12px', textTransform: 'uppercase', color: 'var(--t-muted)', fontWeight: 600, marginBottom: '0.75rem', marginTop: 0, letterSpacing: '0.5px' }}>Waveform (normalized)</h4>
+      <canvas ref={canvasRef} width={600} height={80} style={{ width: '100%', height: '80px', borderRadius: '6px', background: 'var(--bg-root)' }} />
     </div>
   );
 };
@@ -2045,9 +2827,9 @@ const SpectrogramCanvas = ({ spectrogram, currentTime, duration }: {
 
   return (
     <div className="result-card" style={{ padding: '1rem' }}>
-      <h4 style={{ fontSize: '12px', textTransform: 'uppercase', color: '#64748b', fontWeight: 600, marginBottom: '0.75rem', marginTop: 0, letterSpacing: '0.5px' }}>STFT Spectrogram</h4>
+      <h4 style={{ fontSize: '12px', textTransform: 'uppercase', color: 'var(--t-muted)', fontWeight: 600, marginBottom: '0.75rem', marginTop: 0, letterSpacing: '0.5px' }}>STFT Spectrogram</h4>
       <canvas ref={canvasRef} width={300} height={160} style={{ width: '100%', height: '160px', borderRadius: '6px', imageRendering: 'pixelated' }} />
-      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', color: '#475569', marginTop: '4px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', color: 'var(--t-muted)', marginTop: '4px' }}>
         <span>0 Hz</span><span>8 kHz (frequency axis)</span>
       </div>
     </div>
@@ -2081,7 +2863,7 @@ const EnergyChart = ({ energy, currentTime }: {
 
   return (
     <div className="result-card" style={{ padding: '1rem' }}>
-      <h4 style={{ fontSize: '12px', textTransform: 'uppercase', color: '#64748b', fontWeight: 600, marginBottom: '0.75rem', marginTop: 0, letterSpacing: '0.5px' }}>RMS Energy</h4>
+      <h4 style={{ fontSize: '12px', textTransform: 'uppercase', color: 'var(--t-muted)', fontWeight: 600, marginBottom: '0.75rem', marginTop: 0, letterSpacing: '0.5px' }}>RMS Energy</h4>
       <canvas ref={canvasRef} width={600} height={60} style={{ width: '100%', height: '60px', borderRadius: '6px', background: '#020617' }} />
     </div>
   );
