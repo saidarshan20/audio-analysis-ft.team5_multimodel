@@ -285,7 +285,38 @@ async def ask_about_image(
 
 class ImageSearchRequest(BaseModel):
     query: str
-    captions: list[dict]
+    images: list[dict]
+
+
+class ImageCollectionAskRequest(BaseModel):
+    question: str
+    images: list[dict]
+
+
+@router.post("/image-collection-ask")
+async def ask_about_image_collection(payload: ImageCollectionAskRequest):
+    """
+    Collection-level Q&A:
+    Answer questions about an analyzed batch using captions, objects, and cluster labels.
+    """
+    if not payload.question or not payload.question.strip():
+        raise HTTPException(status_code=400, detail="Question cannot be empty.")
+
+    if not payload.images:
+        raise HTTPException(status_code=400, detail="No analyzed images provided.")
+
+    service = TeammateImageAnalysisService()
+
+    try:
+        result = service.ask_about_collection(payload.question.strip(), payload.images)
+        return {
+            "status": "success",
+            "question": payload.question.strip(),
+            **result,
+        }
+    except Exception as exc:
+        logger.exception("Collection image Q&A failed")
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 
 @router.post("/image-search")
@@ -297,17 +328,17 @@ async def search_images(payload: ImageSearchRequest):
     if not payload.query or not payload.query.strip():
         raise HTTPException(status_code=400, detail="Search query cannot be empty.")
 
-    if not payload.captions:
-        raise HTTPException(status_code=400, detail="No image captions provided.")
+    if not payload.images:
+        raise HTTPException(status_code=400, detail="No analyzed images provided.")
 
     service = TeammateImageAnalysisService()
 
     try:
-        ranked_results = service.search_images(payload.query.strip(), payload.captions)
+        ranked_results = service.search_images(payload.query.strip(), payload.images)
         return {
             "status": "success",
             "query": payload.query.strip(),
-            "total_searched": len(payload.captions),
+            "total_searched": len(payload.images),
             "results": ranked_results
         }
     except Exception as exc:
@@ -484,7 +515,7 @@ async def stream_temp_video():
 #  data.gov.in Catalog Proxy
 # ──────────────────────────────────────────────
 @router.get("/datasets")
-async def list_datasets(q: str = "", sector: str = "", offset: int = 0, limit: int = 20):
+async def list_datasets(q: str = "", offset: int = 0, limit: int = 20):
     """
     Proxy to data.gov.in catalog API.
     Returns { total, results: [{name, desc, category, org}] }
@@ -497,24 +528,17 @@ async def list_datasets(q: str = "", sector: str = "", offset: int = 0, limit: i
     params: dict = {
         "format": "json",
         "api-key": api_key,
-        "offset": int(offset),
-        "limit": int(limit),
+        "offset": offset,
+        "limit": limit,
         "filters[org_type]": "Central",
     }
-    
-    # Add sector filter if provided
-    if sector and sector.strip():
-        params["filters[sector]"] = sector.strip()
-
-    if q and q.strip():
-        # Searching by dataset title as a filter
+    if q.strip():
         params["filters[title]"] = q.strip()
 
     try:
         async with httpx.AsyncClient(timeout=15) as client:
             resp = await client.get("https://api.data.gov.in/lists", params=params)
-            if resp.status_code != 200:
-                return {"total": 0, "results": [], "error": f"OGD API returned status {resp.status_code}"}
+            resp.raise_for_status()
             data = resp.json()
 
         results = []
@@ -527,20 +551,11 @@ async def list_datasets(q: str = "", sector: str = "", offset: int = 0, limit: i
                 title = str(item.get("title") or "Untitled").strip()
                 if not title or title.lower().startswith("mydata-") or title.lower() == "untitled":
                     continue
-                
-                # Extract deeper metadata for the Detail Hub (Aggressive search for ID)
-                index_id = item.get("index_name") or item.get("resource_uuid") or item.get("id") or ""
-                fields = item.get("field") or item.get("fields") or []
-                last_updated = item.get("updated_date") or ""
-                
                 results.append({
-                    "id": str(index_id),
                     "name": title,
                     "desc": str(item.get("desc") or ""),
                     "category": str(category),
                     "org": str(org_name),
-                    "fields": fields,
-                    "updated": last_updated
                 })
             except Exception:
                 continue
@@ -556,91 +571,6 @@ async def list_datasets(q: str = "", sector: str = "", offset: int = 0, limit: i
     except Exception as exc:
         logger.warning("data.gov.in API error: %s", exc)
         return {"total": 0, "results": [], "error": str(exc)}
-
-
-@router.get("/datasets/sample/{index_id:path}")
-async def get_dataset_sample(index_id: str, limit: int = 10):
-    """Fetch sample rows for a specific dataset from data.gov.in."""
-    settings = get_settings()
-    api_key = settings.data_gov_api_key
-    if not api_key:
-        raise HTTPException(status_code=400, detail="DATA_GOV_API_KEY not configured")
-
-    params = {
-        "api-key": api_key,
-        "format": "json",
-        "limit": limit
-    }
-    
-    try:
-        async with httpx.AsyncClient(timeout=25) as client:
-            url = f"https://api.data.gov.in/resource/{index_id}"
-            resp = await client.get(url, params=params)
-            
-            if resp.status_code != 200:
-                return {
-                    "records": [], 
-                    "error": f"OGD API returned status {resp.status_code}",
-                    "id": index_id
-                }
-            
-            data = resp.json()
-            # OGD API can return rows in several keys depending on the resource type
-            records = data.get("records") or data.get("data") or data.get("results") or []
-            
-            return {
-                "records": records, 
-                "field": data.get("field") or data.get("fields") or [],
-                "total": data.get("total", 0),
-                "id": index_id
-            }
-    except Exception as exc:
-        logger.error("Dataset sample fetch error: %s", exc)
-        return {"records": [], "error": str(exc), "id": index_id}
-
-
-class DatasetChatRequest(BaseModel):
-    dataset_name: str
-    description: str
-    fields: list[dict]
-    question: str
-    history: list[dict] = []
-
-@router.post("/datasets/chat")
-async def chat_about_dataset(payload: DatasetChatRequest):
-    """Professional AI analysis of dataset metadata to provide insights without being 'gimmicky'."""
-    from openai import AsyncOpenAI
-    settings = get_settings()
-    if settings.nvidia_api_key:
-        client = AsyncOpenAI(base_url="https://integrate.api.nvidia.com/v1", api_key=settings.nvidia_api_key)
-        model_name = settings.nvidia_model
-    else:
-        client = AsyncOpenAI(base_url="https://api.groq.com/openai/v1", api_key=settings.groq_api_key)
-        model_name = settings.groq_model
-
-    column_names = [f.get("name") or f.get("id") for f in payload.fields]
-    system = (
-        "You are a Senior Data Scientist. Analyze the following dataset metadata to answer technical or analytical questions. "
-        "Avoid conversational fluff. Focus on data potential, possible correlations, and analytical use-cases.\n\n"
-        f"DATASET: {payload.dataset_name}\n"
-        f"DESCRIPTION: {payload.description}\n"
-        f"DETECTED COLUMNS: {', '.join(column_names)}\n\n"
-        "Provide professional, fact-based responses."
-    )
-    
-    messages = [{"role": "system", "content": system}]
-    for turn in payload.history[-4:]:
-        messages.append(turn)
-    messages.append({"role": "user", "content": payload.question})
-
-    try:
-        resp = await client.chat.completions.create(
-            model=model_name, messages=messages, temperature=0.2, max_tokens=600
-        )
-        return {"answer": resp.choices[0].message.content}
-    except Exception as exc:
-        logger.error("dataset-chat error: %s", exc)
-        raise HTTPException(status_code=500, detail=str(exc))
 
 
 # ──────────────────────────────────────────────
@@ -681,68 +611,6 @@ async def chat_about_codebase(payload: CodeChatRequest):
     except Exception as exc:
         logger.error("code-chat LLM error: %s", exc)
         raise HTTPException(status_code=500, detail=str(exc))
-
-
-# ──────────────────────────────────────────────
-#  Audio Chat — Q&A about a transcript
-# ──────────────────────────────────────────────
-class AudioChatRequest(BaseModel):
-    transcript_text: str
-    question: str
-    history: list[dict] = []  # [{role, content}] — last N turns
-
-@router.post("/audio-chat")
-async def chat_about_audio(payload: AudioChatRequest):
-    """Answer a question about an audio transcript using the transcript as context."""
-    from openai import AsyncOpenAI
-    settings = get_settings()
-    if settings.nvidia_api_key:
-        client = AsyncOpenAI(base_url="https://integrate.api.nvidia.com/v1", api_key=settings.nvidia_api_key)
-        model_name = settings.nvidia_model
-    else:
-        client = AsyncOpenAI(base_url="https://api.groq.com/openai/v1", api_key=settings.groq_api_key)
-        model_name = settings.groq_model
-
-    # Truncate long transcripts to avoid token limits
-    transcript_excerpt = payload.transcript_text[:4000] if payload.transcript_text else "(no transcript)"
-    system = (
-        "You are an expert audio analyst. Answer questions about the audio recording based on its transcript. "
-        "Be concise and insightful. Reference specific quotes or speakers when relevant.\n\n"
-        f"=== TRANSCRIPT ===\n{transcript_excerpt}\n=== END ==="
-    )
-    messages = [{"role": "system", "content": system}]
-    for turn in payload.history[-6:]:
-        messages.append(turn)
-    messages.append({"role": "user", "content": payload.question.strip()})
-
-    try:
-        resp = await client.chat.completions.create(
-            model=model_name, messages=messages, temperature=0.3, max_tokens=600
-        )
-        return {"answer": resp.choices[0].message.content, "model": model_name}
-    except Exception as exc:
-        logger.error("audio-chat LLM error: %s", exc)
-        raise HTTPException(status_code=500, detail=str(exc))
-
-
-@router.get("/demo-video-stream")
-async def get_demo_video():
-    """Stream the pre-analyzed demo video (huhu_analyzed.mp4) with range-request headers."""
-    video_path = os.path.join(os.path.dirname(__file__), "huhu_analyzed.mp4")
-    if not os.path.exists(video_path):
-        raise HTTPException(
-            status_code=404,
-            detail="Demo video not found. Place huhu_analyzed.mp4 in modules/team5_multimodal/."
-        )
-    return FileResponse(
-        video_path,
-        media_type="video/mp4",
-        headers={
-            "Accept-Ranges": "bytes",
-            "Cache-Control": "no-cache",
-            "Content-Disposition": "inline",
-        },
-    )
 
 
 @router.get("/demo-video-metadata")

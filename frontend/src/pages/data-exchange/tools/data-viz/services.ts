@@ -8,13 +8,10 @@ const BASE_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8000';
 // ── data.gov.in Catalog ──────────────────────────────────────────────────────
 
 export interface DatasetEntry {
-  id?: string;
   name: string;
   desc: string;
   category: string;
   org: string;
-  fields?: Array<{ id: string; name: string; type: string }>;
-  updated?: string;
 }
 
 export interface DatasetPage {
@@ -23,38 +20,10 @@ export interface DatasetPage {
   error?: string;
 }
 
-export async function fetchDatasets(q: string, offset: number, limit: number, sector: string = ''): Promise<DatasetPage> {
-  const params = new URLSearchParams({ 
-    q, 
-    offset: String(offset), 
-    limit: String(limit),
-    sector 
-  });
+export async function fetchDatasets(q: string, offset: number, limit: number): Promise<DatasetPage> {
+  const params = new URLSearchParams({ q, offset: String(offset), limit: String(limit) });
   const response = await fetch(`${BASE_URL}/team5/datasets?${params}`);
   if (!response.ok) throw new Error(`Dataset fetch failed: ${response.status}`);
-  return response.json();
-}
-
-export async function fetchDatasetSample(indexId: string): Promise<{ records: any[], [key: string]: any }> {
-  // encoding the indexId as it might contain path-like chars
-  const response = await fetch(`${BASE_URL}/team5/datasets/sample/${encodeURIComponent(indexId)}`);
-  if (!response.ok) throw new Error(`Sample fetch failed: ${response.status}`);
-  return response.json();
-}
-
-export async function chatAboutDataset(
-  name: string, 
-  desc: string, 
-  fields: any[], 
-  question: string, 
-  history: any[] = []
-): Promise<{ answer: string }> {
-  const response = await fetch(`${BASE_URL}/team5/datasets/chat`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ dataset_name: name, description: desc, fields, question, history }),
-  });
-  if (!response.ok) throw new Error(`Chat failed: ${response.status}`);
   return response.json();
 }
 
@@ -71,25 +40,6 @@ export interface TextAnalysisResult {
   kg_edges: Array<{ source: string; target: string; relation: string }>;
   timeline: Array<{ date: string; description: string }>;
   locations: Array<{ name: string; lat: number; lng: number }>;
-  // Extended NLP fields (audio branch)
-  word_count?: number;
-  conversation_score?: number;
-  emotion?: string;
-  tone?: string;
-  domain?: string;
-  bullet_points?: string[];
-  action_items?: string[];
-  topic?: string;
-  theme?: string;
-  sentence_sentiments?: Array<{ sentence: string; sentiment: string }>;
-  top_keyphrases?: string[];
-  top_keywords?: string[];
-  decisions?: string[];
-  agreements?: string[];
-  questions?: string[];
-  unanswered_questions?: string[];
-  disagreements?: string[];
-  topic_segments?: Array<{ topic: string; segment: string }>;
 }
 
 export interface DiagramGroup {
@@ -377,6 +327,7 @@ export interface ImageSearchResult {
   caption: string;
   relevance_score: number;
   reason: string;
+  matched_on: string[];
 }
 
 export interface ImageSearchResponse {
@@ -384,6 +335,27 @@ export interface ImageSearchResponse {
   query: string;
   total_searched: number;
   results: ImageSearchResult[];
+}
+
+export interface GroundedImageRecord {
+  filename: string;
+  caption: string;
+  objects: string[];
+  cluster: number;
+  cluster_description?: string;
+}
+
+export interface CollectionAnswerEvidence {
+  filename: string;
+  reason: string;
+}
+
+export interface ImageCollectionQAResponse {
+  status: string;
+  question: string;
+  answer: string;
+  supporting_results: CollectionAnswerEvidence[];
+  follow_up_suggestions: string[];
 }
 
 /**
@@ -430,17 +402,35 @@ export async function askAboutImage(file: File, question: string): Promise<Image
  */
 export async function searchImages(
   query: string,
-  captions: Array<{ filename: string; caption: string }>
+  images: GroundedImageRecord[]
 ): Promise<ImageSearchResponse> {
   const response = await fetch(`${BASE_URL}/team5/image-search`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ query, captions }),
+    body: JSON.stringify({ query, images }),
   });
 
   if (!response.ok) {
     const err = await response.json().catch(() => ({ detail: 'Unknown error' }));
     throw new Error(err.detail || `Image search failed with status ${response.status}`);
+  }
+
+  return response.json();
+}
+
+export async function askAboutImageCollection(
+  question: string,
+  images: GroundedImageRecord[]
+): Promise<ImageCollectionQAResponse> {
+  const response = await fetch(`${BASE_URL}/team5/image-collection-ask`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ question, images }),
+  });
+
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({ detail: 'Unknown error' }));
+    throw new Error(err.detail || `Collection Q&A failed with status ${response.status}`);
   }
 
   return response.json();
@@ -471,11 +461,6 @@ export interface EnergyData {
   rms_values: number[];
 }
 
-export interface MFCCData {
-  timestamps: number[];
-  coefficients: number[][];  // [mfcc_idx][time_idx], 13 coefficients
-}
-
 export interface AudioFeatures {
   sample_rate: number;
   duration: number;
@@ -483,39 +468,6 @@ export interface AudioFeatures {
   waveform: WaveformData;
   spectrogram: SpectrogramData;
   energy: EnergyData;
-  tempo: number;
-  spectral_centroid_mean: number;
-  mfcc?: MFCCData;
-  mel_spectrogram?: SpectrogramData;
-}
-
-export interface AudioFeaturesResponse {
-  status: string;
-  filename: string;
-  content_type: string;
-  result: AudioFeatures;
-}
-
-export interface AudioQualityMetrics {
-  snr: number;
-  loudness: number;
-  clarity: number;
-  noise: number;
-}
-
-export interface AudioQuality {
-  overall_score?: number;
-  composite_percent?: number;
-  rating?: string;
-  summary?: string;
-  snr_db?: number;
-  metrics?: AudioQualityMetrics;
-}
-
-export interface SpeakerMetrics {
-  dominance_ratio: number;
-  wpm: number;
-  participation_ratio: number;
 }
 
 export interface AudioAnalysisResult {
@@ -523,12 +475,13 @@ export interface AudioAnalysisResult {
   segments: SpeakerSegment[];
   transcript_text: string;
   features?: AudioFeatures;
-  text_analysis: TextAnalysisResult | null;
-  // Extended fields (audio branch)
-  audio_quality?: AudioQuality;
-  language?: string;
-  speaker_metrics?: Record<string, SpeakerMetrics>;
-  interruption_count?: number;
+  text_analysis: {
+    summary: string;
+    sentiment: { positive: number; negative: number; neutral: number; overall_label: string };
+    entities: Array<{ id: string; label: string; type: string }>;
+    timeline: Array<{ date: string; description: string }>;
+    locations: Array<{ name: string; lat: number; lng: number }>;
+  } | null;
 }
 
 export interface AudioAnalysisResponse {
@@ -536,27 +489,6 @@ export interface AudioAnalysisResponse {
   filename: string;
   content_type: string;
   result: AudioAnalysisResult;
-}
-
-/**
- * Lightweight acoustic feature extraction — waveform, spectrogram, RMS energy.
- * No Whisper/diarization. Suitable for visualization demos.
- */
-export async function extractAudioFeatures(file: File): Promise<AudioFeaturesResponse> {
-  const formData = new FormData();
-  formData.append('file', file);
-
-  const response = await fetch(`${BASE_URL}/team5/audio-features`, {
-    method: 'POST',
-    body: formData,
-  });
-
-  if (!response.ok) {
-    const err = await response.json().catch(() => ({ detail: 'Unknown error' }));
-    throw new Error(err.detail || `Feature extraction failed with status ${response.status}`);
-  }
-
-  return response.json();
 }
 
 /**
@@ -629,56 +561,4 @@ export async function analyzeVideo(file: File): Promise<VideoAnalysisResult> {
   }
 
   return response.json();
-}
-
-// ── Audio Chat ────────────────────────────────────────────────────────────────
-
-export interface AudioChatMessage {
-  role: 'user' | 'assistant';
-  content: string;
-}
-
-export interface AudioChatResponse {
-  answer: string;
-  model: string;
-}
-
-/**
- * Ask a question about an audio transcript using multi-turn LLM chat
- */
-export async function submitAudioChat(
-  transcriptText: string,
-  history: AudioChatMessage[],
-  question: string
-): Promise<AudioChatResponse> {
-  const response = await fetch(`${BASE_URL}/team5/audio-chat`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ transcript_text: transcriptText, history, question }),
-  });
-
-  if (!response.ok) {
-    const err = await response.json().catch(() => ({ detail: 'Unknown error' }));
-    throw new Error(err.detail || `Audio chat failed with status ${response.status}`);
-  }
-
-  return response.json();
-}
-
-/**
- * Fetches pre-computed analysis metadata for the demo video (huhu_analyzed.mp4)
- */
-export async function fetchVideoDemoMetadata(): Promise<VideoAnalysisResult> {
-  const response = await fetch(`${BASE_URL}/team5/demo-video-metadata`);
-  if (!response.ok) {
-    throw new Error(`Failed to fetch demo metadata: ${response.status}`);
-  }
-  return response.json();
-}
-
-/**
- * Returns the URL for streaming the analyzed demo video
- */
-export function getVideoDemoStreamUrl(): string {
-  return `${BASE_URL}/team5/demo-video-stream`;
 }

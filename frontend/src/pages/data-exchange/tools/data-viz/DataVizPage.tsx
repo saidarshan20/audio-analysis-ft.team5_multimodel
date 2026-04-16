@@ -29,6 +29,7 @@ import ImageAnalysisView from './components/ImageAnalysisView';
 import AudioAnalysisView from './components/AudioAnalysisView';
 import VideoAnalysisView from './components/VideoAnalysisView';
 import CatalogView       from './components/CatalogView';
+import ErrorBoundary     from './components/ErrorBoundary';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -637,13 +638,15 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
                 {textResult   && <TextAnalysisView  result={textResult} />}
                 {codeResult   && <CodeAnalysisView  result={codeResult} />}
                 {(imgResult || imgZipResult) && (
-                  <ImageAnalysisView
-                    imgResult={imgResult}
-                    imgZipResult={imgZipResult}
-                    imgTokens={imgTokens}
-                    imgDuration={imgDuration}
-                    imgModel={imgModel}
-                  />
+                  <ErrorBoundary>
+                    <ImageAnalysisView
+                      imgResult={imgResult}
+                      imgZipResult={imgZipResult}
+                      imgTokens={imgTokens}
+                      imgDuration={imgDuration}
+                      imgModel={imgModel}
+                    />
+                  </ErrorBoundary>
                 )}
                 {audioResult  && <AudioAnalysisView result={audioResult.result} file={selectedFiles[0]} />}
                 {videoResult  && <VideoAnalysisView result={videoResult} />}
