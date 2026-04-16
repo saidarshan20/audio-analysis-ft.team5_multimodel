@@ -4,6 +4,8 @@ uvicorn[standard]>=0.34.0
 pydantic>=2.10.0
 pydantic-settings>=2.7.0
 python-multipart>=0.0.18
+pandas>=2.1.0
+openpyxl>=3.1.2
 
 # --- AI (Groq) ---
 groq>=0.25.0

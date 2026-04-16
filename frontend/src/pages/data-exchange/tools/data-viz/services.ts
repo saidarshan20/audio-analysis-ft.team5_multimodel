@@ -104,6 +104,36 @@ export interface CodeAnalysisResult {
   };
 }
 
+// ── Team 4: Data Visualization Types ──────────────────────────────────────
+
+export interface ColumnStat {
+  name: string;
+  type: 'numeric' | 'categorical';
+  null_count: number;
+  unique_count: number;
+  min: number | null;
+  max: number | null;
+  mean: number | null;
+  std_dev: number | null;
+  top_category: string | null;
+}
+
+export interface CSVAnalysisResult {
+  filename: string;
+  total_rows: number;
+  total_cols: number;
+  columns: string[];
+  preview_rows: any[];
+  column_stats: ColumnStat[];
+}
+
+export interface ChartDataResponse {
+  chart_type: string;
+  x_axis: string;
+  y_axis: string;
+  data: any[];
+}
+
 export interface ImageAnalysisResult {
   filename: string;
   caption: string;
@@ -558,6 +588,115 @@ export async function analyzeVideo(file: File): Promise<VideoAnalysisResult> {
   if (!response.ok) {
     const err = await response.json().catch(() => ({ detail: 'Unknown error' }));
     throw new Error(err.detail || `Video analysis failed with status ${response.status}`);
+  }
+
+  return response.json();
+}
+
+// ── Audio Chat ────────────────────────────────────────────────────────────────
+
+export interface AudioChatMessage {
+  role: 'user' | 'assistant';
+  content: string;
+}
+
+export interface AudioChatResponse {
+  answer: string;
+  model: string;
+}
+
+/**
+ * Ask a question about an audio transcript using multi-turn LLM chat
+ */
+export async function submitAudioChat(
+  transcriptText: string,
+  history: AudioChatMessage[],
+  question: string
+): Promise<AudioChatResponse> {
+  const response = await fetch(`${BASE_URL}/team5/audio-chat`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ transcript_text: transcriptText, history, question }),
+  });
+
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({ detail: 'Unknown error' }));
+    throw new Error(err.detail || `Audio chat failed with status ${response.status}`);
+  }
+
+  return response.json();
+}
+
+/**
+ * Fetches pre-computed analysis metadata for the demo video (huhu_analyzed.mp4)
+ */
+export async function fetchVideoDemoMetadata(): Promise<VideoAnalysisResult> {
+  const response = await fetch(`${BASE_URL}/team5/demo-video-metadata`);
+  if (!response.ok) {
+    throw new Error(`Failed to fetch demo metadata: ${response.status}`);
+  }
+  return response.json();
+}
+
+/**
+ * Returns the URL for streaming the analyzed demo video
+ */
+export function getVideoDemoStreamUrl(): string {
+  return `${BASE_URL}/team5/demo-video-stream`;
+}
+
+// ── Team 4: Visualization API ───────────────────────────────────────────────
+
+/**
+ * Uploads a CSV/Excel file to Team 4's scratchpad for visualization analysis
+ */
+export async function uploadDatasetTeam4(file: File): Promise<{ message: string; data: { filename: string; columns: string[] } }> {
+  const formData = new FormData();
+  formData.append('file', file);
+
+  const response = await fetch(`${BASE_URL}/team4/upload`, {
+    method: 'POST',
+    body: formData,
+  });
+
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({ detail: 'Upload failed' }));
+    throw new Error(err.detail || `Upload failed with status ${response.status}`);
+  }
+
+  return response.json();
+}
+
+/**
+ * Gets first 100 rows and column-level statistics from Team 4
+ */
+export async function getPreviewTeam4(filename: string): Promise<CSVAnalysisResult> {
+  const response = await fetch(`${BASE_URL}/team4/preview?filename=${encodeURIComponent(filename)}`);
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({ detail: 'Preview failed' }));
+    throw new Error(err.detail || `Preview failed with status ${response.status}`);
+  }
+  return response.json();
+}
+
+/**
+ * Gets chart-ready data from Team 4 based on axis and type selection
+ */
+export async function getChartDataTeam4(
+  filename: string, 
+  xAxis: string, 
+  yAxis: string, 
+  chartType: string
+): Promise<ChartDataResponse> {
+  const response = await fetch(`${BASE_URL}/team4/visualize`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ filename, x_axis: xAxis, y_axis: yAxis, chart_type: chartType }),
+  });
+
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({ detail: 'Visualization failed' }));
+    throw new Error(err.detail || `Visualization failed with status ${response.status}`);
   }
 
   return response.json();

@@ -7,13 +7,10 @@ import { toast } from 'sonner';
 import '../ToolPage.css';
 
 import {
-  analyzeTextFile,
-  analyzeCodebase,
-  analyzeGithubRepo,
-  analyzeImagesBatch,
-  analyzeAudio,
   analyzeVideo,
   fetchVideoDemoMetadata,
+  uploadDatasetTeam4,
+  getPreviewTeam4,
   TextAnalysisResult,
   CodeAnalysisResult,
   MultiImageAnalysisResponse,
@@ -21,6 +18,7 @@ import {
   AudioAnalysisResponse,
   AudioAnalysisResult,
   VideoAnalysisResult,
+  CSVAnalysisResult,
 } from './services';
 
 import TextAnalysisView  from './components/TextAnalysisView';
@@ -28,6 +26,7 @@ import CodeAnalysisView  from './components/CodeAnalysisView';
 import ImageAnalysisView from './components/ImageAnalysisView';
 import AudioAnalysisView from './components/AudioAnalysisView';
 import VideoAnalysisView from './components/VideoAnalysisView';
+import CSVAnalysisView   from './components/CSVAnalysisView';
 import CatalogView       from './components/CatalogView';
 import ErrorBoundary     from './components/ErrorBoundary';
 
@@ -41,7 +40,7 @@ type HistoryItem = {
   type: FileType | 'github';
   label: string;
   timestamp: number;
-  data: TextAnalysisResult | CodeAnalysisResult | MultiImageAnalysisResponse | AudioAnalysisResult | VideoAnalysisResult;
+  data: TextAnalysisResult | CodeAnalysisResult | MultiImageAnalysisResponse | AudioAnalysisResult | VideoAnalysisResult | CSVAnalysisResult;
 };
 
 const FILE_TYPES: { id: FileType; label: string; desc: string; icon: any }[] = [
@@ -158,6 +157,7 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
   const [imgModel,      setImgModel]      = useState('');
   const [audioResult,   setAudioResult]   = useState<AudioAnalysisResponse | null>(null);
   const [videoResult,   setVideoResult]   = useState<VideoAnalysisResult   | null>(null);
+  const [csvResult,     setCsvResult]     = useState<CSVAnalysisResult     | null>(null);
 
   // History
   const [history, setHistory] = useState<HistoryItem[]>(() => {
@@ -183,6 +183,7 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
     setImgModel('');
     setAudioResult(null);
     setVideoResult(null);
+    setCsvResult(null);
     setSelectedFiles([]);
     setShowHistory(false);
   };
@@ -204,6 +205,8 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
       setAudioResult({ status: 'success', filename: item.label, content_type: 'audio/wav', result: item.data as AudioAnalysisResult });
     } else if (item.type === 'videos') {
       setVideoResult(item.data as VideoAnalysisResult);
+    } else if (item.type === 'csv') {
+      setCsvResult(item.data as CSVAnalysisResult);
     } else {
       setTextResult(item.data as TextAnalysisResult);
     }
@@ -219,7 +222,7 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
   };
 
   const handleDownloadResult = () => {
-    const activeData = textResult || codeResult || imgResult || (audioResult?.result) || imgZipResult;
+    const activeData = textResult || codeResult || imgResult || (audioResult?.result) || imgZipResult || csvResult;
     if (!activeData) return;
     const blob = new Blob([JSON.stringify(activeData, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
@@ -348,6 +351,13 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
         setVideoResult(res);
         saveToHistory('videos', res, files[0].name);
         toast.success('Video analysis complete!', { id: 'analysis' });
+      } else if (fileType === 'csv' && files.length === 1) {
+        toast.loading('Running Visual Exploration Engine...', { id: 'analysis' });
+        const uploadRes = await uploadDatasetTeam4(files[0]);
+        const result = await getPreviewTeam4(uploadRes.data.filename);
+        setCsvResult(result);
+        saveToHistory('csv', result, files[0].name);
+        toast.success('Data exploration ready!', { id: 'analysis' });
       } else {
         toast.error('Unsupported file combo.', { id: 'analysis' });
       }
@@ -384,17 +394,19 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
 
       const file = new File([csvContent], `${dataset.name.slice(0, 30)}.csv`, { type: 'text/csv' });
       
-      // 2. Setup state to match a manual CSV upload
+      // 2. Setup state
       setFileType('csv');
       setSelectedFiles([file]);
       setActiveTab('upload');
 
-      // 3. Trigger analysis exactly like handleContinue
+      // 3. Trigger Team 4 pipeline
       toast.loading('Analyzing dataset structure & patterns...', { id: 'analysis' });
-      const res = await analyzeTextFile(file);
-      setTextResult(res);
+      const uploadRes = await uploadDatasetTeam4(file);
+      const res = await getPreviewTeam4(uploadRes.data.filename);
+      
+      setCsvResult(res);
       saveToHistory('csv', res, `Catalog: ${dataset.name}`);
-      toast.success('Dataset analysis complete!', { id: 'analysis' });
+      toast.success('Professional data exploration ready!', { id: 'analysis' });
     } catch (err: any) {
       toast.error(err.message || 'Analysis failed', { id: 'analysis' });
     } finally {
@@ -403,7 +415,7 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
     }
   };
 
-  const hasResult = !!(textResult || codeResult || imgResult || imgZipResult || audioResult || videoResult);
+  const hasResult = !!(textResult || codeResult || imgResult || imgZipResult || audioResult || videoResult || csvResult);
 
   // ── Render ────────────────────────────────────────────────────────────────────
 
@@ -650,6 +662,7 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
                 )}
                 {audioResult  && <AudioAnalysisView result={audioResult.result} file={selectedFiles[0]} />}
                 {videoResult  && <VideoAnalysisView result={videoResult} />}
+                {csvResult    && <CSVAnalysisView   result={csvResult} />}
               </div>
             )}
           </div>
