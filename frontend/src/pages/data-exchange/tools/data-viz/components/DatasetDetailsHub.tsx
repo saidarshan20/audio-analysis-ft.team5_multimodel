@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { 
+import {
   X,
   Database,
   Calendar,
@@ -8,9 +8,9 @@ import {
   Table as TableIcon,
   Send,
   Loader2,
-  FileSpreadsheet
+  Download
 } from 'lucide-react';
-import { DatasetEntry, fetchDatasetSample, chatAboutDataset } from '../services';
+import { DatasetEntry, fetchDatasetSample, chatAboutDataset, downloadDatasetCSV } from '../services';
 
 interface Props {
   dataset: DatasetEntry;
@@ -26,6 +26,15 @@ const DatasetDetailsHub: React.FC<Props> = ({ dataset, onClose, onAnalyze }) => 
   const [chatMessage, setChatMessage] = useState('');
   const [chatHistory, setChatHistory] = useState<any[]>([]);
   const [chatLoading, setChatLoading] = useState(false);
+  const [downloading, setDownloading] = useState(false);
+
+  const handleDownload = () => {
+    if (!dataset.id) return;
+    setDownloading(true);
+    downloadDatasetCSV(dataset.id, dataset.name);
+    // The browser handles the file — reset the button after a short delay
+    setTimeout(() => setDownloading(false), 3000);
+  };
 
   const loadSample = async () => {
     if (!dataset.id || sampleData.length > 0) return;
@@ -140,17 +149,37 @@ const DatasetDetailsHub: React.FC<Props> = ({ dataset, onClose, onAnalyze }) => 
             </div>
 
             <div className="hub-cta-section" style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              <button 
-                className="xt-continue-btn" 
-                style={{ width: '100%', justifyContent: 'center', gap: '10px' }} 
-                onClick={() => onAnalyze?.(dataset, sampleData)}
-                disabled={sampleData.length === 0}
+              <button
+                className="xt-continue-btn"
+                style={{ width: '100%', justifyContent: 'center', gap: '10px' }}
+                onClick={() => setActiveTab('preview')}
               >
-                <FileSpreadsheet size={16} /> Analyze in CSV Tool
+                <TableIcon size={16} /> Load Sample &amp; Analyze
               </button>
-              <button className="xt-tab active" style={{ width: '100%', justifyContent: 'center' }} onClick={() => setActiveTab('preview')}>
-                <TableIcon size={16} /> Explore Sample Records
-              </button>
+              {dataset.id && (
+                <button
+                  onClick={handleDownload}
+                  disabled={downloading}
+                  style={{
+                    width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+                    padding: '10px', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: downloading ? 'not-allowed' : 'pointer',
+                    background: downloading ? 'rgba(34,197,94,0.05)' : 'rgba(34,197,94,0.1)',
+                    color: downloading ? '#4ade80' : '#22c55e',
+                    border: `1px solid ${downloading ? 'rgba(74,222,128,0.2)' : 'rgba(34,197,94,0.3)'}`,
+                    transition: 'all 0.2s',
+                  }}
+                >
+                  {downloading
+                    ? <><Loader2 size={15} style={{ animation: 'spin 1s linear infinite' }} /> Preparing download…</>
+                    : <><Download size={15} /> Download Full Dataset (CSV)</>
+                  }
+                </button>
+              )}
+              {!dataset.id && (
+                <p style={{ fontSize: '11px', color: '#475569', textAlign: 'center', margin: 0 }}>
+                  Download unavailable — no resource ID for this entry.
+                </p>
+              )}
             </div>
           </div>
         )}
@@ -177,14 +206,32 @@ const DatasetDetailsHub: React.FC<Props> = ({ dataset, onClose, onAnalyze }) => 
             ) : sampleData.length > 0 ? (
               <div className="hub-table-wrap">
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                  <span style={{ fontSize: '11px', color: '#94a3b8' }}>Showing up to 50 sample records from {dataset.name}</span>
-                  <button 
-                    className="xt-tab active" 
-                    style={{ fontSize: '11px', padding: '6px 12px', background: 'rgba(251, 140, 54, 0.1)', color: '#fb8c36' }}
-                    onClick={() => onAnalyze?.(dataset, sampleData)}
-                  >
-                    Analyze Full Snapshot
-                  </button>
+                  <span style={{ fontSize: '11px', color: '#94a3b8' }}>
+                    {sampleData.length} sample rows — not the full dataset
+                  </span>
+                  <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
+                    <button
+                      className="xt-tab active"
+                      style={{ fontSize: '11px', padding: '6px 12px', background: 'rgba(251, 140, 54, 0.1)', color: '#fb8c36' }}
+                      onClick={() => onAnalyze?.(dataset, sampleData)}
+                    >
+                      Explore Sample
+                    </button>
+                    {dataset.id && (
+                      <button
+                        onClick={handleDownload}
+                        disabled={downloading}
+                        style={{
+                          fontSize: '11px', padding: '6px 12px', display: 'flex', alignItems: 'center', gap: '5px',
+                          background: 'rgba(34,197,94,0.1)', color: '#22c55e',
+                          border: '1px solid rgba(34,197,94,0.25)', borderRadius: '6px', cursor: 'pointer',
+                        }}
+                      >
+                        {downloading ? <Loader2 size={12} style={{ animation: 'spin 1s linear infinite' }} /> : <Download size={12} />}
+                        Full CSV
+                      </button>
+                    )}
+                  </div>
                 </div>
                 <table className="hub-table">
                   <thead>

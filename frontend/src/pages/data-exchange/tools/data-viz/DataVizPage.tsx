@@ -161,6 +161,7 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
   const [audioResult,   setAudioResult]   = useState<AudioAnalysisResponse | null>(null);
   const [videoResult,   setVideoResult]   = useState<VideoAnalysisResult   | null>(null);
   const [csvResult,     setCsvResult]     = useState<CSVAnalysisResult     | null>(null);
+  const [csvIsSample,   setCsvIsSample]   = useState(false);
 
   // History
   const [history, setHistory] = useState<HistoryItem[]>(() => {
@@ -187,6 +188,7 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
     setAudioResult(null);
     setVideoResult(null);
     setCsvResult(null);
+    setCsvIsSample(false);
     setSelectedFiles([]);
     setShowHistory(false);
   };
@@ -358,6 +360,7 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
         toast.loading('Running Visual Exploration Engine...', { id: 'analysis' });
         const uploadRes = await uploadDatasetTeam4(files[0]);
         const result = await getPreviewTeam4(uploadRes.data.filename);
+        setCsvIsSample(false);
         setCsvResult(result);
         saveToHistory('csv', result, files[0].name);
         toast.success('Data exploration ready!', { id: 'analysis' });
@@ -403,13 +406,14 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
       setActiveTab('upload');
 
       // 3. Trigger Team 4 pipeline
-      toast.loading('Analyzing dataset structure & patterns...', { id: 'analysis' });
+      toast.loading(`Fetching ${records.length} rows & analyzing structure…`, { id: 'analysis' });
       const uploadRes = await uploadDatasetTeam4(file);
       const res = await getPreviewTeam4(uploadRes.data.filename);
-      
+
+      setCsvIsSample(true);   // flag: came from catalog, not a full file upload
       setCsvResult(res);
       saveToHistory('csv', res, `Catalog: ${dataset.name}`);
-      toast.success('Professional data exploration ready!', { id: 'analysis' });
+      toast.success(`Sample analysis ready — ${records.length} rows from catalog`, { id: 'analysis' });
     } catch (err: any) {
       toast.error(err.message || 'Analysis failed', { id: 'analysis' });
     } finally {
@@ -665,7 +669,7 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
                 )}
                 {audioResult  && <AudioAnalysisView result={audioResult.result} file={selectedFiles[0]} />}
                 {videoResult  && <VideoAnalysisView result={videoResult} />}
-                {csvResult    && <CSVAnalysisView   result={csvResult} />}
+                {csvResult    && <CSVAnalysisView   result={csvResult} isSample={csvIsSample} />}
               </div>
             )}
           </div>

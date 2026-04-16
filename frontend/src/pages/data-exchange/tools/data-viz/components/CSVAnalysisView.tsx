@@ -13,6 +13,8 @@ import { CSVAnalysisResult, ColumnStat, getChartDataTeam4, ChartDataResponse } f
 
 interface Props {
   result: CSVAnalysisResult;
+  isSample?: boolean;       // true when data comes from a catalog 500-row sample
+  sampleOf?: number;        // original dataset total (if known)
 }
 
 const CHART_COLORS = ['#fb8c36', '#38bdf8', '#818cf8', '#34d399', '#f472b6', '#fbbf24', '#a78bfa', '#f87171'];
@@ -35,9 +37,9 @@ const ChartRenderer = ({
   xAxis: string;
   yAxis: string;
 }) => {
-  // Normalise & limit
+  // Normalise — use all rows the backend sent (already capped server-side at 2000)
   const points = useMemo(() => {
-    return data.slice(0, 100).map(item => ({
+    return data.map(item => ({
       ...item,
       _x: item[xAxis] ?? item['label'] ?? '',
       _y: Number(item[yAxis] ?? item['count'] ?? 0),
@@ -68,7 +70,7 @@ const ChartRenderer = ({
     });
     const pieData = Object.entries(aggregated)
       .sort((a, b) => b[1] - a[1])
-      .slice(0, 12)
+      .slice(0, 16)
       .map(([name, value]) => ({ name, value }));
 
     return (
@@ -115,12 +117,11 @@ const ChartRenderer = ({
   }
 
   if (chartType === 'histogram') {
-    // Backend sends pre-binned data for histogram: {bin_start, bin_end, count}
+    // Backend sends pre-binned data: { [xAxis]: "(1000, 5000]", count: 145 }
+    // The bin key is the xAxis column name containing the interval string.
     const histData = data.map(d => ({
-      label: d.bin_start !== undefined
-        ? `${Number(d.bin_start).toFixed(1)}–${Number(d.bin_end).toFixed(1)}`
-        : String(d[xAxis] ?? d['label'] ?? ''),
-      count: Number(d.count ?? d[yAxis] ?? 0),
+      label: String(d[xAxis] ?? d['label'] ?? d['bin'] ?? ''),
+      count: Number(d['count'] ?? d[yAxis] ?? 0),
     }));
 
     return (
@@ -137,14 +138,15 @@ const ChartRenderer = ({
   }
 
   // Bar / Line / Area — aggregate by _x, sum _y
+  // Show up to 200 categories (backend already limits rows to 2000)
   const aggregated: Record<string, number> = {};
   points.forEach(p => {
-    const key = String(p._x).slice(0, 25);
+    const key = String(p._x).slice(0, 30);
     aggregated[key] = (aggregated[key] || 0) + p._y;
   });
   const agg = Object.entries(aggregated)
     .sort((a, b) => b[1] - a[1])
-    .slice(0, 50)
+    .slice(0, 200)
     .map(([name, value]) => ({ name, value }));
 
   if (chartType === 'line') {
@@ -200,7 +202,7 @@ const ChartRenderer = ({
 };
 
 // ── Main component ────────────────────────────────────────────────────────────
-const CSVAnalysisView = ({ result }: Props) => {
+const CSVAnalysisView = ({ result, isSample = false, sampleOf }: Props) => {
   const [activeTab, setActiveTab] = useState<'stats' | 'preview' | 'visuals'>('stats');
   const [selectedColumn, setSelectedColumn] = useState<ColumnStat | null>(null);
 
@@ -246,6 +248,26 @@ const CSVAnalysisView = ({ result }: Props) => {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', marginTop: '1.5rem', animation: 'fadeIn 0.5s ease-out' }}>
+
+      {/* ── Sample Warning Banner ── */}
+      {isSample && (
+        <div style={{
+          display: 'flex', alignItems: 'flex-start', gap: '12px',
+          padding: '12px 16px', borderRadius: '10px',
+          background: 'rgba(251, 191, 36, 0.08)',
+          border: '1px solid rgba(251, 191, 36, 0.25)',
+        }}>
+          <span style={{ fontSize: '18px', lineHeight: 1 }}>⚠️</span>
+          <div style={{ fontSize: '13px', lineHeight: 1.5 }}>
+            <strong style={{ color: '#fbbf24' }}>Sample analysis — not the full dataset.</strong>
+            <span style={{ color: '#94a3b8', marginLeft: '6px' }}>
+              Stats and charts are based on {result.total_rows.toLocaleString()} sampled rows
+              {sampleOf ? ` of ~${sampleOf.toLocaleString()} total` : ' from the data.gov.in catalog'}.
+              Download the full dataset for authoritative analysis.
+            </span>
+          </div>
+        </div>
+      )}
 
       {/* ── Summary Cards ── */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
@@ -387,9 +409,9 @@ const CSVAnalysisView = ({ result }: Props) => {
               </tbody>
             </table>
           </div>
-          <div style={{ padding: '12px 20px', background: '#0f172a', borderTop: '1px solid #1e293b', fontSize: '11px', color: '#64748b', display: 'flex', justifyContent: 'space-between' }}>
-            <span>Showing first {result.preview_rows.length} rows of {result.total_rows.toLocaleString()} total.</span>
-            <span>{result.total_cols} columns identified.</span>
+          <div style={{ padding: '12px 20px', background: '#0f172a', borderTop: '1px solid #1e293b', fontSize: '11px', color: '#64748b', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '6px' }}>
+            <span>Preview: first {result.preview_rows.length} of {result.total_rows.toLocaleString()} rows · {result.total_cols} columns</span>
+            <span style={{ color: '#475569' }}>Charts use up to 2,000 rows from backend · Stats computed on full data</span>
           </div>
         </div>
       )}
@@ -486,7 +508,8 @@ const CSVAnalysisView = ({ result }: Props) => {
                       {xAxis} {chartType !== 'histogram' && chartType !== 'pie' ? `vs ${yAxis}` : ''}
                     </h4>
                     <p style={{ fontSize: '11px', color: '#64748b', margin: '3px 0 0 0' }}>
-                      {chartType.toUpperCase()} · {chartData.data.length} data points
+                      {chartType.toUpperCase()} · {chartData.data.length.toLocaleString()} rows from backend
+                      {isSample && <span style={{ color: '#fbbf24', marginLeft: 6 }}>· sample only</span>}
                     </p>
                   </div>
                   <button

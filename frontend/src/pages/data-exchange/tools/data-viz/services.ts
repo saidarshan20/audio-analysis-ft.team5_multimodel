@@ -37,6 +37,22 @@ export async function fetchDatasetSample(indexId: string): Promise<{ records: an
   return response.json();
 }
 
+/**
+ * Triggers a full CSV download for a data.gov.in dataset.
+ * The backend paginates through the API and streams the file —
+ * the API key never leaves the server.
+ */
+export function downloadDatasetCSV(indexId: string, datasetName: string): void {
+  const safeName = encodeURIComponent(datasetName.slice(0, 60));
+  const url = `${BASE_URL}/team5/datasets/download/${encodeURIComponent(indexId)}?filename=${safeName}`;
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${datasetName.slice(0, 60)}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+}
+
 export async function chatAboutDataset(
   name: string, 
   desc: string, 

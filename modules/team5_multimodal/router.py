@@ -637,7 +637,7 @@ async def chat_about_codebase(payload: CodeChatRequest):
 #  Dataset Sample Preview — proxy data.gov.in resource rows
 # ──────────────────────────────────────────────
 @router.get("/datasets/sample/{index_id:path}")
-async def get_dataset_sample(index_id: str, limit: int = 50):
+async def get_dataset_sample(index_id: str, limit: int = 500):
     """
     Fetch up to `limit` rows from a data.gov.in resource.
     Returns { records: [...], field: [...], total: int }
@@ -674,6 +674,98 @@ async def get_dataset_sample(index_id: str, limit: int = 50):
     except Exception as exc:
         logger.warning("Dataset sample fetch error for %s: %s", index_id, exc)
         return {"records": [], "field": [], "total": 0, "error": str(exc)}
+
+
+# ──────────────────────────────────────────────
+#  Dataset Full CSV Download — paginated proxy stream
+# ──────────────────────────────────────────────
+MAX_DOWNLOAD_ROWS = 50_000   # hard cap to prevent abuse / timeouts
+
+@router.get("/datasets/download/{index_id:path}")
+async def download_dataset_csv(index_id: str, filename: str = "dataset"):
+    """
+    Streams the full dataset from data.gov.in as a CSV file download.
+    Paginates through the resource API (1 000 rows per page) up to MAX_DOWNLOAD_ROWS.
+    The API key stays server-side — never exposed to the browser.
+    """
+    import csv
+    import io
+
+    settings = get_settings()
+    api_key = settings.data_gov_api_key
+    if not api_key:
+        raise HTTPException(status_code=503, detail="DATA_GOV_API_KEY not configured")
+
+    base_url = f"https://api.data.gov.in/resource/{index_id}"
+    PAGE_SIZE = 1_000
+
+    async def csv_stream():
+        writer_buf = io.StringIO()
+        csv_writer = None
+        rows_written = 0
+        offset = 0
+        first_page = True
+
+        async with httpx.AsyncClient(timeout=30) as client:
+            while rows_written < MAX_DOWNLOAD_ROWS:
+                params = {
+                    "api-key": api_key,
+                    "format": "json",
+                    "limit": min(PAGE_SIZE, MAX_DOWNLOAD_ROWS - rows_written),
+                    "offset": offset,
+                }
+                try:
+                    resp = await client.get(base_url, params=params)
+                    resp.raise_for_status()
+                    data = resp.json()
+                except Exception as exc:
+                    logger.error("Download page error at offset %d: %s", offset, exc)
+                    break
+
+                records = data.get("records", [])
+                if not records:
+                    break   # no more data
+
+                for record in records:
+                    if csv_writer is None:
+                        # Write header on very first record
+                        headers = list(record.keys())
+                        csv_writer = csv.DictWriter(
+                            writer_buf,
+                            fieldnames=headers,
+                            extrasaction="ignore",
+                            lineterminator="\n",
+                        )
+                        if first_page:
+                            csv_writer.writeheader()
+                            first_page = False
+
+                    csv_writer.writerow(record)
+                    rows_written += 1
+
+                # Flush buffer and yield
+                chunk = writer_buf.getvalue()
+                writer_buf.truncate(0)
+                writer_buf.seek(0)
+                if chunk:
+                    yield chunk.encode("utf-8")
+
+                total = int(data.get("total", 0))
+                offset += len(records)
+                if offset >= total:
+                    break   # fetched everything the API has
+
+        # Append download cap note as a CSV comment if we hit the limit
+        if rows_written >= MAX_DOWNLOAD_ROWS:
+            yield f"\n# Download capped at {MAX_DOWNLOAD_ROWS:,} rows. Visit data.gov.in for the full dataset.\n".encode("utf-8")
+
+    safe_name = "".join(c if c.isalnum() or c in "-_ " else "_" for c in filename)[:60].strip() or "dataset"
+    headers = {
+        "Content-Disposition": f'attachment; filename="{safe_name}.csv"',
+        "Content-Type": "text/csv; charset=utf-8",
+        "X-Accel-Buffering": "no",   # disable nginx buffering so chunks arrive live
+    }
+    return StreamingResponse(csv_stream(), headers=headers, media_type="text/csv")
 
 
 # ──────────────────────────────────────────────
