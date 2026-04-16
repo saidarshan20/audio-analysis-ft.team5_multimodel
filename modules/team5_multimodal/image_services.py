@@ -268,11 +268,11 @@ class ImageAnalysisService:
                         label = _yolo_model.names[cls]
                         objs.append(DetectedObject(label=label, confidence=conf, bbox=[x1, y1, x2, y2]))
                     
-                    # Generate annotated image
+                    # Generate annotated image — always save as JPEG so browsers can render it
                     im_array = r.plot()
-                    im_pil = Image.fromarray(im_array[..., ::-1])
-                    out_img = annotated_dir / img_path.name
-                    im_pil.save(str(out_img))
+                    im_pil = Image.fromarray(im_array[..., ::-1]).convert("RGB")
+                    out_img = annotated_dir / (img_path.stem + ".jpg")
+                    im_pil.save(str(out_img), format="JPEG", quality=90)
                     rel_annotated_path = str(out_img.relative_to(self.base_dir))
 
             # --- CLIP Embeddings ---

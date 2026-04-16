@@ -104,10 +104,20 @@ const ImageMetadataPanel = ({ record, onClose }: { record: VisualRecord, onClose
         <div className="metadata-modal-body">
           <div className="image-preview-pane">
             {record.annotated_image_path ? (
-              <img src={`${import.meta.env.VITE_API_URL ?? 'http://localhost:8000'}/${record.annotated_image_path}`} alt={record.filename} />
-            ) : (
-              <div className="no-image"><ImageIcon size={48} /><span>No Preview</span></div>
-            )}
+              <img
+                src={`${import.meta.env.VITE_API_URL ?? 'http://localhost:8000'}/${record.annotated_image_path}`}
+                alt={record.filename}
+                onError={(e) => {
+                  const el = e.currentTarget;
+                  el.style.display = 'none';
+                  const placeholder = el.parentElement?.querySelector('.no-image') as HTMLElement | null;
+                  if (placeholder) placeholder.style.display = 'flex';
+                }}
+              />
+            ) : null}
+            <div className="no-image" style={{ display: record.annotated_image_path ? 'none' : 'flex' }}>
+              <ImageIcon size={48} /><span>No Preview Available</span>
+            </div>
           </div>
 
           <div className="info-sidebar">
