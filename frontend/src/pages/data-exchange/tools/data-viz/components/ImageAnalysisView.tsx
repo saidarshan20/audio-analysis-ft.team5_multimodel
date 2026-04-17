@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import {
@@ -6,6 +7,7 @@ import {
   MessageCircle, Loader2, Send, SearchCheck, Upload, ArrowRight, X,
   Clock, Zap, Cpu, MapPin, Camera
 } from 'lucide-react';
+import { ScatterChart, Scatter, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, CartesianGrid, Label } from 'recharts';
 import { toast } from 'sonner';
 import {
   MultiImageAnalysisResponse, ImageZipAnalysisResponse, ImageQAResponse, ImageSearchResult,
@@ -23,6 +25,8 @@ export interface VisualRecord {
   annotated_image_path: string | null;
   object_count: number;
   object_details: { label: string; confidence: number; bbox: number[] }[];
+  x?: number;
+  y?: number;
   metadata?: {
     make?: string;
     model?: string;
@@ -90,7 +94,7 @@ const ImageMetadataPanel = ({ record, onClose }: { record: VisualRecord, onClose
 
   const meta = record.metadata;
 
-  return (
+  return createPortal(
     <div className="metadata-modal-overlay" onClick={onClose}>
       <div className="metadata-modal-content" onClick={e => e.stopPropagation()}>
         <div className="metadata-modal-header">
@@ -192,7 +196,8 @@ const ImageMetadataPanel = ({ record, onClose }: { record: VisualRecord, onClose
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };
 
@@ -287,6 +292,30 @@ interface Props {
 
 const BASE_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8000';
 
+const CustomTooltip = ({ active, payload }: any) => {
+  if (active && payload && payload.length) {
+    const data: VisualRecord = payload[0].payload;
+    return (
+      <div style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-mid)', borderRadius: '12px', padding: '12px', boxShadow: '0 10px 25px rgba(0,0,0,0.5)', maxWidth: '200px', zIndex: 100 }}>
+        {data.annotated_image_path ? (
+          <img 
+            src={`${BASE_URL}/${data.annotated_image_path}`} 
+            style={{ width: '100%', borderRadius: '6px', marginBottom: '8px' }} 
+            alt={data.filename} 
+          />
+        ) : (
+          <div style={{ width: '100%', height: '100px', background: 'var(--border-mid)', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '6px', marginBottom: '8px' }}>
+            <ImageIcon size={24} color="var(--t-muted)" />
+          </div>
+        )}
+        <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--t-primary)', wordBreak: 'break-all', lineHeight: 1.2 }}>{data.filename}</div>
+        <div style={{ fontSize: '11px', color: '#fb8c36', marginTop: '6px', fontWeight: 500 }}>{data.cluster_description}</div>
+      </div>
+    );
+  }
+  return null;
+};
+
 const ImageAnalysisView = ({ imgResult, imgZipResult, imgTokens, imgDuration, imgModel }: Props) => {
   const [selectedClusterPoint, setSelectedClusterPoint] = useState<any | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<number | null>(null);
@@ -339,10 +368,13 @@ const ImageAnalysisView = ({ imgResult, imgZipResult, imgTokens, imgDuration, im
         object_count: point.objects.length,
         object_details: point.objects,
         metadata: point.metadata,
+        x: point.umap_x,
+        y: point.umap_y,
       }))
     : imgResult
       ? imgResult.results.map(result => {
           const clusterId = projectionClusterMap[result.filename] ?? 0;
+          const projectionPoint = imgResult.projection?.find(p => p.filename === result.filename);
           return {
             filename: result.filename,
             caption: result.caption,
@@ -357,6 +389,8 @@ const ImageAnalysisView = ({ imgResult, imgZipResult, imgTokens, imgDuration, im
               confidence: detection.confidence,
               bbox: [detection.x1, detection.y1, detection.x2, detection.y2],
             })),
+            x: projectionPoint?.x,
+            y: projectionPoint?.y,
           };
         })
       : [];
@@ -718,12 +752,30 @@ const ImageAnalysisView = ({ imgResult, imgZipResult, imgTokens, imgDuration, im
         <div style={{ marginTop: '20px', background: 'var(--bg-root)', height: '400px', borderRadius: '16px', border: '1px solid var(--border-mid)', position: 'relative', overflow: 'hidden', boxShadow: 'inset 0 2px 10px rgba(0,0,0,0.5)' }}>
           {vizMode === 'semantic' ? (
             <div style={{ width: '100%', height: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-              <img
-                src={`${import.meta.env.VITE_API_URL ?? 'http://localhost:8000'}/${imgZipResult.result?.plot_file_path}`}
-                alt="Cluster Plot"
-                style={{ maxWidth: '100%', maxHeight: '100%', borderRadius: '8px', objectFit: 'contain' }}
-                onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
-              />
+              <ResponsiveContainer width="100%" height="100%">
+                <ScatterChart margin={{ top: 30, right: 30, bottom: 30, left: 30 }}>
+                  <CartesianGrid stroke="var(--border-mid)" strokeDasharray="3 3" opacity={0.4} />
+                  <XAxis type="number" dataKey="x" name="UMAP 1" stroke="var(--t-muted)" tick={{fill: 'var(--t-muted)', fontSize: 11}} tickFormatter={(val) => val.toFixed(1)}>
+                    <Label value="UMAP 1" position="bottom" fill="var(--t-secondary)" fontSize={12} offset={0} />
+                  </XAxis>
+                  <YAxis type="number" dataKey="y" name="UMAP 2" stroke="var(--t-muted)" tick={{fill: 'var(--t-muted)', fontSize: 11}} tickFormatter={(val) => val.toFixed(1)}>
+                    <Label value="UMAP 2" angle={-90} position="left" fill="var(--t-secondary)" fontSize={12} offset={10} />
+                  </YAxis>
+                  <Tooltip content={<CustomTooltip />} cursor={{ strokeDasharray: '3 3' }} isAnimationActive={false} />
+                  <Scatter name="Images" data={visualRecords} onClick={(e) => {
+                    const rec = imgZipResult?.result.clusters.find(c => c.filename === e.filename) || null;
+                    if (rec) setSelectedClusterPoint(rec);
+                  }}>
+                    {visualRecords.map((entry, index) => (
+                      <Cell 
+                        key={`cell-${index}`} 
+                        fill={`var(--cluster-${entry.cluster % 5})`} 
+                        style={{ cursor: 'pointer', outline: 'none' }}
+                      />
+                    ))}
+                  </Scatter>
+                </ScatterChart>
+              </ResponsiveContainer>
             </div>
           ) : (
             <GlobalCollectionMap 

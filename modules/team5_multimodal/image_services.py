@@ -18,6 +18,7 @@ from PIL import Image, ExifTags
 import matplotlib.pyplot as plt
 import matplotlib
 matplotlib.use('Agg')  # Headless backend for fastAPI
+from matplotlib.colors import ListedColormap
 from pillow_heif import register_heif_opener
 register_heif_opener()
 
@@ -339,7 +340,9 @@ class ImageAnalysisService:
         # UMAP requires n_neighbors >= 2 AND n_neighbors < n_samples,
         # so we need at least 3 samples. Handle smaller sets with trivial layouts.
         if len(X) >= 3:
-            reducer = umap.UMAP(n_neighbors=min(15, len(X)-1), n_components=2, random_state=42, init="random")
+            # For small data, lower n_neighbors pulls clusters much tighter together.
+            n_neighbors = min(5, max(2, len(X) - 1))
+            reducer = umap.UMAP(n_neighbors=n_neighbors, min_dist=0.01, n_components=2, random_state=42, init="random")
             coords = reducer.fit_transform(X)
         elif len(X) == 2:
             coords = np.array([[0.0, 0.0], [1.0, 0.0]])
@@ -386,9 +389,20 @@ class ImageAnalysisService:
 
     def _generate_plot(self, coords, labels, out_path: Path):
         """Generates a headless matplotlib scatter plot of the clusters"""
+        # Match frontend modulo logic perfectly
+        hex_colors = ['#fb8c36', '#4ade80', '#60a5fa', '#a78bfa', '#f472b6']
+        n_clusters = len(np.unique(labels))
+        exact_colors = [hex_colors[i % len(hex_colors)] for i in range(max(1, n_clusters))]
+        ui_cmap = ListedColormap(exact_colors)
+        
+        # Plot with matching UI colors (discrete bins matching discrete labels exactly)
         plt.figure(figsize=(10, 8))
-        scatter = plt.scatter(coords[:, 0], coords[:, 1], c=labels, cmap='viridis', s=100, alpha=0.8)
-        plt.colorbar(scatter, label='Cluster ID')
+        scatter = plt.scatter(coords[:, 0], coords[:, 1], c=labels, cmap=ui_cmap, vmin=0, vmax=max(1, n_clusters)-1, s=100, alpha=0.8)
+        
+        # Colorbar
+        cbar = plt.colorbar(scatter, label='Cluster ID')
+        cbar.set_ticks(range(n_clusters))
+        
         plt.title('UMAP Projection of Image Embeddings')
         plt.xlabel('UMAP 1')
         plt.ylabel('UMAP 2')
