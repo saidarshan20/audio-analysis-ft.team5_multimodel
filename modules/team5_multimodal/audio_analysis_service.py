@@ -37,9 +37,18 @@ from pydub import AudioSegment
 load_dotenv()
 
 from modules.team5_multimodal.config import get_settings
-from modules.team5_multimodal.models import AudioAnalysisResult, AudioFeatures, SpeakerSegment
+from modules.team5_multimodal.models import (
+    AudioAnalysisResult,
+    AudioFeatures,
+    AudioQuality,
+    AudioVerdict,
+    AudioInterpretation,
+    SpeakerSegment,
+    SpeakerMetrics,
+)
 from modules.team5_multimodal.services import TextAnalysisService
 from modules.team5_multimodal.audio_feature_extractor import AudioFeatureExtractor
+from modules.team5_multimodal.audio_quality_service import AudioQualityService
 
 logger = logging.getLogger(__name__)
 
@@ -92,11 +101,14 @@ class AudioAnalysisService:
             ffmpeg_exe=self.settings.ffmpeg_path or "",
             ffprobe_exe=self.settings.ffprobe_path or "",
         )
+        self._quality_service = AudioQualityService()
 
     def process_audio(self, file_bytes: bytes, filename: str) -> AudioAnalysisResult:
         """
-        Main pipeline: Convert -> Enforce limits -> Extract features
-                       -> Transcribe -> Diarize -> Align segments
+        Main pipeline:
+          1) Validate file size + runtime
+          2) Convert to normalized WAV (16k mono)
+          3) Run all downstream analysis on that WAV only
         """
         if self.ffmpeg_error:
             raise ValueError(self.ffmpeg_error)
@@ -120,37 +132,92 @@ class AudioAnalysisService:
             with open(raw_path, "wb") as f:
                 f.write(file_bytes)
 
-            # 2. Conversion and Duration Check
-            wav_path = os.path.join(tmpdir, "processed.wav")
-            audio = AudioSegment.from_file(raw_path, format=ext.lstrip(".") or None)
-            duration_sec = len(audio) / 1000.0
-
-            logger.info(f"Audio duration: {duration_sec}s")
+            # 2. Runtime check (duration) on uploaded input, before conversion.
+            input_audio = self._decode_audio_any(raw_path, ext.lstrip("."))
+            duration_sec = len(input_audio) / 1000.0
+            logger.info("Audio duration (input): %.2fs", duration_sec)
             if duration_sec > self.max_duration_sec:
                 raise ValueError(f"Audio duration exceeds {self.max_duration_sec/60} minutes limit.")
 
-            audio.export(wav_path, format="wav")
+            # 3. Convert to normalized WAV (16 kHz mono) once.
+            wav_path = os.path.join(tmpdir, "processed.wav")
+            input_audio.set_channels(1).set_frame_rate(16_000).export(wav_path, format="wav")
 
-            # 3. Extract acoustic features (Task 1 — feature extraction)
-            features_pydantic = self._safe_extract_features(file_bytes, filename)
+            # 4. Extract acoustic features from WAV only
+            features_pydantic = self._safe_extract_features_from_wav(wav_path)
+            quality = self._safe_score_audio_quality(
+                wav_path,
+                input_had_multiple_channels=input_audio.channels > 1,
+            )
 
-            # 4. Transcribe
-            transcript_segs = self._transcribe(wav_path)
+            # 5. Transcribe (WAV only)
+            transcript_out = self._transcribe(wav_path)
+            transcript_segs = transcript_out["segments"]
+            language = transcript_out.get("language", "")
 
-            # 5. Diarize (best effort: continue without speaker IDs if gated model unavailable)
+            # 6. Diarize (best effort: continue without speaker IDs if gated model unavailable)
             speaker_segs = self._safe_diarize(wav_path)
 
-            # 6. Align transcription with diarization
+            # 7. Align transcription with diarization
             aligned_segments = self._align(transcript_segs, speaker_segs)
 
             # Format full text
             transcript_text = " ".join([s.text for s in aligned_segments])
 
+            # ── Speaker metrics: WPM, dominance, participation, interruptions ──
+            interruption_count = 0
+            speaker_metrics_raw: dict[str, dict] = {}
+            total_duration = 0.0
+
+            for idx, seg in enumerate(aligned_segments):
+                s_id = seg.speaker
+                if s_id not in speaker_metrics_raw:
+                    speaker_metrics_raw[s_id] = {"words": 0, "duration": 0.0, "segments": 0}
+                speaker_metrics_raw[s_id]["words"] += len(seg.text.split())
+                seg_dur = seg.end - seg.start
+                speaker_metrics_raw[s_id]["duration"] += seg_dur
+                speaker_metrics_raw[s_id]["segments"] += 1
+                total_duration += seg_dur
+                if idx > 0:
+                    prev = aligned_segments[idx - 1]
+                    if prev.speaker != seg.speaker and seg.start < prev.end - 0.5:
+                        interruption_count += 1
+
+            total_segs = len(aligned_segments)
+
+            # ── Per-speaker pitch from diarized WAV segments ──
+            speaker_pitch = self._compute_per_speaker_pitch(
+                wav_path, speaker_segs, speaker_metrics_raw
+            )
+
+            speaker_metrics_final: dict[str, SpeakerMetrics] = {}
+            for s_id, data in speaker_metrics_raw.items():
+                wpm = (data["words"] / (data["duration"] / 60.0)) if data["duration"] > 0 else 0
+                dominance = (data["duration"] / total_duration) if total_duration > 0 else 0
+                participation = (data["segments"] / total_segs) if total_segs > 0 else 0
+                p_mean, p_tag = speaker_pitch.get(s_id, (None, ""))
+                speaker_metrics_final[s_id] = SpeakerMetrics(
+                    wpm=float(wpm),
+                    dominance_ratio=float(dominance),
+                    participation_ratio=float(participation),
+                    pitch_mean=p_mean,
+                    gender_tag=p_tag,
+                )
+
+            # ── 8. Build rule-based interpretation ──────────────────────────────
+            word_count = len(transcript_text.split()) if transcript_text else 0
+            interp = self._build_interpretation(quality, word_count, duration_sec)
+
             return AudioAnalysisResult(
                 duration=duration_sec,
                 segments=aligned_segments,
                 transcript_text=transcript_text,
-                features=features_pydantic,  # ← Task 1 acoustic features attached here
+                features=features_pydantic,
+                language=language,
+                interruption_count=interruption_count,
+                speaker_metrics=speaker_metrics_final,
+                audio_quality=quality,
+                interpretation=interp,
             )
 
         except Exception as e:
@@ -159,16 +226,15 @@ class AudioAnalysisService:
         finally:
             self._cleanup_tmpdir(tmpdir)
 
-    def _safe_extract_features(self, file_bytes: bytes, filename: str) -> AudioFeatures | None:
+    def _safe_extract_features_from_wav(self, wav_path: str) -> AudioFeatures | None:
         """
-        Extract acoustic features via AudioFeatureExtractor (Task 1).
+        Extract acoustic features from the normalized WAV path.
         Returns None gracefully if librosa/pydub are not installed or extraction fails,
         so the rest of the pipeline (STT, diarization) still completes.
         """
         try:
-            raw = self._feature_extractor.extract(
-                file_bytes,
-                filename,
+            raw = self._feature_extractor.extract_from_wav_path(
+                wav_path,
                 include_mfcc=False,  # MFCCs optional, off by default
             )
             # Use from_attributes=True so Pydantic reads nested dataclass
@@ -177,6 +243,129 @@ class AudioAnalysisService:
         except Exception as exc:
             logger.warning("Acoustic feature extraction failed (non-fatal): %s", exc)
             return None
+
+    def _safe_score_audio_quality(
+        self,
+        wav_path: str,
+        *,
+        input_had_multiple_channels: bool,
+    ) -> AudioQuality:
+        raw_quality = self._quality_service.score_wav(
+            wav_path,
+            input_had_multiple_channels=input_had_multiple_channels,
+        )
+        return AudioQuality.model_validate(raw_quality)
+
+    @staticmethod
+    def _build_interpretation(
+        quality: AudioQuality,
+        word_count: int,
+        duration_sec: float,
+    ) -> AudioInterpretation:
+        """
+        Convert raw quality scores into human-readable labels.
+        This is purely rule-based — no LLM call.
+        """
+        # ── Noise label from SNR ─────────────────────────────────────────────
+        snr = quality.snr_db if quality.snr_db is not None else -1
+        if not quality.is_speech_present or snr < 0:
+            noise_label = "Unscored"
+        elif snr < 10:
+            noise_label = "High Noise"
+        elif snr < 20:
+            noise_label = "Moderate Noise"
+        else:
+            noise_label = "Clean Audio"
+
+        # ── Loudness label from loudness score ───────────────────────────────
+        loudness_score = quality.metrics.loudness if quality.metrics else None
+        if loudness_score is None:
+            loudness_label = "Unscored"
+        elif loudness_score < 35:
+            loudness_label = "Too Quiet"
+        elif loudness_score <= 70:
+            loudness_label = "Normal"
+        else:
+            loudness_label = "Too Loud"
+
+        # ── Clarity label from clarity score ─────────────────────────────────
+        clarity_score = quality.metrics.clarity if quality.metrics else None
+        if clarity_score is None:
+            clarity_label = "Unscored"
+        elif clarity_score < 35:
+            clarity_label = "Low"
+        elif clarity_score <= 65:
+            clarity_label = "Moderate"
+        else:
+            clarity_label = "High"
+
+        # ── Speech rate from word count + duration ───────────────────────────
+        duration_min = duration_sec / 60.0 if duration_sec > 0 else 0
+        speech_rate = round(word_count / duration_min, 1) if duration_min > 0 else 0.0
+        if speech_rate < 120:
+            speech_rate_label = "Slow"
+        elif speech_rate <= 200:
+            speech_rate_label = "Normal"
+        else:
+            speech_rate_label = "Fast"
+
+        # ── Silence ratio from speech_frame_ratio ───────────────────────────
+        silence_ratio = round(1.0 - quality.speech_frame_ratio, 4)
+
+        return AudioInterpretation(
+            noise_label=noise_label,
+            loudness_label=loudness_label,
+            clarity_label=clarity_label,
+            speech_rate_label=speech_rate_label,
+            silence_ratio=silence_ratio,
+            speech_rate=speech_rate,
+        )
+
+    @staticmethod
+    def _normalize_input_ext(ext_hint: str) -> str:
+        ext = (ext_hint or "").strip().lower().lstrip(".")
+        alias = {
+            "wave": "wav",
+            "mpga": "mp3",
+            "oga": "ogg",
+            "m4b": "m4a",
+        }
+        return alias.get(ext, ext)
+
+    def _decode_audio_any(self, raw_path: str, ext_hint: str = "") -> AudioSegment:
+        """
+        Robust decode for uploaded audio: try auto-detection first, then
+        common codec/container hints (mp3/mpeg/m4a/ogg/flac/aac/webm/opus...).
+        """
+        try:
+            return AudioSegment.from_file(raw_path)
+        except Exception:
+            pass
+
+        ext = self._normalize_input_ext(ext_hint)
+        candidates: list[str] = []
+        if ext:
+            candidates.append(ext)
+            if ext == "mpeg":
+                candidates.extend(["mp3", "mp2"])
+            if ext == "mp3":
+                candidates.append("mpeg")
+            if ext == "m4a":
+                candidates.append("mp4")
+
+        candidates.extend(["wav", "mp3", "mpeg", "m4a", "mp4", "ogg", "flac", "aac", "webm", "opus", "wma"])
+
+        seen: set[str] = set()
+        for fmt in candidates:
+            if not fmt or fmt in seen:
+                continue
+            seen.add(fmt)
+            try:
+                return AudioSegment.from_file(raw_path, format=fmt)
+            except Exception:
+                continue
+
+        raise ValueError("Unsupported or corrupted audio file. Please upload a valid audio format.")
 
     def _resolve_binary_path(self, configured_path: str, exe_name: str) -> str | None:
         if configured_path:
@@ -249,13 +438,76 @@ class AudioAnalysisService:
                 time.sleep(0.2 * (attempt + 1))
         shutil.rmtree(tmpdir, ignore_errors=True)
 
-    def _transcribe(self, audio_path: str):
+    def _transcribe(self, audio_path: str) -> dict:
         model = get_whisper_model()
         result = model.transcribe(audio_path, word_timestamps=True)
-        return [
-            {"start": s["start"], "end": s["end"], "text": s["text"].strip()}
-            for s in result["segments"]
-        ]
+        return {
+            "language": result.get("language", ""),
+            "segments": [
+                {"start": s["start"], "end": s["end"], "text": s["text"].strip()}
+                for s in result["segments"]
+            ]
+        }
+
+    def _compute_per_speaker_pitch(
+        self,
+        wav_path: str,
+        speaker_segs: list[dict],
+        speaker_metrics_raw: dict[str, dict],
+    ) -> dict[str, tuple[float | None, str]]:
+        """
+        For each speaker, extract their audio frames from the WAV, compute mean F0,
+        and return a dict mapping speaker_id -> (pitch_mean, gender_tag).
+        Falls back gracefully if librosa is unavailable.
+        """
+        from modules.team5_multimodal.audio_feature_extractor import AudioFeatureExtractor
+        try:
+            import librosa
+            import numpy as np
+            y_full, sr = librosa.load(wav_path, sr=16000, mono=True)
+            f0_full = librosa.yin(
+                y_full,
+                fmin=float(librosa.note_to_hz('C2')),
+                fmax=float(librosa.note_to_hz('C7')),
+                sr=sr,
+                hop_length=512,
+            )
+            hop = 512
+            result: dict[str, tuple[float | None, str]] = {}
+
+            for s_id in speaker_metrics_raw:
+                # Gather F0 frames for all segments belonging to this speaker
+                all_f0 = []
+                for sseg in speaker_segs:
+                    if sseg.get("speaker") != s_id:
+                        continue
+                    start_frame = int(sseg["start"] * sr / hop)
+                    end_frame = int(sseg["end"] * sr / hop)
+                    chunk = f0_full[start_frame:end_frame]
+                    voiced = chunk[(chunk > 60) & (chunk < 600)]
+                    all_f0.extend(voiced.tolist())
+
+                if len(all_f0) < 5:
+                    result[s_id] = (None, "Indeterminate")
+                else:
+                    mean_f0 = float(np.mean(all_f0))
+                    tag = AudioFeatureExtractor.classify_gender_from_f0(mean_f0)
+                    result[s_id] = (round(mean_f0, 2), tag)
+
+            # If no diarization happened (single UNKNOWN speaker), use global pitch
+            if not speaker_segs and "UNKNOWN" in speaker_metrics_raw:
+                voiced_global = f0_full[(f0_full > 60) & (f0_full < 600)]
+                if len(voiced_global) >= 5:
+                    mean_f0 = float(np.mean(voiced_global))
+                    tag = AudioFeatureExtractor.classify_gender_from_f0(mean_f0)
+                    result["UNKNOWN"] = (round(mean_f0, 2), tag)
+                else:
+                    result["UNKNOWN"] = (None, "Indeterminate")
+
+            return result
+        except Exception as exc:
+            logger.warning("Per-speaker pitch computation failed (non-fatal): %s", exc)
+            return {}
 
     def _diarize(self, audio_path: str):
         pipeline = get_diarization_pipeline()

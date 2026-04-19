@@ -159,6 +159,27 @@ export interface TextAnalysisResult {
   kg_edges: Array<{ source: string; target: string; relation: string }>;
   timeline: Array<{ date: string; description: string }>;
   locations: Array<{ name: string; lat: number; lng: number }>;
+  word_count?: number;
+  char_count?: number;
+  sentence_count?: number;
+  conversation_score?: number;
+  environment?: string;
+  emotion?: string;
+  tone?: string;
+  domain?: string;
+  bullet_points?: string[];
+  action_items?: string[];
+  topic?: string;
+  theme?: string;
+  sentence_sentiments?: Array<{ sentence: string; sentiment: string }>;
+  top_keyphrases?: string[];
+  top_keywords?: string[];
+  decisions?: string[];
+  agreements?: string[];
+  questions?: string[];
+  unanswered_questions?: string[];
+  disagreements?: string[];
+  topic_segments?: Array<{ topic: string; segment: string }>;
 }
 
 export interface DiagramGroup {
@@ -634,42 +655,62 @@ export interface AudioFeatures {
   tempo?: number;
   spectral_centroid_mean?: number;
   mel_spectrogram?: SpectrogramData;
+  pitch_mean?: number;
+  pitch_std?: number;
+  gender_tag?: string;
 }
 
+export interface AudioFeaturesResponse {
+  status: string;
+  filename: string;
+  content_type: string;
+  result: AudioFeatures;
+}
+
+export interface AudioQualityMetrics {
+  snr: number | null;
+  loudness: number | null;
+  clarity: number | null;
+  cleanliness: number | null;
+}
+
+export interface AudioQuality {
+  score_version?: string;
+  content_type?: 'speech' | 'non_speech' | 'silent' | string;
+  is_speech_present?: boolean;
+  duration_warning?: boolean;
+  confidence?: number;
+  overall_score?: number | null;
+  composite_percent?: number | null;
+  rating?: string;
+  summary?: string;
+  snr_db?: number | null;
+  clip_ratio?: number;
+  speech_frame_ratio?: number;
+  metrics?: AudioQualityMetrics;
+}
+
+export interface SpeakerMetrics {
+  dominance_ratio: number;
+  wpm: number;
+  participation_ratio: number;
+  pitch_mean?: number;
+  gender_tag?: string;
+}
 export interface AudioAnalysisResult {
   duration: number;
   segments: SpeakerSegment[];
   transcript_text: string;
   features?: AudioFeatures;
+  text_analysis: TextAnalysisResult | null;
+  audio_quality?: AudioQuality;
   language?: string;
-  speaker_metrics?: Record<string, { speaking_time: number; word_count: number; turn_count: number; dominance_ratio?: number; wpm?: number; participation_ratio?: number }>;
+  speaker_metrics?: Record<string, SpeakerMetrics>;
   interruption_count?: number;
-  audio_quality?: {
-    overall?: number;
-    overall_score?: number;
-    rating?: string;
-    summary?: string;
-    snr_db?: number;
-    snr?: number;
-    clipping?: number;
-    silence_ratio?: number;
-    composite_percent?: number;
-    metrics?: { snr: number; loudness: number; clarity: number; noise: number };
-  };
-  text_analysis: {
-    summary: string;
-    sentiment: { positive: number; negative: number; neutral: number; overall_label: string };
-    entities: Array<{ id: string; label: string; type: string }>;
-    timeline: Array<{ date: string; description: string }>;
-    locations: Array<{ name: string; lat: number; lng: number }>;
-    action_items?: string[];
-    decisions?: string[];
-    emotion?: string;
-    tone?: string;
-    domain?: string;
-    conversation_score?: number;
-    top_keyphrases?: string[];
-  } | null;
+  // ── Decision layer ─────────────────────────────────────────
+  verdict?: AudioVerdict;
+  recommended_actions?: string[];
+  interpretation?: AudioInterpretation;
 }
 
 export interface AudioAnalysisResponse {
@@ -677,6 +718,35 @@ export interface AudioAnalysisResponse {
   filename: string;
   content_type: string;
   result: AudioAnalysisResult;
+}
+
+// ── Decision Layer Types ─────────────────────────────────────
+
+export interface AudioVerdict {
+  /** LLM-generated punchy title, e.g. "Low Quality Audio | Nostalgic Tone" */
+  title: string;
+  /** 1-2 sentence plain-english explanation */
+  description: string;
+}
+
+export interface AudioInterpretation {
+  /** "High Noise" | "Moderate Noise" | "Clean Audio" | "Unscored" */
+  noise_label: string;
+  /** "Too Quiet" | "Normal" | "Too Loud" | "Unscored" */
+  loudness_label: string;
+  /** "Low" | "Moderate" | "High" | "Unscored" */
+  clarity_label: string;
+  /** "Slow" | "Normal" | "Fast" */
+  speech_rate_label: string;
+  /** Fraction of total duration that is silence [0, 1] */
+  silence_ratio: number;
+  /** Overall WPM */
+  speech_rate: number;
+}
+
+export interface AudioVerdictResponse {
+  verdict: AudioVerdict;
+  recommended_actions: string[];
 }
 
 /**
@@ -780,6 +850,37 @@ export async function submitAudioChat(
   if (!response.ok) {
     const err = await response.json().catch(() => ({ detail: 'Unknown error' }));
     throw new Error(err.detail || `Audio chat failed with status ${response.status}`);
+  }
+
+  return response.json();
+}
+
+/**
+ * Fetches pre-computed analysis metadata for the demo video (huhu_analyzed.mp4)
+ */
+export async function fetchAudioVerdict(params: {
+  snr?: number | null;
+  noise_label?: string;
+  loudness_label?: string;
+  clarity_label?: string;
+  speech_rate?: number | null;
+  speech_rate_label?: string;
+  silence_ratio?: number | null;
+  sentiment?: string;
+  emotion?: string;
+  quality_score?: number | null;
+  quality_rating?: string;
+  duration_sec?: number | null;
+}): Promise<AudioVerdictResponse> {
+  const response = await fetch(`${BASE_URL}/team5/audio-verdict`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(params),
+  });
+
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({ detail: 'Unknown error' }));
+    throw new Error(err.detail || `Verdict fetch failed with status ${response.status}`);
   }
 
   return response.json();

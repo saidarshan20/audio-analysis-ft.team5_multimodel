@@ -29,6 +29,7 @@ from modules.team5_multimodal.models import (
     AudioAnalysisResponse,
     AudioFeaturesResponse,
     AudioFeatures,
+    AudioVerdict,
     WaveformData,
     SpectrogramData,
     EnergyData,
@@ -381,6 +382,33 @@ async def analyze_audio(file: UploadFile = File(...)):
         text_analysis = await service.analyze_transcript(analysis_result.transcript_text)
         analysis_result.text_analysis = text_analysis
 
+        # Best-effort verdict generation (never blocks core analyze-audio response)
+        try:
+            interp = analysis_result.interpretation
+            quality = analysis_result.audio_quality
+            verdict_payload = AudioVerdictRequest(
+                snr=quality.snr_db if quality else None,
+                noise_label=(interp.noise_label if interp else ""),
+                loudness_label=(interp.loudness_label if interp else ""),
+                clarity_label=(interp.clarity_label if interp else ""),
+                speech_rate=(interp.speech_rate if interp else None),
+                speech_rate_label=(interp.speech_rate_label if interp else ""),
+                silence_ratio=(interp.silence_ratio if interp else None),
+                sentiment=(text_analysis.sentiment.overall_label if text_analysis and text_analysis.sentiment else ""),
+                emotion=(text_analysis.emotion if text_analysis else ""),
+                quality_score=(quality.overall_score if quality else None),
+                quality_rating=(quality.rating if quality else ""),
+                duration_sec=analysis_result.duration,
+            )
+            verdict_data = await _generate_audio_verdict_raw(verdict_payload)
+            analysis_result.verdict = AudioVerdict(
+                title=verdict_data.get("verdict", {}).get("title", ""),
+                description=verdict_data.get("verdict", {}).get("description", ""),
+            )
+            analysis_result.recommended_actions = verdict_data.get("recommended_actions", [])
+        except Exception as verdict_exc:
+            logger.warning("Non-fatal: verdict generation skipped: %s", verdict_exc)
+
         return AudioAnalysisResponse(
             filename=file.filename or "unknown",
             content_type=file.content_type or "audio/wav",
@@ -391,6 +419,118 @@ async def analyze_audio(file: UploadFile = File(...)):
     except Exception as exc:
         logger.exception("Audio analysis failed")
         raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+# ──────────────────────────────────────────────
+#  Audio Verdict — LLM decision layer (no audio sent to LLM)
+#  Receives structured signal JSON, returns verdict + recommended_actions.
+# ──────────────────────────────────────────────
+class AudioVerdictRequest(BaseModel):
+    snr: float | None = None
+    noise_label: str = ""
+    loudness_label: str = ""
+    clarity_label: str = ""
+    speech_rate: float | None = None
+    speech_rate_label: str = ""
+    silence_ratio: float | None = None
+    sentiment: str = ""
+    emotion: str = ""
+    quality_score: float | None = None
+    quality_rating: str = ""
+    duration_sec: float | None = None
+
+
+VERDICT_SYSTEM_PROMPT = """You are an expert audio analysis assistant. Given structured audio signal metrics, you will:
+1. Write a punchy 4-8 word verdict TITLE (e.g. "Low Quality Audio | Nostalgic Tone")
+2. Write a 1-2 sentence plain-English DESCRIPTION explaining what the audio is like and whether it is suitable for transcription
+3. List 2-4 concise RECOMMENDED ACTIONS to improve the audio quality (if the quality is good, list 1-2 best practices instead)
+
+Return ONLY a JSON object with exactly these keys:
+{
+  "title": "<4-8 word verdict title>",
+  "description": "<1-2 sentence plain English explanation>",
+  "recommended_actions": ["<action 1>", "<action 2>", ...]
+}
+
+Rules:
+- The title should reflect BOTH quality AND tone/emotion separated by " | " (e.g. "Clear Audio | Nostalgic Tone")
+- If emotion is empty or neutral, omit the tone part from the title
+- Be constructive — if quality is good, acknowledge it
+- Actions should be specific and actionable (e.g. "Re-record closer to the microphone" not just "improve quality")
+- Return ONLY raw JSON. No markdown fences, no commentary."""
+
+
+@router.post("/audio-verdict")
+async def generate_audio_verdict(payload: AudioVerdictRequest):
+    """
+    Decision layer: receives structured audio quality signals — NOT raw audio.
+    Calls Groq LLM to generate a plain-language verdict and recommended actions.
+    10-second timeout; returns null verdict on failure.
+    """
+    try:
+        return await _generate_audio_verdict_raw(payload)
+    except asyncio.TimeoutError:
+        logger.warning("Audio verdict LLM call timed out (10s)")
+        raise HTTPException(status_code=504, detail="Verdict generation timed out")
+    except Exception as exc:
+        logger.error("Audio verdict LLM error: %s", exc)
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+async def _generate_audio_verdict_raw(payload: AudioVerdictRequest) -> dict:
+    settings = get_settings()
+    if not settings.groq_api_key:
+        raise ValueError("Groq API key not configured")
+
+    from groq import AsyncGroq
+    client = AsyncGroq(api_key=settings.groq_api_key)
+
+    signal_parts = []
+    if payload.snr is not None:
+        signal_parts.append(f"SNR: {payload.snr:.1f} dB ({payload.noise_label or 'unknown'})")
+    if payload.loudness_label:
+        signal_parts.append(f"Loudness: {payload.loudness_label}")
+    if payload.clarity_label:
+        signal_parts.append(f"Clarity: {payload.clarity_label}")
+    if payload.speech_rate is not None and payload.speech_rate_label:
+        signal_parts.append(f"Speech Rate: {payload.speech_rate:.0f} WPM ({payload.speech_rate_label})")
+    if payload.silence_ratio is not None:
+        signal_parts.append(f"Silence Ratio: {payload.silence_ratio * 100:.0f}%")
+    if payload.sentiment:
+        signal_parts.append(f"Sentiment: {payload.sentiment}")
+    if payload.emotion:
+        signal_parts.append(f"Emotion: {payload.emotion}")
+    if payload.quality_score is not None and payload.quality_rating:
+        signal_parts.append(f"Overall Quality Score: {payload.quality_score:.0f}/100 ({payload.quality_rating})")
+    if payload.duration_sec is not None:
+        mins = int(payload.duration_sec // 60)
+        secs = int(payload.duration_sec % 60)
+        signal_parts.append(f"Duration: {mins}:{secs:02d}")
+
+    user_message = "Audio signal data:\n" + "\n".join(f"- {p}" for p in signal_parts)
+    resp = await asyncio.wait_for(
+        client.chat.completions.create(
+            model=settings.groq_model,
+            response_format={"type": "json_object"},
+            messages=[
+                {"role": "system", "content": VERDICT_SYSTEM_PROMPT},
+                {"role": "user", "content": user_message},
+            ],
+            temperature=0.3,
+            max_tokens=400,
+        ),
+        timeout=10.0,
+    )
+    raw = resp.choices[0].message.content
+    data = json.loads(raw)  # type: ignore[arg-type]
+    title = str(data.get("title", "") or "").strip()
+    description = str(data.get("description", "") or "").strip()
+    actions_raw = data.get("recommended_actions", [])
+    actions = [str(a).strip() for a in actions_raw if str(a).strip()] if isinstance(actions_raw, list) else []
+    return {
+        "verdict": {"title": title, "description": description},
+        "recommended_actions": actions,
+    }
 
 
 # ──────────────────────────────────────────────

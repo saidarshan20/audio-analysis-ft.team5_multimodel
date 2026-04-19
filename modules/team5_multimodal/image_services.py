@@ -19,8 +19,15 @@ import matplotlib.pyplot as plt
 import matplotlib
 matplotlib.use('Agg')  # Headless backend for fastAPI
 from matplotlib.colors import ListedColormap
-from pillow_heif import register_heif_opener
-register_heif_opener()
+
+# HEIC/HEIF support is optional. Do not crash app startup if package is missing.
+try:
+    from pillow_heif import register_heif_opener
+    register_heif_opener()
+    _HEIF_AVAILABLE = True
+except Exception:
+    register_heif_opener = None  # type: ignore[assignment]
+    _HEIF_AVAILABLE = False
 
 # Machine Learning
 from ultralytics import YOLO
@@ -230,7 +237,14 @@ class ImageAnalysisService:
     def process_images(self, extract_dir: str) -> ZipPipelineResult:
         start_time = time.time()
         root = Path(extract_dir)
-        valid_exts = {".jpg", ".jpeg", ".png", ".bmp", ".webp", ".heic", ".heif"}
+        valid_exts = {".jpg", ".jpeg", ".png", ".bmp", ".webp"}
+        if _HEIF_AVAILABLE:
+            valid_exts.update({".heic", ".heif"})
+        else:
+            logger.warning(
+                "pillow-heif not installed: .heic/.heif files will be skipped. "
+                "Install pillow-heif to enable HEIF support."
+            )
         
         image_files = []
         for path in root.rglob("*"):

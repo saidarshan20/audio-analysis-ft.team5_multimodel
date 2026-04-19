@@ -26,20 +26,40 @@ export interface AudioQualityView {
   summary: string;
   snrDb: number;
   compositePercent: number;
-  metrics: { snr: number; loudness: number; clarity: number; noise: number };
+  confidence: number;
+  source: 'backend' | 'estimated';
+  showEstimatedBadge: boolean;
+  contentType: string;
+  metrics: { snr: number; loudness: number; clarity: number; cleanliness: number };
 }
 
 export function deriveAudioQuality(result: AudioAnalysisResult): AudioQualityView {
-  // Use backend quality if available
-  if (result.audio_quality?.overall_score !== undefined) {
+  // Use backend quality only when payload is complete and scored.
+  if (
+    result.audio_quality &&
+    result.audio_quality.overall_score !== null &&
+    result.audio_quality.overall_score !== undefined &&
+    !!result.audio_quality.score_version
+  ) {
     const q = result.audio_quality;
+    const rawMetrics = q.metrics ?? { snr: null, loudness: null, clarity: null, cleanliness: null };
+    const confidence = q.confidence ?? 1;
     return {
       score:            q.overall_score ?? 0,
       rating:           q.rating        ?? 'Unknown',
       summary:          q.summary       ?? '',
       snrDb:            q.snr_db        ?? 0,
-      compositePercent: q.composite_percent ?? 0,
-      metrics:          q.metrics       ?? { snr: 0, loudness: 0, clarity: 0, noise: 0 },
+      compositePercent: q.composite_percent ?? (q.overall_score ?? 0),
+      confidence,
+      source: 'backend',
+      showEstimatedBadge: confidence < 0.6,
+      contentType: q.content_type ?? 'speech',
+      metrics: {
+        snr:         rawMetrics.snr ?? 0,
+        loudness:    rawMetrics.loudness ?? 0,
+        clarity:     rawMetrics.clarity ?? 0,
+        cleanliness: rawMetrics.cleanliness ?? 0,
+      },
     };
   }
 
@@ -48,7 +68,7 @@ export function deriveAudioQuality(result: AudioAnalysisResult): AudioQualityVie
   const rms  = result.features?.energy?.rms_values     ?? [];
   const spec = result.features?.spectrogram?.magnitude_db ?? [];
 
-  const rmsAvg       = avg(rms);
+  const rmsAvg        = avg(rms);
   const loudnessScore = mapToScore(rmsAvg, 0, 0.3);
 
   const p95       = percentile(amps.map(Math.abs), 95);
@@ -57,16 +77,16 @@ export function deriveAudioQuality(result: AudioAnalysisResult): AudioQualityVie
   const snrDb     = 20 * Math.log10(Math.max(snrLinear, 1));
   const snrScore  = mapToScore(snrDb, 0, 30);
 
-  const flatRows       = spec.flatMap(row => row);
-  const highEnergyFrac = flatRows.length > 0
+  const flatRows        = spec.flatMap(row => row);
+  const highEnergyFrac  = flatRows.length > 0
     ? flatRows.filter(v => v > -40).length / flatRows.length
     : 0.5;
-  const clarityScore   = mapToScore(highEnergyFrac, 0.2, 0.7);
+  const clarityScore    = mapToScore(highEnergyFrac, 0.2, 0.7);
 
-  const lowNoiseRms = percentile(rms, 10);
-  const noiseScore  = 100 - mapToScore(lowNoiseRms, 0, 0.1);
+  const lowNoiseRms    = percentile(rms, 10);
+  const cleanlinessScore = 100 - mapToScore(lowNoiseRms, 0, 0.1);
 
-  const composite   = snrScore * 0.35 + loudnessScore * 0.25 + clarityScore * 0.25 + noiseScore * 0.15;
+  const composite   = snrScore * 0.35 + loudnessScore * 0.25 + clarityScore * 0.25 + cleanlinessScore * 0.15;
   const overallScore = clamp(Math.round(composite), 0, 100);
 
   const rating =
@@ -86,11 +106,16 @@ export function deriveAudioQuality(result: AudioAnalysisResult): AudioQualityVie
     summary,
     snrDb:            Math.round(snrDb * 10) / 10,
     compositePercent: Math.round(composite),
+    confidence: 0.5,
+    source: 'estimated',
+    showEstimatedBadge: true,
+    contentType: 'speech',
     metrics: {
-      snr:      Math.round(snrScore),
-      loudness: Math.round(loudnessScore),
-      clarity:  Math.round(clarityScore),
-      noise:    Math.round(noiseScore),
+      snr:           Math.round(snrScore),
+      loudness:      Math.round(loudnessScore),
+      clarity:       Math.round(clarityScore),
+      cleanliness:   Math.round(cleanlinessScore),
     },
   };
 }
+

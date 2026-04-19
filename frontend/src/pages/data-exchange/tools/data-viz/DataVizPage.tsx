@@ -162,6 +162,7 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
   const [imgDuration,   setImgDuration]   = useState(0);
   const [imgModel,      setImgModel]      = useState('');
   const [audioResult,   setAudioResult]   = useState<AudioAnalysisResponse | null>(null);
+  const [audioSourceFile, setAudioSourceFile] = useState<File | null>(null);
   const [videoResult,   setVideoResult]   = useState<VideoAnalysisResult   | null>(null);
   const [csvResult,     setCsvResult]     = useState<CSVAnalysisResult     | null>(null);
   const [csvIsSample,   setCsvIsSample]   = useState(false);
@@ -189,6 +190,7 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
     setImgDuration(0);
     setImgModel('');
     setAudioResult(null);
+    setAudioSourceFile(null);
     setVideoResult(null);
     setCsvResult(null);
     setCsvIsSample(false);
@@ -293,6 +295,7 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
       return;
     }
 
+    const files = selectedFiles;
     setLoading(true);
     setAnalysisStep('init');
     setProgressMsg('Initializing analysis pipeline...');
@@ -321,7 +324,6 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
     }
 
     // 2) Standard file processing
-    const files = selectedFiles;
     const isZip = files.length === 1 && files[0].name.toLowerCase().endsWith('.zip');
     const isDoc = files.length === 1 && (files[0].name.toLowerCase().endsWith('.pdf') || files[0].name.toLowerCase().endsWith('.txt'));
 
@@ -352,6 +354,7 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
         toast.loading('Processing audio pipeline...', { id: 'analysis' });
         const res = await analyzeAudio(files[0]);
         setAudioResult(res);
+        setAudioSourceFile(files[0]);
         saveToHistory('music', res.result, files[0].name);
         toast.success('Audio analysis complete!', { id: 'analysis' });
       } else if (fileType === 'videos') {
@@ -731,7 +734,7 @@ const DataVizPage = ({ onBack }: { onBack: () => void }) => {
                     />
                   </ErrorBoundary>
                 )}
-                {audioResult  && <AudioAnalysisView result={audioResult.result} file={selectedFiles[0]} />}
+                {audioResult  && <AudioAnalysisView result={audioResult.result} file={audioSourceFile ?? undefined} />}
                 {videoResult  && <VideoAnalysisView result={videoResult} />}
                 {csvResult    && <CSVAnalysisView   result={csvResult} isSample={csvIsSample} />}
               </div>

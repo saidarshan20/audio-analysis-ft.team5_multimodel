@@ -36,14 +36,52 @@ class GeoLocation(BaseModel):
     lng: float = Field(ge=-180, le=180)
 
 
+class TopicSegment(BaseModel):
+    segment: str
+    topic: str
+
+
+class SentenceSentiment(BaseModel):
+    sentence: str
+    sentiment: str  # "positive" | "negative" | "neutral"
+
+
+class WordFrequency(BaseModel):
+    word: str
+    count: int
+
+
 class TextAnalysisResult(BaseModel):
-    summary: str
-    sentiment: Sentiment
-    entities: list[KGNode]
-    kg_nodes: list[KGNode]
-    kg_edges: list[KGEdge]
-    timeline: list[TimelineEvent]
-    locations: list[GeoLocation]
+    summary: str = ""
+    sentiment: Sentiment = Field(default_factory=lambda: Sentiment(positive=0, negative=0, neutral=1, overall_label="neutral"))
+    entities: list[KGNode] = Field(default_factory=list)
+    kg_nodes: list[KGNode] = Field(default_factory=list)
+    kg_edges: list[KGEdge] = Field(default_factory=list)
+    timeline: list[TimelineEvent] = Field(default_factory=list)
+    locations: list[GeoLocation] = Field(default_factory=list)
+    # Extended NLP fields (populated by full audio services.py prompt)
+    emotion: str = ""
+    tone: str = ""
+    domain: str = ""
+    environment: str = ""
+    topic: str = ""
+    theme: str = ""
+    bullet_points: list[str] = Field(default_factory=list)
+    action_items: list[str] = Field(default_factory=list)
+    decisions: list[str] = Field(default_factory=list)
+    agreements: list[str] = Field(default_factory=list)
+    disagreements: list[str] = Field(default_factory=list)
+    questions: list[str] = Field(default_factory=list)
+    unanswered_questions: list[str] = Field(default_factory=list)
+    top_keywords: list[str] = Field(default_factory=list)
+    top_keyphrases: list[str] = Field(default_factory=list)
+    topic_segments: list[TopicSegment] = Field(default_factory=list)
+    sentence_sentiments: list[SentenceSentiment] = Field(default_factory=list)
+    word_frequencies: list[WordFrequency] = Field(default_factory=list)
+    word_count: int = 0
+    char_count: int = 0
+    sentence_count: int = 0
+    conversation_score: float | None = None
 
 
 class TextAnalysisResponse(BaseModel):
@@ -250,7 +288,12 @@ class AudioFeatures(BaseModel):
     energy: EnergyData
     tempo: float = 0.0
     spectral_centroid_mean: float = 0.0
+    mel_spectrogram: SpectrogramData | None = None
     mfcc: MFCCData | None = None
+    # Pitch / gender estimation fields
+    pitch_mean: float | None = None      # Mean F0 in Hz (None if not computed)
+    pitch_std: float | None = None       # Std of F0 in Hz
+    gender_tag: str = ""                  # "Likely Male" | "Likely Female" | "Indeterminate" | ""
 
 
 # ──────────────────────────────────────────────
@@ -265,12 +308,68 @@ class SpeakerSegment(BaseModel):
     text: str
 
 
+class SpeakerMetrics(BaseModel):
+    """Per-speaker analytics derived from aligned segments."""
+    wpm: float = 0.0
+    dominance_ratio: float = 0.0
+    participation_ratio: float = 0.0
+    pitch_mean: float | None = None   # Mean F0 Hz for this speaker
+    gender_tag: str = ""              # "Likely Male" | "Likely Female" | "Indeterminate"
+
+
+class AudioQualityMetrics(BaseModel):
+    snr: float | None = None
+    loudness: float | None = None
+    clarity: float | None = None
+    cleanliness: float | None = None
+
+
+class AudioQuality(BaseModel):
+    score_version: str = ""
+    content_type: str = "speech"   # speech | non_speech | silent
+    is_speech_present: bool = False
+    duration_warning: bool = False
+    confidence: float = 1.0
+    overall_score: float | None = None
+    composite_percent: float | None = None
+    rating: str = "unscored"
+    summary: str = ""
+    snr_db: float | None = None
+    clip_ratio: float = 0.0
+    speech_frame_ratio: float = 0.0
+    metrics: AudioQualityMetrics = Field(default_factory=AudioQualityMetrics)
+
+
+class AudioVerdict(BaseModel):
+    """LLM-generated plain-language verdict for the audio recording."""
+    title: str = ""         # e.g. "Low Quality Audio | Nostalgic Tone"
+    description: str = ""   # 1-2 sentence natural-language explanation
+
+
+class AudioInterpretation(BaseModel):
+    """Rule-based interpretation layer: converts raw metrics → human labels."""
+    noise_label: str = ""       # "High Noise" | "Moderate Noise" | "Clean Audio"
+    loudness_label: str = ""    # "Too Quiet" | "Normal" | "Too Loud"
+    clarity_label: str = ""     # "Low" | "Moderate" | "High"
+    speech_rate_label: str = "" # "Slow" | "Normal" | "Fast"
+    silence_ratio: float = 0.0  # fraction of total duration that is silence
+    speech_rate: float = 0.0    # overall WPM (word count / duration in minutes)
+
+
 class AudioAnalysisResult(BaseModel):
     duration: float
     segments: list[SpeakerSegment]
     transcript_text: str
     text_analysis: TextAnalysisResult | None = None
     features: AudioFeatures | None = None   # ← acoustic feature data (Task 1)
+    language: str = ""
+    interruption_count: int = 0
+    speaker_metrics: dict[str, SpeakerMetrics] = Field(default_factory=dict)
+    audio_quality: AudioQuality | None = None
+    # ── Decision layer (populated by interpretation + LLM verdict step) ──────
+    verdict: AudioVerdict | None = None
+    recommended_actions: list[str] = Field(default_factory=list)
+    interpretation: AudioInterpretation | None = None
 
 
 class AudioAnalysisResponse(BaseModel):
