@@ -629,6 +629,7 @@ async def analyze_video_endpoint(file: UploadFile = File(...)):
         # Store output path for streaming endpoint
         import builtins
         builtins._last_analyzed_video = out_path  # type: ignore[attr-defined]
+        builtins._last_original_video = input_path  # type: ignore[attr-defined]
 
         return result
 
@@ -637,11 +638,6 @@ async def analyze_video_endpoint(file: UploadFile = File(...)):
     except Exception as exc:
         logger.exception("Video analysis failed")
         raise HTTPException(status_code=500, detail=str(exc)) from exc
-    finally:
-        try:
-            os.unlink(input_path)
-        except Exception:
-            pass
 
 
 @router.get("/stream-temp-video")
@@ -656,6 +652,56 @@ async def stream_temp_video():
         media_type="video/mp4",
         headers={"Accept-Ranges": "bytes", "Cache-Control": "no-cache", "Content-Disposition": "inline"},
     )
+
+
+@router.get("/stream-original-video")
+async def stream_original_video():
+    """Stream the original uploaded video (without annotations)."""
+    import builtins
+    video_path = getattr(builtins, "_last_original_video", None)
+    if not video_path or not os.path.exists(video_path):
+        raise HTTPException(status_code=404, detail="Original video not found.")
+    return FileResponse(
+        video_path,
+        media_type="video/mp4",
+        headers={"Accept-Ranges": "bytes", "Cache-Control": "no-cache", "Content-Disposition": "inline"},
+    )
+
+
+class VideoChatRequest(BaseModel):
+    question: str
+    transcript: str
+    summary: str
+    metadata: dict = {}
+
+
+@router.post("/video-chat")
+async def video_chat(payload: VideoChatRequest):
+    """Answer questions about a video using Azure OpenAI / Groq fallback."""
+    from modules.team5_multimodal.config import get_llm_client
+    client, model_name = get_llm_client()
+
+    system_prompt = (
+        "You are an AI Video Assistant. You help users understand video content based on transcripts and summaries.\n"
+        "Use the provided context to answer the user's question accurately.\n"
+        "IMPORTANT: Keep your answer CONCISE, ideally between 20-30 words. Do not exceed 40 words.\n"
+        f"Video Summary: {payload.summary}\n"
+        f"Video Transcript: {payload.transcript}\n"
+    )
+
+    try:
+        completion = await client.chat.completions.create(
+            model=model_name,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": payload.question},
+            ],
+            temperature=0.3,
+        )
+        return {"answer": completion.choices[0].message.content}
+    except Exception as e:
+        logger.exception("Video chat failed")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 # ──────────────────────────────────────────────

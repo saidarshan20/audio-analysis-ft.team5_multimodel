@@ -792,11 +792,13 @@ export interface VideoAnalysisResult {
   clip_scenes: ClipScene[];
   groq_summary: string;
   sentiment_analysis: string;
+  all_emotions?: string;
   transcript?: {
     full_text: string;
     segments?: Array<{ start: number; end: number; text: string }>;
     language?: string;
     vtt_content?: string;
+    speakers?: Array<{ start: number; end: number; speaker: string; text: string }>;
     entities?: Array<{ label: string; items: string[] }>;
     topics?: Array<{ name: string; count: number }>;
     audio_plots?: { waveform?: string; spectrogram?: string; energy?: string };
@@ -816,6 +818,35 @@ export async function analyzeVideo(file: File): Promise<VideoAnalysisResult> {
   if (!response.ok) {
     const err = await response.json().catch(() => ({ detail: 'Unknown error' }));
     throw new Error(err.detail || `Video analysis failed with status ${response.status}`);
+  }
+
+  return response.json();
+}
+
+// ── Video Chat ────────────────────────────────────────────────────────────────
+
+export interface VideoChatResponse {
+  answer: string;
+}
+
+/**
+ * Ask a question about a video using its transcript and summary context
+ */
+export async function videoChat(
+  question: string,
+  transcript: string,
+  summary: string,
+  metadata: Record<string, unknown> = {}
+): Promise<VideoChatResponse> {
+  const response = await fetch(`${BASE_URL}/team5/video-chat`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ question, transcript, summary, metadata }),
+  });
+
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({ detail: 'Unknown error' }));
+    throw new Error(err.detail || `Video chat failed with status ${response.status}`);
   }
 
   return response.json();

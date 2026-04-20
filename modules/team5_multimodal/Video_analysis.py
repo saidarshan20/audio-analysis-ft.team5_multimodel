@@ -2,6 +2,8 @@
 Video_analysis.py — Full multimodal video analysis pipeline.
 Uses YOLOv8 for object detection, BLIP for captioning, CLIP for embeddings.
 Produces a browser-compatible H.264 MP4 and returns rich analysis metadata.
+
+LLM Priority: Azure OpenAI → Groq  (mirrors config.get_llm_client logic)
 """
 
 import cv2
@@ -11,9 +13,64 @@ import argparse
 import tempfile
 import subprocess
 import numpy as np
+import base64
+import io
 from collections import Counter
 from ultralytics import YOLO
 from PIL import Image
+
+from modules.team5_multimodal.config import get_settings
+
+
+# ── Helpers: synchronous LLM clients (this file runs in asyncio.to_thread) ──
+
+def _get_sync_llm_client():
+    """
+    Returns (client, model_name) for the best available *synchronous* LLM.
+    Priority: Azure OpenAI → Groq
+    """
+    from openai import OpenAI, AzureOpenAI
+    s = get_settings()
+
+    if s.azure_openai_key and s.azure_openai_endpoint and s.azure_openai_deployment_name:
+        return AzureOpenAI(
+            azure_endpoint=s.azure_openai_endpoint,
+            api_key=s.azure_openai_key,
+            api_version=s.azure_openai_api_version,
+        ), s.azure_openai_deployment_name
+
+    # Groq fallback
+    if s.groq_api_key:
+        return OpenAI(
+            base_url="https://api.groq.com/openai/v1",
+            api_key=s.groq_api_key,
+        ), s.groq_model
+
+    raise RuntimeError("No LLM API key configured (set AZURE_OPENAI_KEY or GROQ_API_KEY in .env)")
+
+
+def _get_sync_vision_client():
+    """
+    Returns (client, model_name) for vision-capable LLM (image understanding).
+    Priority: Azure OpenAI → Groq Vision
+    """
+    from openai import OpenAI, AzureOpenAI
+    s = get_settings()
+
+    if s.azure_openai_key and s.azure_openai_endpoint and s.azure_openai_deployment_name:
+        return AzureOpenAI(
+            azure_endpoint=s.azure_openai_endpoint,
+            api_key=s.azure_openai_key,
+            api_version=s.azure_openai_api_version,
+        ), s.azure_openai_deployment_name
+
+    if s.groq_api_key and s.groq_vision_model:
+        return OpenAI(
+            base_url="https://api.groq.com/openai/v1",
+            api_key=s.groq_api_key,
+        ), s.groq_vision_model
+
+    return None, None
 
 
 def analyze_video(input_path: str, output_path: str = "", model_path: str = "yolov8n.pt", show: bool = False):
@@ -110,7 +167,6 @@ def analyze_video(input_path: str, output_path: str = "", model_path: str = "yol
                             crop = cv2.resize(crop, (0,0), fx=scale, fy=scale)
                         
                         _, buffer = cv2.imencode('.jpg', crop, [cv2.IMWRITE_JPEG_QUALITY, 70])
-                        import base64
                         crop_b64 = f"data:image/jpeg;base64,{base64.b64encode(buffer.tobytes()).decode('utf-8')}"
                     
                     object_details[class_name].append({
@@ -159,9 +215,14 @@ def analyze_video(input_path: str, output_path: str = "", model_path: str = "yol
         "-y",                           # overwrite
         "-framerate", "1",              # input is 1 fps (one keyframe per second)
         "-i", os.path.join(temp_dir, "frame_%06d.png"),
+        "-i", input_path,               # original video for audio
         "-c:v", "libx264",             # H.264 codec
         "-preset", "fast",
         "-pix_fmt", "yuv420p",          # browser compatibility
+        "-c:a", "aac",                  # encode audio to AAC
+        "-map", "0:v:0",                # map video from frames
+        "-map", "1:a:0?",               # map audio from original video (optional)
+        "-shortest",                    # stop encoding when shortest stream ends
         "-movflags", "+faststart",      # stream-friendly
         "-r", "1",                      # output 1 fps
         output_path
@@ -185,37 +246,69 @@ def analyze_video(input_path: str, output_path: str = "", model_path: str = "yol
     import shutil
     shutil.rmtree(temp_dir, ignore_errors=True)
 
-    # --- Step 3: Run BLIP captioning on keyframes → single combined caption ---
-    per_frame_captions = []
-    video_caption = ""
-    try:
-        from transformers import BlipProcessor, BlipForConditionalGeneration
-        print("Loading BLIP captioning model...")
-        blip_processor = BlipProcessor.from_pretrained("Salesforce/blip-image-captioning-base")
-        blip_model = BlipForConditionalGeneration.from_pretrained("Salesforce/blip-image-captioning-base")
-        
-        for i, img in enumerate(keyframe_images):
-            inputs = blip_processor(img, return_tensors="pt")
-            out = blip_model.generate(**inputs, max_new_tokens=50)
-            caption = blip_processor.decode(out[0], skip_special_tokens=True)
-            per_frame_captions.append(caption)
-            print(f"  Frame {i+1} caption: {caption}")
-        
-        # Filter and deduplicate per-frame captions for the LLM
-        unique_blip = []
-        for c in per_frame_captions:
-            if c not in unique_blip:
-                unique_blip.append(c)
-        # We will use Groq later to synthesize this into a single caption to save API requests
-        video_caption_raw = ", ".join(unique_blip)
-        video_caption = ". ".join(unique_blip[:3]) # temporary fallback
-        print(f"  Captured {len(unique_blip)} unique BLIP frame captions.")
-    except Exception as e:
-        print(f"BLIP captioning skipped (error: {e})")
-        video_caption_raw = "None"
-        video_caption = "Caption unavailable"
+    # --- Step 3: Image Description (Azure Vision → Groq Vision → BLIP fallback) ---
+    video_caption_raw = "None"
+    settings = get_settings()
 
-    # --- Step 4: Run CLIP embeddings on keyframes + UMAP + KMeans ---
+    # Sample 3 keyframes for deep AI analysis
+    n_frames = len(keyframe_images)
+    indices = [0, n_frames // 2, max(0, n_frames - 1)] if n_frames >= 3 else list(range(n_frames))
+
+    ai_captions = []
+
+    # 3a. Try Azure OpenAI Vision / Groq Vision for primary captions
+    vision_client, vision_model = _get_sync_vision_client()
+    if vision_client and vision_model:
+        provider = "Azure OpenAI" if settings.azure_openai_key else "Groq Vision"
+        print(f"Using {provider} ({vision_model}) for primary captions...")
+        try:
+            for idx in indices:
+                img = keyframe_images[idx]
+                buffered = io.BytesIO()
+                img.save(buffered, format="JPEG")
+                img_str = base64.b64encode(buffered.getvalue()).decode("utf-8")
+
+                response = vision_client.chat.completions.create(
+                    model=vision_model,
+                    messages=[{
+                        "role": "user",
+                        "content": [
+                            {"type": "text", "text": "Describe this video frame concisely, focusing on the main action and environment."},
+                            {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{img_str}"}}
+                        ]
+                    }],
+                    max_tokens=150
+                )
+                cap_text = response.choices[0].message.content
+                ai_captions.append(cap_text)
+                print(f"  {provider} Frame {idx}: {cap_text[:60]}...")
+
+            video_caption_raw = " | ".join(ai_captions)
+        except Exception as e:
+            print(f"{provider} Vision failed: {e}")
+
+    # 3b. BLIP Fallback (if no AI captions were generated)
+    if video_caption_raw == "None":
+        try:
+            from transformers import BlipProcessor, BlipForConditionalGeneration
+            print("Loading local BLIP fallback...")
+            blip_processor = BlipProcessor.from_pretrained(settings.caption_model)
+            blip_model = BlipForConditionalGeneration.from_pretrained(settings.caption_model)
+
+            per_frame_captions = []
+            for img in keyframe_images:
+                inputs = blip_processor(img, return_tensors="pt")
+                out = blip_model.generate(**inputs, max_new_tokens=50)
+                per_frame_captions.append(blip_processor.decode(out[0], skip_special_tokens=True))
+            video_caption_raw = ", ".join(set(per_frame_captions))
+        except Exception as e:
+            print(f"BLIP fallback skipped: {e}")
+
+    video_caption = "No analysis available"
+    if video_caption_raw != "None":
+        video_caption = video_caption_raw
+
+    # --- Step 4: Run CLIP embeddings on keyframes ---
     clip_labels = []
     umap_projection = []
     scene_clusters = []
@@ -242,45 +335,58 @@ def analyze_video(input_path: str, output_path: str = "", model_path: str = "yol
             clip_labels.append({"second": i + 1, "scene": scene_labels[best_idx], "score": round(float(similarities[best_idx]), 3)})
             
         print(f"CLIP scene classification complete for {len(embeddings)} frames.")
-
-        print(f"CLIP scene classification complete for {len(embeddings)} frames.")
     except Exception as e:
         print(f"CLIP embedding skipped (error: {e})")
 
-    # --- Step 5: Groq LLM summary (Combined Call) ---
+    # --- Step 5: Whisper audio transcription (BEFORE LLM so transcript feeds into summary) ---
+    transcript = {"full_text": "", "segments": [], "language": "unknown"}
+    try:
+        from modules.team5_multimodal.video_analysis_transcript import transcribe_video as whisper_transcribe
+        transcript = whisper_transcribe(input_path, model_size="base")
+    except ImportError:
+        try:
+            from video_analysis_transcript import transcribe_video as whisper_transcribe
+            transcript = whisper_transcribe(input_path, model_size="base")
+        except Exception as e:
+            print(f"Whisper transcription skipped (error: {e})")
+    except Exception as e:
+        print(f"Whisper transcription skipped (error: {e})")
+
+    # --- Step 6: LLM summary with Azure → Groq fallback (Combined Call) ---
     groq_summary = ""
     sentiment_analysis = "Neutral - Default fallback."
+    all_emotions = ""
     
     if detected_objects or video_caption_raw:
         try:
-            from groq import Groq
-            from dotenv import load_dotenv
-            load_dotenv()
-            
-            items_str = ", ".join([f"{count} {obj}(s)" for obj, count in detected_objects.most_common(10)])
-            scenes_str = ", ".join(set([s["scene"] for s in clip_labels[:5]])) if clip_labels else "unknown"
-            
-            client = Groq()
-            completion = client.chat.completions.create(
-                model=os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile"),
+            llm_client, llm_model = _get_sync_llm_client()
+            provider = "Azure OpenAI" if settings.azure_openai_key else "Groq"
+
+            items_str = ", ".join([f"{count} {obj}(s)" for obj, count in detected_objects.most_common(12)])
+            scenes_str = ", ".join(set([s["scene"] for s in clip_labels[:8]])) if clip_labels else "unknown"
+            transcript_text = transcript.get("full_text", "No audio detected.")
+
+            completion = llm_client.chat.completions.create(
+                model=llm_model,
                 messages=[
-                    {"role": "system", "content": "You are a multimodal video analysis AI."},
+                    {"role": "system", "content": "You are a senior multimodal AI. Your goal is to synthesize audio and video data into a professional narrative summary. DO NOT just list objects. Describe the core narrative/action."},
                     {"role": "user", "content": (
-                        f"Analyze this video based on these AI outputs:\n"
-                        f"- YOLO detected objects: {items_str}\n"
-                        f"- Unique BLIP frame captions: {video_caption_raw}\n"
-                        f"- CLIP scene types: {scenes_str}\n"
+                        f"Synthesize this video content:\n"
+                        f"- VISUAL CONTENT (Objects detected): {items_str}\n"
+                        f"- VISUAL CONTENT (Frame analysis): {video_caption_raw}\n"
+                        f"- AUDIO CONTENT (Transcript): {transcript_text}\n"
                         f"- Video duration: ~{duration_sec} seconds\n\n"
+                        f"CRITICAL: If the transcript contains speech, prioritize it as the primary narrative source.\n\n"
                         f"Provide your response EXACTLY in this format:\n"
-                        f"Caption: [Write a SINGLE, natural 1-sentence descriptive caption of the entire video, removing repetitions]\n"
-                        f"Summary: [Write a 2-3 sentence summary of what this video shows]\n"
-                        f"Sentiment: [Positive/Negative/Neutral] - [Brief Reason]"
+                        f"Summary: [Provide a high-quality, professional narrative summary in EXACTLY 20-30 words. Focus on human actions and conversation if present.]\n"
+                        f"Sentiment: [Main Category] ([Score 0-1.0]) - [Brief description of sentiment progression throughout the video]\n"
+                        f"All Emotions: [Emotion1] ([Score1]) - [Why1], [Emotion2] ([Score2]) - [Why2], [Emotion3] ([Score3]) - [Why3]"
                     )}
                 ]
             )
             raw_groq_resp = completion.choices[0].message.content
             print("==========================================")
-            print("🚀 GROQ AI VIDEO SUMMARY RAW:")
+            print(f"🚀 {provider} VIDEO SUMMARY RAW:")
             print(raw_groq_resp)
             
             # Parse the structured response
@@ -292,34 +398,25 @@ def analyze_video(input_path: str, output_path: str = "", model_path: str = "yol
                     groq_summary = line.split(':', 1)[1].strip()
                 elif line_lower.startswith('sentiment:'):
                     sentiment_analysis = line.split(':', 1)[1].strip()
+                elif line_lower.startswith('all emotions:'):
+                    all_emotions = line.split(':', 1)[1].strip()
                     
             print(f"Parsed Caption: {video_caption}")
             print(f"Parsed Summary: {groq_summary}")
             print(f"Parsed Sentiment: {sentiment_analysis}")
+            print(f"Parsed All Emotions: {all_emotions}")
             print("==========================================")
         except Exception as e:
-            print(f"Groq API call failed: {e}")
+            print(f"LLM API call failed: {e}")
             if not groq_summary:
-                groq_summary = f"Video contains: {', '.join(detected_objects.keys())}"
+                objects = ", ".join(list(detected_objects.keys())[:5])
+                groq_summary = f"This video depicts a scene featuring {objects}. Further analysis is needed for a full narrative."
             sentiment_analysis = "Neutral - API call failed."
+            all_emotions = "Neutral (1.0)"
     else:
         groq_summary = "No objects detected in the video."
         sentiment_analysis = "Neutral - Video is empty."
-
-    # --- Step 6: Whisper audio transcription ---
-    transcript = {"full_text": "", "segments": [], "language": "unknown"}
-    try:
-        from modules.team5_multimodal.video_analysis_transcript import transcribe_video as whisper_transcribe
-        transcript = whisper_transcribe(input_path, model_size="base")
-    except ImportError:
-        # Try relative import for CLI usage
-        try:
-            from video_analysis_transcript import transcribe_video as whisper_transcribe
-            transcript = whisper_transcribe(input_path, model_size="base")
-        except Exception as e:
-            print(f"Whisper transcription skipped (error: {e})")
-    except Exception as e:
-        print(f"Whisper transcription skipped (error: {e})")
+        all_emotions = "Neutral (1.0)"
 
     # --- Build result metadata ---
     analysis_result = {
@@ -332,6 +429,7 @@ def analyze_video(input_path: str, output_path: str = "", model_path: str = "yol
         "clip_scenes": clip_labels,
         "groq_summary": groq_summary,
         "sentiment_analysis": sentiment_analysis,
+        "all_emotions": all_emotions,
         "transcript": transcript,
         "output_video": output_path
     }

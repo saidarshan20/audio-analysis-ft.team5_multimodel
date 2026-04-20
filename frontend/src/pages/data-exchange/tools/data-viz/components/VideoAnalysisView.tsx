@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
-import { Video } from 'lucide-react';
-import { VideoAnalysisResult } from '../services';
+import { Video, Send, Loader2, MessageCircle } from 'lucide-react';
+import { VideoAnalysisResult, videoChat } from '../services';
 
 interface Props {
   result: VideoAnalysisResult;
@@ -15,6 +15,11 @@ const VideoAnalysisView = ({ result }: Props) => {
   const [subtitleUrl, setSubtitleUrl] = useState<string | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
 
+  // Video Chat state
+  const [chatQuestion, setChatQuestion] = useState('');
+  const [chatLoading, setChatLoading] = useState(false);
+  const [chatMessages, setChatMessages] = useState<Array<{ role: 'user' | 'assistant'; content: string }>>([]);
+
   useEffect(() => {
     if (result.transcript?.vtt_content) {
       const blob = new Blob([result.transcript.vtt_content], { type: 'text/vtt' });
@@ -24,6 +29,35 @@ const VideoAnalysisView = ({ result }: Props) => {
     }
     setSubtitleUrl(null);
   }, [result]);
+
+  const handleVideoChat = async (questionOverride?: string) => {
+    const q = questionOverride || chatQuestion;
+    if (!q.trim()) return;
+
+    setChatMessages(prev => [...prev, { role: 'user', content: q }]);
+    setChatQuestion('');
+    setChatLoading(true);
+
+    try {
+      const response = await videoChat(
+        q,
+        result.transcript?.full_text || '',
+        result.groq_summary || '',
+        { duration: result.duration_seconds, objects: result.detected_objects }
+      );
+      setChatMessages(prev => [...prev, { role: 'assistant', content: response.answer }]);
+    } catch (err: any) {
+      setChatMessages(prev => [...prev, { role: 'assistant', content: `Error: ${err.message}` }]);
+    } finally {
+      setChatLoading(false);
+    }
+  };
+
+  const quickQuestions = [
+    'What is happening in this video?',
+    'Who are the speakers?',
+    'What are the key topics discussed?',
+  ];
 
   return (
     <div className="video-analysis-view" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
@@ -40,7 +74,7 @@ const VideoAnalysisView = ({ result }: Props) => {
         {/* Groq AI Summary */}
         {result.groq_summary && (
           <div className="result-card" style={{ borderLeft: '4px solid #fb8c36' }}>
-            <h4 style={{ color: '#fb8c36', marginTop: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>🚀 AI Video Summary (Groq LLM)</h4>
+            <h4 style={{ color: '#fb8c36', marginTop: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>🚀 AI Video Summary</h4>
             <p style={{ color: '#f1f5f9', fontSize: '14px', lineHeight: 1.6, margin: '10px 0 0' }}>{result.groq_summary}</p>
             {result.sentiment_analysis && (
               <div style={{ marginTop: '15px', padding: '12px', background: 'rgba(56,189,248,0.1)', borderLeft: '4px solid #38bdf8', borderRadius: '4px' }}>
@@ -50,7 +84,7 @@ const VideoAnalysisView = ({ result }: Props) => {
             )}
             {result.video_caption && (
               <div style={{ marginTop: '15px', padding: '12px', background: 'rgba(96,165,250,0.1)', borderLeft: '4px solid #60a5fa', borderRadius: '4px' }}>
-                <h5 style={{ margin: '0 0 5px 0', color: '#60a5fa', fontSize: '12px', textTransform: 'uppercase' }}>BLIP Video Caption</h5>
+                <h5 style={{ margin: '0 0 5px 0', color: '#60a5fa', fontSize: '12px', textTransform: 'uppercase' }}>AI Video Caption</h5>
                 <p style={{ margin: 0, color: '#f8fafc', fontSize: '13px', fontStyle: 'italic' }}>"{result.video_caption}"</p>
               </div>
             )}
@@ -178,6 +212,50 @@ const VideoAnalysisView = ({ result }: Props) => {
             </div>
           </div>
         )}
+
+        {/* Video Chat */}
+        <div className="result-card" style={{ borderLeft: '4px solid #c084fc' }}>
+          <h4 style={{ color: '#c084fc', marginTop: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <MessageCircle size={16} /> Ask AI About This Video
+          </h4>
+          <div style={{ display: 'flex', gap: '8px', marginBottom: '12px', flexWrap: 'wrap' }}>
+            {quickQuestions.map(q => (
+              <button
+                key={q}
+                onClick={() => handleVideoChat(q)}
+                style={{ padding: '4px 12px', fontSize: '11px', background: 'rgba(192,132,252,0.1)', color: '#c084fc', border: '1px solid rgba(192,132,252,0.2)', borderRadius: '16px', cursor: 'pointer', whiteSpace: 'nowrap' }}
+              >
+                {q}
+              </button>
+            ))}
+          </div>
+          {chatMessages.length > 0 && (
+            <div style={{ maxHeight: '250px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '12px' }}>
+              {chatMessages.map((msg, i) => (
+                <div key={i} style={{ padding: '10px 14px', borderRadius: '10px', fontSize: '13px', lineHeight: 1.5, background: msg.role === 'user' ? 'rgba(192,132,252,0.1)' : 'rgba(74,222,128,0.08)', color: msg.role === 'user' ? '#e9d5ff' : '#bbf7d0', borderLeft: msg.role === 'assistant' ? '3px solid #4ade80' : 'none', alignSelf: msg.role === 'user' ? 'flex-end' : 'flex-start', maxWidth: '85%' }}>
+                  {msg.content}
+                </div>
+              ))}
+            </div>
+          )}
+          <div style={{ display: 'flex', gap: '10px' }}>
+            <input
+              type="text"
+              value={chatQuestion}
+              onChange={e => setChatQuestion(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && handleVideoChat()}
+              placeholder="Ask anything about this video..."
+              style={{ flex: 1, background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '10px', padding: '10px 14px', color: '#fff', fontSize: '13px', outline: 'none' }}
+            />
+            <button
+              onClick={() => handleVideoChat()}
+              disabled={chatLoading || !chatQuestion.trim()}
+              style={{ background: '#c084fc', border: 'none', borderRadius: '10px', padding: '10px 16px', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', opacity: (chatLoading || !chatQuestion.trim()) ? 0.5 : 1 }}
+            >
+              {chatLoading ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
+            </button>
+          </div>
+        </div>
       </div>
 
       {/* AUDIO ANALYSIS TAB */}
@@ -206,6 +284,36 @@ const VideoAnalysisView = ({ result }: Props) => {
                 </div>
               )}
             </div>
+
+            {/* Speaker Diarization */}
+            {result.transcript.speakers && result.transcript.speakers.length > 0 && (
+              <div className="result-card" style={{ borderLeft: '4px solid #a78bfa' }}>
+                <h4 style={{ color: '#a78bfa', marginTop: 0, marginBottom: '15px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  🗣️ Speaker Diarization ({result.transcript.speakers.length} segments)
+                </h4>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '350px', overflowY: 'auto' }}>
+                  {result.transcript.speakers.map((sp, i) => {
+                    const speakerColors: Record<string, string> = {
+                      'Speaker 1': '#38bdf8',
+                      'Speaker 2': '#fb923c',
+                      'Speaker 3': '#4ade80',
+                      'Speaker 4': '#f472b6',
+                    };
+                    const color = speakerColors[sp.speaker] || '#94a3b8';
+                    return (
+                      <div key={i} style={{ display: 'flex', gap: '12px', padding: '10px 14px', background: '#0f172a', borderRadius: '8px', border: '1px solid #1e293b', alignItems: 'flex-start' }}>
+                        <div style={{ minWidth: '80px', flexShrink: 0 }}>
+                          <div style={{ color, fontWeight: 'bold', fontSize: '12px' }}>{sp.speaker}</div>
+                          <div style={{ color: '#475569', fontSize: '10px', marginTop: '2px' }}>{sp.start}s – {sp.end}s</div>
+                        </div>
+                        <span style={{ color: '#e2e8f0', fontSize: '13px', lineHeight: 1.5 }}>{sp.text}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
             {result.transcript.audio_plots && Object.keys(result.transcript.audio_plots).length > 0 && (
               <div className="result-card" style={{ borderLeft: '4px solid #f472b6' }}>
                 <h4 style={{ color: '#f472b6', marginTop: 0, marginBottom: '15px' }}>🎛️ Acoustic Spectral Analysis</h4>
@@ -247,6 +355,25 @@ const VideoAnalysisView = ({ result }: Props) => {
             <p style={{ margin: 0, color: '#f8fafc', fontSize: '14px', background: '#020617', padding: '15px', borderRadius: '8px', border: '1px solid #1e293b' }}>{result.sentiment_analysis.replace('Sentiment Analysis:', '')}</p>
           </div>
         )}
+
+        {/* All Emotions */}
+        {result.all_emotions && (
+          <div className="result-card" style={{ borderLeft: '4px solid #f472b6' }}>
+            <h4 style={{ color: '#f472b6', marginTop: 0, marginBottom: '10px' }}>🎭 Emotional Analysis</h4>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
+              {result.all_emotions.split(',').map((emotion, i) => {
+                const trimmed = emotion.trim();
+                const colors = ['#38bdf8', '#fb923c', '#4ade80', '#f472b6', '#a78bfa', '#fbbf24'];
+                return (
+                  <div key={i} style={{ background: '#020617', padding: '10px 16px', borderRadius: '10px', border: '1px solid #1e293b', fontSize: '13px', color: colors[i % colors.length], fontWeight: 500 }}>
+                    {trimmed}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         {result.transcript?.full_text && (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '15px' }}>
             {result.transcript.entities && result.transcript.entities.length > 0 && (
@@ -279,7 +406,7 @@ const VideoAnalysisView = ({ result }: Props) => {
             )}
           </div>
         )}
-        {!result.sentiment_analysis && !result.transcript?.entities?.length && !result.transcript?.topics?.length && (
+        {!result.sentiment_analysis && !result.all_emotions && !result.transcript?.entities?.length && !result.transcript?.topics?.length && (
           <div className="result-card" style={{ textAlign: 'center', padding: '40px 20px', color: '#94a3b8' }}>
             <p>No text analysis data available for this video.</p>
           </div>
