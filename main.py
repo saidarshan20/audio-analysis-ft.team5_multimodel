@@ -46,9 +46,9 @@ def create_app() -> FastAPI:
         version="0.1.0",
     )
 
-    # Include both the legacy Vite default (5173) and the new unique port (5742).
+    # Include both the legacy Vite default (5173) and the new unique port (3652).
     # Override FRONTEND_PORT in .env if you need a different value.
-    frontend_port = int(os.getenv("FRONTEND_PORT", os.getenv("VITE_PORT", "5742")))
+    frontend_port = int(os.getenv("FRONTEND_PORT", os.getenv("VITE_PORT", "3652")))
     cors_origins = list({
         "http://localhost:3000",
         "http://localhost:5173",

@@ -57,10 +57,10 @@ class Team5Settings(BaseSettings):
 
     # --- App Ports (override in .env to avoid clashes on shared remote desktops) ---
     backend_port: int = 8742
-    frontend_port: int = 5742
+    frontend_port: int = 3652
 
     # --- CORS (for run_local.py standalone testing) ---
-    cors_origins: list[str] = ["http://localhost:3000", "http://localhost:5173", "http://localhost:5742"]
+    cors_origins: list[str] = ["http://localhost:3000", "http://localhost:5173", "http://localhost:3652"]
 
     model_config = {
         "env_file": os.path.join(

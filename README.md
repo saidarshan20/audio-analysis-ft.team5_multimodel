@@ -29,10 +29,10 @@ Kosh_V2/
 
 ```bash
 pip install -r requirements.txt
-uvicorn main:app --reload --port 8000
+uvicorn main:app --reload --port 8742
 ```
 
-Open `http://localhost:8000/docs` for the interactive API explorer.
+Open `http://localhost:8742/docs` for the interactive API explorer.
 
 ## Team Local Testing
 
