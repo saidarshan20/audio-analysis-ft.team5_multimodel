@@ -280,7 +280,7 @@ const AudioAnalysisView = ({ result, file }: Props) => {
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
         <div style={{ display: 'flex', gap: '4px', background: 'rgba(15,23,42,0.6)', borderRadius: '10px', padding: '4px' }}>
           <button style={TAB_STYLE(activeTab === 'nlp')} onClick={() => setActiveTab('nlp')}>
-            <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><List size={13} /> NLP &amp; Context</span>
+            <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><List size={13} /> Insights</span>
           </button>
           <button style={TAB_STYLE(activeTab === 'chat')} onClick={() => setActiveTab('chat')}>
             <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><MessageCircle size={13} /> AI Chat &amp; Search</span>
