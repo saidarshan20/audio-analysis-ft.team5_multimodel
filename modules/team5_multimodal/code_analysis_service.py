@@ -13,7 +13,6 @@ import tempfile
 import zipfile
 from pathlib import Path
 
-from openai import AsyncOpenAI
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import HumanMessage, SystemMessage
 from langgraph.graph import StateGraph, END
@@ -194,22 +193,10 @@ class AnalysisState(TypedDict):
     metadata: Annotated[Dict[str, Any], merge_metadata]
     error: Optional[str]
 
-# ─────────────────── Groq client ───────────────────
-
-_openai_client: AsyncOpenAI | None = None
-
-def _get_llm_client() -> AsyncOpenAI:
-    global _openai_client
-    if _openai_client is None:
-        s = get_settings()
-        if s.nvidia_api_key:
-            _openai_client = AsyncOpenAI(
-                base_url="https://integrate.api.nvidia.com/v1",
-                api_key=s.nvidia_api_key
-            )
-        else:
-            _openai_client = AsyncOpenAI(api_key=s.groq_api_key, base_url="https://api.groq.com/openai/v1")
-    return _openai_client
+# ─────────────────── LLM client (Azure / NVIDIA / Groq) ───────────────────
+# Centralised in config.py so personal-laptop (Groq/NVIDIA) and office-laptop
+# (Azure OpenAI) both work without touching this file.
+from modules.team5_multimodal.config import get_llm_client as _get_llm_client
 
 def _get_langchain_model(force_groq: bool = False) -> ChatOpenAI:
     """Get the LangChain ChatOpenAI adapter. 
@@ -250,7 +237,7 @@ def _get_langchain_model(force_groq: bool = False) -> ChatOpenAI:
 
 class CodeAnalysisService:
     def __init__(self) -> None:
-        self._client: AsyncOpenAI = _get_llm_client()
+        self._client, self._model_name = _get_llm_client()
         self._settings = get_settings()
         self._workflow = self._build_workflow()
 

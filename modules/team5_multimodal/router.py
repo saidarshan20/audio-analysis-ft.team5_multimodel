@@ -744,14 +744,8 @@ class CodeChatRequest(BaseModel):
 @router.post("/code-chat")
 async def chat_about_codebase(payload: CodeChatRequest):
     """Answer a question about the codebase using the analysis result as context."""
-    from openai import AsyncOpenAI
-    settings = get_settings()
-    if settings.nvidia_api_key:
-        client = AsyncOpenAI(base_url="https://integrate.api.nvidia.com/v1", api_key=settings.nvidia_api_key)
-        model_name = settings.nvidia_model
-    else:
-        client = AsyncOpenAI(base_url="https://api.groq.com/openai/v1", api_key=settings.groq_api_key)
-        model_name = settings.groq_model
+    from modules.team5_multimodal.config import get_llm_client
+    client, model_name = get_llm_client()
 
     system = (
         "You are an expert software architect. Answer questions about the codebase described below. "
@@ -1084,15 +1078,8 @@ class DatasetChatRequest(BaseModel):
 @router.post("/datasets/chat")
 async def chat_about_dataset(payload: DatasetChatRequest):
     """Answer a question about a data.gov.in dataset using its metadata as context."""
-    from openai import AsyncOpenAI
-    settings = get_settings()
-
-    if settings.nvidia_api_key:
-        client = AsyncOpenAI(base_url="https://integrate.api.nvidia.com/v1", api_key=settings.nvidia_api_key)
-        model_name = settings.nvidia_model
-    else:
-        client = AsyncOpenAI(base_url="https://api.groq.com/openai/v1", api_key=settings.groq_api_key)
-        model_name = settings.groq_model
+    from modules.team5_multimodal.config import get_llm_client
+    client, model_name = get_llm_client()
 
     # Build schema context
     schema_lines = ""

@@ -4,7 +4,7 @@ import '../ToolPage.css';
 
 type OcrStep = 'upload' | 'processing' | 'results';
 
-const OCR_API_BASE = (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? 'http://localhost:8000';
+const OCR_API_BASE = (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? 'http://localhost:8742';
 const OCR_BACKEND_ENABLED = false;
 
 const OCR_STEPS: { id: OcrStep; label: string; Icon: React.ElementType }[] = [

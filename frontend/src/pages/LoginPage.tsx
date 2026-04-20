@@ -17,7 +17,7 @@ const LoginPage = () => {
   const [loading, setLoading] = useState(false);
  
   // API URL from environment variables
-  const API_BASE_URL = `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'}/auth`;
+  const API_BASE_URL = `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8742'}/auth`;
  
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>): Promise<void> => {
     e.preventDefault();

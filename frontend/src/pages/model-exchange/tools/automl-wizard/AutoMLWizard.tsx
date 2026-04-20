@@ -9,7 +9,7 @@ import './AutoMLWizard.css';
 type WizardStep = 'dataset' | 'configure' | 'configuration' | 'training' | 'results';
 type DatasetTab = 'catalog' | 'upload';
 
-const AUTOML_API_BASE = (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? 'http://localhost:8000';
+const AUTOML_API_BASE = (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? 'http://localhost:8742';
 const AUTOML_BACKEND_ENABLED = false;
 
 // ─── Step definitions ─────────────────────────────────────────────────────────

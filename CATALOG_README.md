@@ -515,7 +515,7 @@ Create `catalog/services.ts` (or add to your existing services file):
 // Adjust BASE_URL to match your backend
 // ============================================================
 
-const BASE_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8000';
+const BASE_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8742';
 
 export interface DatasetEntry {
   name:     string;
@@ -958,19 +958,19 @@ Browser                          FastAPI Backend              data.gov.in
 
 ```bash
 # 1. Verify catalog listing
-curl "http://localhost:8000/team5/datasets?limit=5" | python3 -m json.tool
+curl "http://localhost:8742/team5/datasets?limit=5" | python3 -m json.tool
 
 # 2. Verify sample preview
-curl "http://localhost:8000/team5/datasets/sample/37670b6f-c236-49a7-8cd7-cc2dc610e32d?limit=3" | python3 -m json.tool
+curl "http://localhost:8742/team5/datasets/sample/37670b6f-c236-49a7-8cd7-cc2dc610e32d?limit=3" | python3 -m json.tool
 
 # 3. Verify AI chat
-curl -s -X POST http://localhost:8000/team5/datasets/chat \
+curl -s -X POST http://localhost:8742/team5/datasets/chat \
   -H "Content-Type: application/json" \
   -d '{"dataset_name":"Hospital Directory","description":"National hospital data","fields":[{"name":"state","type":"keyword"}],"question":"What states are covered?"}' \
   | python3 -m json.tool
 
 # 4. Verify NDJSON fetch stream
-curl -s -X POST http://localhost:8000/team5/datasets/fetch-for-analysis \
+curl -s -X POST http://localhost:8742/team5/datasets/fetch-for-analysis \
   -H "Content-Type: application/json" \
   -d '{"index_id":"37670b6f-c236-49a7-8cd7-cc2dc610e32d","dataset_name":"Hospital Directory","max_rows":100}'
 ```
