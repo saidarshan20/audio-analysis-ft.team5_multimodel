@@ -339,6 +339,7 @@ const ImageAnalysisView = ({ imgResult, imgZipResult, imgTokens, imgDuration, im
   const [collectionAnswer, setCollectionAnswer] = useState<ImageCollectionQAResponse | null>(null);
   const [compareSelection, setCompareSelection] = useState<string[]>([]);
   const [vizMode, setVizMode] = useState<'semantic' | 'geographic'>('semantic');
+  const [imageTab, setImageTab] = useState<'overview' | 'explorer' | 'intelligence'>('overview');
 
 
   const zipClusterLabelMap: Record<number, string> = {};
@@ -536,6 +537,16 @@ const ImageAnalysisView = ({ imgResult, imgZipResult, imgTokens, imgDuration, im
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+      {(imgResult || imgZipResult) && (
+        <div className="tab-navigation" style={{ display: 'flex', gap: '10px', borderBottom: '1px solid var(--border-mid)', paddingBottom: '10px', marginBottom: '10px', flexWrap: 'wrap' }}>
+          <button onClick={() => setImageTab('overview')} style={{ padding: '8px 16px', background: imageTab === 'overview' ? '#fb8c36' : 'transparent', color: imageTab === 'overview' ? '#fff' : 'var(--t-muted)', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '8px', transition: 'all 0.2s' }}><BarChart2 size={16} /> Batch Overview</button>
+          <button onClick={() => setImageTab('explorer')} style={{ padding: '8px 16px', background: imageTab === 'explorer' ? '#22d3ee' : 'transparent', color: imageTab === 'explorer' ? '#fff' : 'var(--t-muted)', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '8px', transition: 'all 0.2s' }}><Layers size={16} /> Image Explorer & Gallery</button>
+          <button onClick={() => setImageTab('intelligence')} style={{ padding: '8px 16px', background: imageTab === 'intelligence' ? '#c084fc' : 'transparent', color: imageTab === 'intelligence' ? '#fff' : 'var(--t-muted)', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '8px', transition: 'all 0.2s' }}><Sparkles size={16} /> Intelligence & Q&A</button>
+        </div>
+      )}
+      
+      {/* ── OVERVIEW TAB ── */}
+      <div style={{ display: imageTab === 'overview' ? 'flex' : 'none', flexDirection: 'column', gap: '20px' }}>
 {imgResult && (
   <div className="img-analysis-view">
     <div className="viz-row">
@@ -575,8 +586,14 @@ const ImageAnalysisView = ({ imgResult, imgZipResult, imgTokens, imgDuration, im
       </div>
     </div>
 
-    <div className="image-grid">
-      {imgResult.results?.map((res, i) => (
+    </div> {/* close img-analysis-view for overview */}
+      </div> {/* close OVERVIEW TAB for imgResult */}
+      
+      {/* ── EXPLORER TAB (imgResult) ── */}
+      <div style={{ display: imageTab === 'explorer' ? 'flex' : 'none', flexDirection: 'column', gap: '20px' }}>
+        <div className="img-analysis-view">
+          <div className="image-grid">
+            {imgResult.results?.map((res, i) => (
         <div key={i} className="img-card result-card">
           <div className="img-thumbnail">
             <ImageIcon size={24} color="var(--border-bright)" />
@@ -595,10 +612,14 @@ const ImageAnalysisView = ({ imgResult, imgZipResult, imgTokens, imgDuration, im
       ))}
     </div>
   </div>
+</div> {/* close EXPLORER TAB for imgResult */}
 )}
 
 {/* ZIP Image Analysis Result */}
 {imgZipResult && (
+  <>
+  {/* ── OVERVIEW TAB (imgZipResult) ── */}
+  <div style={{ display: imageTab === 'overview' ? 'flex' : 'none', flexDirection: 'column', gap: '20px' }}>
   <div className="img-analysis-view">
     {/* ── Image Analysis Metrics Strip ── */}
     <div className="metrics-strip with-margin">
@@ -812,8 +833,13 @@ const ImageAnalysisView = ({ imgResult, imgZipResult, imgTokens, imgDuration, im
       </div>
     </div>
 
+  </div></div> {/* close img-analysis-view and OVERVIEW TAB */}
+  
+  {/* ── EXPLORER TAB (imgZipResult) ── */}
+  <div style={{ display: imageTab === 'explorer' ? 'flex' : 'none', flexDirection: 'column', gap: '20px' }}>
+  <div className="img-analysis-view">
     {/* 5th Thing: Semantic Category Explorer */}
-    <div style={{ padding: '40px 0 0' }}>
+    <div style={{ padding: '20px 0 0' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
         <div>
           <h3 className="theme-heading" style={{ margin: 0, fontSize: '20px', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -951,10 +977,14 @@ const ImageAnalysisView = ({ imgResult, imgZipResult, imgTokens, imgDuration, im
       </div>
     </div>
   </div>
+  </div> {/* close EXPLORER TAB */}
+  </>
 )}
 
+{/* ── INTELLIGENCE TAB ── */}
+<div style={{ display: imageTab === 'intelligence' ? 'flex' : 'none', flexDirection: 'column', gap: '20px' }}>
 {(imgResult || imgZipResult) && (
-  <div className="ai-intelligence-section">
+  <div className="ai-intelligence-section" style={{ margin: 0 }}>
     <h3 className="theme-heading" style={{ fontSize: '22px', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
       <Sparkles size={24} color="#fb8c36" /> Intelligent Visual Reasoning
     </h3>
@@ -1359,6 +1389,7 @@ const ImageAnalysisView = ({ imgResult, imgZipResult, imgTokens, imgDuration, im
     )}
   </div>
 )}
+</div> {/* close INTELLIGENCE TAB */}
 
     {/* Metadata & Map Modal */}
     {selectedClusterPoint && (
