@@ -32,6 +32,14 @@ class Team5Settings(BaseSettings):
     # --- Audio Tooling (Optional, needed for pydub) ---
     ffmpeg_path: str = ""
     ffprobe_path: str = ""
+    yamnet_enabled: bool = True
+    yamnet_model_url: str = "https://tfhub.dev/google/yamnet/1"
+    yamnet_confidence_threshold: float = 0.2
+    yamnet_max_penalty_points: float = 25.0
+    yamnet_chunk_seconds: float = 30.0
+    yamnet_frame_hop_seconds: float = 0.48
+    yamnet_noise_config_path: str = ""
+    yamnet_penalty_weights_json: str = ""
 
     # --- data.gov.in Open Data Catalog ---
     data_gov_api_key: str = ""

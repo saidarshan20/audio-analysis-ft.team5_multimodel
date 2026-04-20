@@ -22,6 +22,10 @@ export const percentile = (arr: number[], p: number) => {
 
 export interface AudioQualityView {
   score: number;
+  baseScore: number | null;
+  adjustedScore: number | null;
+  noisePenaltyPoints: number;
+  dominantNoiseCauses: string[];
   rating: string;
   summary: string;
   snrDb: number;
@@ -42,10 +46,21 @@ export function deriveAudioQuality(result: AudioAnalysisResult): AudioQualityVie
     !!result.audio_quality.score_version
   ) {
     const q = result.audio_quality;
+    const baseScore = q.overall_score ?? null;
+    const adjustedScore = q.adjusted_overall_score ?? baseScore;
+    const dominantCauses =
+      q.background_noise?.dominant_causes ||
+      q.score_components?.dominant_causes ||
+      [];
+    const penalty = q.noise_penalty_points ?? q.score_components?.noise_penalty_points ?? 0;
     const rawMetrics = q.metrics ?? { snr: null, loudness: null, clarity: null, cleanliness: null };
     const confidence = q.confidence ?? 1;
     return {
-      score:            q.overall_score ?? 0,
+      score:            adjustedScore ?? 0,
+      baseScore,
+      adjustedScore,
+      noisePenaltyPoints: penalty,
+      dominantNoiseCauses: dominantCauses,
       rating:           q.rating        ?? 'Unknown',
       summary:          q.summary       ?? '',
       snrDb:            q.snr_db        ?? 0,
@@ -102,6 +117,10 @@ export function deriveAudioQuality(result: AudioAnalysisResult): AudioQualityVie
 
   return {
     score:            overallScore,
+    baseScore: overallScore,
+    adjustedScore: overallScore,
+    noisePenaltyPoints: 0,
+    dominantNoiseCauses: [],
     rating,
     summary,
     snrDb:            Math.round(snrDb * 10) / 10,

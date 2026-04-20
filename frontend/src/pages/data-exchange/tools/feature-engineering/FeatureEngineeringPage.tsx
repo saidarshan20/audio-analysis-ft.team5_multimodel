@@ -30,7 +30,7 @@ type ProfileApiResponse = {
   distributions: Record<string, { type: string; mean?: number; median?: number }>;
 };
 
-const API_BASE = (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? 'http://localhost:8000';
+const API_BASE = ((import.meta.env.VITE_API_BASE_URL as string | undefined) ?? (import.meta.env.VITE_API_URL as string | undefined) ?? 'http://localhost:9080').replace(/\/$/, '');
 
 const FE_STEPS: { id: FeStep; label: string; Icon: React.ElementType }[] = [
   { id: 'dataset',    label: 'Select Dataset',    Icon: Database   },

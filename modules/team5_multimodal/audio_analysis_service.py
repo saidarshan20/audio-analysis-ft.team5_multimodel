@@ -43,12 +43,15 @@ from modules.team5_multimodal.models import (
     AudioQuality,
     AudioVerdict,
     AudioInterpretation,
+    BackgroundNoiseSummary,
+    AudioScoreComponents,
     SpeakerSegment,
     SpeakerMetrics,
 )
 from modules.team5_multimodal.services import TextAnalysisService
 from modules.team5_multimodal.audio_feature_extractor import AudioFeatureExtractor
 from modules.team5_multimodal.audio_quality_service import AudioQualityService
+from modules.team5_multimodal.yamnet_service import YamnetNoiseService
 
 logger = logging.getLogger(__name__)
 
@@ -102,6 +105,7 @@ class AudioAnalysisService:
             ffprobe_exe=self.settings.ffprobe_path or "",
         )
         self._quality_service = AudioQualityService()
+        self._yamnet_service = YamnetNoiseService(self.settings)
 
     def process_audio(self, file_bytes: bytes, filename: str) -> AudioAnalysisResult:
         """
@@ -149,6 +153,8 @@ class AudioAnalysisService:
                 wav_path,
                 input_had_multiple_channels=input_audio.channels > 1,
             )
+            background_noise = self._safe_detect_background_noise(wav_path)
+            quality = self._apply_noise_adjustment(quality, background_noise)
 
             # 5. Transcribe (WAV only)
             transcript_out = self._transcribe(wav_path)
@@ -206,7 +212,12 @@ class AudioAnalysisService:
 
             # ── 8. Build rule-based interpretation ──────────────────────────────
             word_count = len(transcript_text.split()) if transcript_text else 0
-            interp = self._build_interpretation(quality, word_count, duration_sec)
+            interp = self._build_interpretation(
+                quality,
+                word_count,
+                duration_sec,
+                dominant_noise_causes=(quality.background_noise.dominant_causes if quality.background_noise else []),
+            )
 
             return AudioAnalysisResult(
                 duration=duration_sec,
@@ -256,11 +267,48 @@ class AudioAnalysisService:
         )
         return AudioQuality.model_validate(raw_quality)
 
+    def _safe_detect_background_noise(self, wav_path: str) -> BackgroundNoiseSummary | None:
+        try:
+            raw = self._yamnet_service.analyze_wav(wav_path)
+            if not raw:
+                return None
+            return BackgroundNoiseSummary.model_validate(raw)
+        except Exception as exc:
+            logger.warning("YAMNet background-noise detection failed (non-fatal): %s", exc)
+            return None
+
+    @staticmethod
+    def _apply_noise_adjustment(
+        quality: AudioQuality,
+        background_noise: BackgroundNoiseSummary | None,
+    ) -> AudioQuality:
+        quality.background_noise = background_noise
+        base_score = quality.overall_score
+        penalty = background_noise.noise_penalty_points if background_noise else 0.0
+        if base_score is None:
+            quality.noise_penalty_points = 0.0
+        else:
+            quality.noise_penalty_points = round(float(max(penalty, 0.0)), 2)
+
+        if base_score is not None:
+            quality.adjusted_overall_score = round(float(np.clip(base_score - quality.noise_penalty_points, 0.0, 100.0)), 2)
+        else:
+            quality.adjusted_overall_score = None
+
+        quality.score_components = AudioScoreComponents(
+            base_overall_score=base_score,
+            noise_penalty_points=quality.noise_penalty_points,
+            adjusted_overall_score=quality.adjusted_overall_score,
+            dominant_causes=background_noise.dominant_causes if background_noise else [],
+        )
+        return quality
+
     @staticmethod
     def _build_interpretation(
         quality: AudioQuality,
         word_count: int,
         duration_sec: float,
+        dominant_noise_causes: list[str] | None = None,
     ) -> AudioInterpretation:
         """
         Convert raw quality scores into human-readable labels.
@@ -314,6 +362,7 @@ class AudioAnalysisService:
 
         return AudioInterpretation(
             noise_label=noise_label,
+            noise_root_cause=", ".join((dominant_noise_causes or [])[:3]),
             loudness_label=loudness_label,
             clarity_label=clarity_label,
             speech_rate_label=speech_rate_label,

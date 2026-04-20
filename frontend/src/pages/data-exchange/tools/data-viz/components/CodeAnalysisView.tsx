@@ -16,7 +16,7 @@ const TONE_COLORS: Record<string, string> = {
   toneRose: '#f43f5e', toneIndigo: '#6366f1', toneTeal: '#14b8a6',
 };
 
-const BASE_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8000';
+const BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? import.meta.env.VITE_API_URL ?? 'http://localhost:9080').replace(/\/$/, '');
 
 const CodeAnalysisView = ({ result }: Props) => {
   const [chatMsgs, setChatMsgs] = useState<{ role: 'user' | 'assistant'; content: string }[]>([]);

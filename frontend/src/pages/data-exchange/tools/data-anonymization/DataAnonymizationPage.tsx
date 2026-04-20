@@ -7,7 +7,7 @@ import '../ToolPage.css';
 type AnonStep = 'input' | 'classification' | 'techniques' | 'export';
 type DatasetTab = 'catalog' | 'upload';
 
-const ANON_API_BASE = (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? 'http://localhost:8000';
+const ANON_API_BASE = ((import.meta.env.VITE_API_BASE_URL as string | undefined) ?? (import.meta.env.VITE_API_URL as string | undefined) ?? 'http://localhost:9080').replace(/\/$/, '');
 const ANON_BACKEND_ENABLED = false;
 
 const ANON_STEPS: { id: AnonStep; label: string; Icon: React.ElementType }[] = [

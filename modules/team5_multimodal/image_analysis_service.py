@@ -17,7 +17,6 @@ from collections import Counter
 import numpy as np
 from PIL import Image
 from ultralytics import YOLO
-from sentence_transformers import SentenceTransformer
 from sklearn.cluster import KMeans
 import umap
 from groq import Groq
@@ -66,6 +65,15 @@ class ImageAnalysisService:
 
         if ImageAnalysisService._embed_model is None:
             logger.info("Loading CLIP embedding model from %s...", self.settings.embedding_model)
+            try:
+                from sentence_transformers import SentenceTransformer
+            except Exception as exc:
+                raise RuntimeError(
+                    "Image embedding model could not be loaded. "
+                    "Install compatible sentence-transformers/torch/torchcodec + FFmpeg runtime, "
+                    "or disable Team5 image embedding features."
+                ) from exc
+
             ImageAnalysisService._embed_model = SentenceTransformer(self.settings.embedding_model)
 
         if ImageAnalysisService._groq_client is None:

@@ -142,7 +142,13 @@ const AudioAnalysisView = ({ result, file }: Props) => {
 
     // Audio quality
     lines.push(`\n--- AUDIO QUALITY ---`);
-    lines.push(`Score: ${quality.score}/100 (${quality.rating}) | SNR: ${quality.snrDb} dB | Source: ${quality.source}${quality.showEstimatedBadge ? ' (estimated)' : ''}`);
+    lines.push(
+      `Base Score: ${quality.baseScore ?? quality.score}/100 | Adjusted Score: ${quality.adjustedScore ?? quality.score}/100 | ` +
+      `Penalty: ${quality.noisePenaltyPoints.toFixed(1)} | SNR: ${quality.snrDb} dB | Source: ${quality.source}${quality.showEstimatedBadge ? ' (estimated)' : ''}`
+    );
+    if (quality.dominantNoiseCauses.length) {
+      lines.push(`Dominant noise causes: ${quality.dominantNoiseCauses.join(', ')}`);
+    }
     lines.push(quality.summary);
 
     // NLP analysis
@@ -318,6 +324,24 @@ const AudioAnalysisView = ({ result, file }: Props) => {
                 <div style={{ width: '88%', height: '10px', borderRadius: '999px', background: 'rgba(148,163,184,0.18)' }} />
               </>
             )}
+            {quality.dominantNoiseCauses.length > 0 && (
+              <div
+                style={{
+                  marginTop: '0.7rem',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.4rem',
+                  fontSize: '12px',
+                  color: '#fcd34d',
+                  background: 'rgba(251,191,36,0.12)',
+                  border: '1px solid rgba(251,191,36,0.3)',
+                  borderRadius: '999px',
+                  padding: '4px 10px',
+                }}
+              >
+                Root cause: {quality.dominantNoiseCauses.slice(0, 2).join(' + ')} noise
+              </div>
+            )}
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.9rem' }}>
@@ -335,8 +359,16 @@ const AudioAnalysisView = ({ result, file }: Props) => {
                     </>
                   ) : (
                     <>
-                      <div style={{ fontSize: '22px', color: '#e2e8f0', fontWeight: 800 }}>{quality.score} / 100</div>
+                      <div style={{ fontSize: '22px', color: '#e2e8f0', fontWeight: 800 }}>{quality.adjustedScore ?? quality.score} / 100</div>
+                      <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '3px' }}>
+                        Original {quality.baseScore ?? quality.score} - Penalty {quality.noisePenaltyPoints.toFixed(1)}
+                      </div>
                       <div style={{ fontSize: '12px', color: '#94a3b8', marginTop: '2px' }}>{result.interpretation?.noise_label || quality.rating}</div>
+                      {result.interpretation?.noise_root_cause && (
+                        <div style={{ fontSize: '11px', color: '#fbbf24', marginTop: '3px' }}>
+                          {result.interpretation.noise_root_cause}
+                        </div>
+                      )}
                     </>
                   )}
                 </div>
@@ -744,6 +776,25 @@ const AudioAnalysisView = ({ result, file }: Props) => {
                         </div>
                       )}
                     </div>
+                    {result.audio_quality?.background_noise && (
+                      <div style={{ marginTop: '0.9rem', borderTop: '1px solid #1e293b', paddingTop: '0.8rem' }}>
+                        <div style={{ fontSize: '10px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '0.45rem' }}>
+                          Background Sounds
+                        </div>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                          {(result.audio_quality.background_noise.top_background_classes || []).slice(0, 6).map((n) => (
+                            <span key={`${n.label}-${n.confidence}`} style={{ fontSize: '11px', padding: '3px 8px', borderRadius: '999px', background: 'rgba(251,191,36,0.12)', color: '#fbbf24', border: '1px solid rgba(251,191,36,0.35)' }}>
+                              {n.label} ({Math.round((n.confidence || 0) * 100)}%)
+                            </span>
+                          ))}
+                        </div>
+                        {!!result.audio_quality.background_noise.detected_instruments?.length && (
+                          <div style={{ marginTop: '0.55rem', fontSize: '11px', color: '#cbd5e1' }}>
+                            Instruments: {result.audio_quality.background_noise.detected_instruments.slice(0, 4).map(i => i.label).join(', ')}
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 )}
 

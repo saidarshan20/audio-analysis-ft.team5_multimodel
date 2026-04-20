@@ -10,6 +10,7 @@ from pathlib import Path
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
+from dotenv import load_dotenv
 
 # ──── Core routers (Integration Team) ────
 from core.auth_router import router as auth_router
@@ -25,6 +26,22 @@ from modules.team5_multimodal.router import router as team5_router
 
 # ──── Shared workspace directories (auto-created) ────
 BASE_DIR = Path(__file__).resolve().parent
+load_dotenv(BASE_DIR / ".env")
+
+
+def _parse_cors_origins() -> list[str]:
+    raw = os.getenv("FRONTEND_ORIGINS", "")
+    if raw.strip():
+        return [origin.strip().rstrip("/") for origin in raw.split(",") if origin.strip()]
+
+    frontend_port = os.getenv("FRONTEND_PORT", "5179").strip() or "5179"
+    return [
+        "http://localhost:3000",
+        f"http://localhost:{frontend_port}",
+        f"http://127.0.0.1:{frontend_port}",
+    ]
+
+
 WORKSPACE_DIRS = [
     BASE_DIR / "shared_workspace" / "1_raw_uploads",
     BASE_DIR / "shared_workspace" / "2_processed_data",
@@ -48,7 +65,7 @@ def create_app() -> FastAPI:
 
     application.add_middleware(
         CORSMiddleware,
-        allow_origins=["http://localhost:3000", "http://localhost:5173"],
+        allow_origins=_parse_cors_origins(),
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
