@@ -53,15 +53,7 @@ Add to your `.env`:
 
 ```env
 # data.gov.in Open Data Platform
-DATA_GOV_API_KEY=your_key_here
-
-# LLM for AI chat (choose one — Groq is free)
-GROQ_API_KEY=gsk_...
-GROQ_MODEL=llama-3.3-70b-versatile
-
-# Optional — NVIDIA NIM (higher quality, paid)
-# NVIDIA_API_KEY=nvapi-...
-# NVIDIA_MODEL=meta/llama-3.3-70b-instruct
+DATA_GOV_API_KEY=579b464db66ec23bdd000001809082399ab84dc572762e93263648ec
 ```
 
 ---
