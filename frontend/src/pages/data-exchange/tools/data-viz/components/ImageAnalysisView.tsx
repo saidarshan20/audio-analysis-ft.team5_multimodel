@@ -1014,6 +1014,8 @@ const ImageAnalysisView = ({ imgResult, imgZipResult, imgTokens, imgDuration, im
         ))}
       </div>
     </div>
+    </>
+    )}
   </div>
 )}
 
