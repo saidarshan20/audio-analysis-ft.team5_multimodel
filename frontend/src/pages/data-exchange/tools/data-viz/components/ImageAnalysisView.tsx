@@ -472,20 +472,15 @@ const ImageAnalysisView = ({ imgResult, imgZipResult, imgTokens, imgDuration, im
     : '';
 
   const handleImageQA = async () => {
-    if (!qaQuestion.trim()) return;
+    if (!qaQuestion.trim() || !selectedImageForQA) {
+      toast.error('Please select an image from the gallery first');
+      return;
+    }
 
     setQaLoading(true);
     try {
       let res: ImageQAResponse;
-      if (selectedImageForQA) {
-        res = await askAboutExistingImage(selectedImageForQA.path, qaQuestion.trim());
-      } else if (qaFile) {
-        res = await askAboutImage(qaFile, qaQuestion.trim());
-      } else {
-        toast.error('Please select an image first');
-        setQaLoading(false);
-        return;
-      }
+      res = await askAboutExistingImage(selectedImageForQA.path, qaQuestion.trim());
       setQaAnswer(res);
       toast.success('AI answered your question!');
     } catch (err: any) {
@@ -1050,34 +1045,43 @@ const ImageAnalysisView = ({ imgResult, imgZipResult, imgTokens, imgDuration, im
                 onClick={() => setSelectedImageForQA(null)}
                 style={{ background: 'transparent', border: 'none', color: 'var(--t-secondary)', cursor: 'pointer', fontSize: '11px', textDecoration: 'underline' }}
               >
-                Switch to Upload
+                Clear
               </button>
             </div>
           )}
 
           {!selectedImageForQA && (
-            <div className="qa-upload-zone" onClick={() => qaFileRef.current?.click()}>
-              <input
-                type="file"
-                ref={qaFileRef}
-                onChange={(e) => {
-                  const f = e.target.files?.[0];
-                  if (f) { setQaFile(f); setQaAnswer(null); toast.success(`Selected: ${f.name}`); }
-                }}
-                style={{ display: 'none' }}
-                accept="image/*"
-              />
-              {qaFile ? (
-                <div className="qa-file-selected">
-                  <ImageIcon size={16} color="#fb8c36" />
-                  <span>{qaFile.name}</span>
-                </div>
-              ) : (
-                <>
-                  <Upload size={18} color="var(--t-secondary)" />
-                  <span style={{ color: 'var(--t-secondary)', fontSize: '13px' }}>Click to select an image</span>
-                </>
-              )}
+            <div style={{ marginBottom: '4px' }}>
+              <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--t-secondary)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '8px' }}>
+                Select an Image to Query
+              </div>
+              <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '6px' }}>
+                {visualRecords.map(r => (
+                  <div
+                    key={r.filename}
+                    onClick={() => { setSelectedImageForQA({ path: r.annotated_image_path || '', filename: r.filename }); setQaAnswer(null); }}
+                    style={{
+                      flexShrink: 0, width: '100px', cursor: 'pointer', borderRadius: '8px',
+                      border: '2px solid transparent', background: 'var(--bg-elevated)',
+                      padding: '5px', transition: 'all 0.15s',
+                    }}
+                    onMouseEnter={e => (e.currentTarget.style.border = '2px solid #60a5fa')}
+                    onMouseLeave={e => (e.currentTarget.style.border = '2px solid transparent')}
+                  >
+                    {r.annotated_image_path ? (
+                      <img src={`${BASE_URL}/${r.annotated_image_path}`} alt={r.filename}
+                        style={{ width: '100%', height: '64px', objectFit: 'cover', borderRadius: '5px', display: 'block' }} />
+                    ) : (
+                      <div style={{ width: '100%', height: '64px', borderRadius: '5px', background: 'var(--border-mid)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <ImageIcon size={16} color="var(--t-muted)" />
+                      </div>
+                    )}
+                    <div style={{ fontSize: '9px', color: 'var(--t-secondary)', marginTop: '4px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {r.filename}
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
 
@@ -1089,7 +1093,7 @@ const ImageAnalysisView = ({ imgResult, imgZipResult, imgTokens, imgDuration, im
               value={qaQuestion}
               onChange={(e) => setQaQuestion(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === 'Enter' && (qaFile || selectedImageForQA) && qaQuestion.trim()) {
+                if (e.key === 'Enter' && selectedImageForQA && qaQuestion.trim()) {
                   e.preventDefault();
                   handleImageQA();
                 }
@@ -1097,7 +1101,7 @@ const ImageAnalysisView = ({ imgResult, imgZipResult, imgTokens, imgDuration, im
             />
             <button
               className="qa-send-btn"
-              disabled={(!qaFile && !selectedImageForQA) || !qaQuestion.trim() || qaLoading}
+              disabled={!selectedImageForQA || !qaQuestion.trim() || qaLoading}
               onClick={handleImageQA}
             >
               {qaLoading ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
@@ -1354,6 +1358,48 @@ const ImageAnalysisView = ({ imgResult, imgZipResult, imgTokens, imgDuration, im
             Clear
           </button>
         )}
+      </div>
+    </div>
+
+    {/* ── Inline Image Selector for Compare ── */}
+    <div style={{ marginBottom: '20px' }}>
+      <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--t-secondary)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '10px' }}>
+        Select 2 Images to Compare
+      </div>
+      <div style={{ display: 'flex', gap: '10px', overflowX: 'auto', paddingBottom: '8px' }}>
+        {visualRecords.map(r => {
+          const isSelected = compareSelection.includes(r.filename);
+          const selIdx = compareSelection.indexOf(r.filename);
+          return (
+            <div
+              key={r.filename}
+              onClick={() => toggleCompareSelection(r.filename)}
+              style={{
+                flexShrink: 0, width: '110px', cursor: 'pointer', borderRadius: '10px',
+                border: isSelected ? '2px solid #fb8c36' : '2px solid transparent',
+                background: isSelected ? 'rgba(251,140,54,0.1)' : 'var(--bg-elevated)',
+                padding: '6px', transition: 'all 0.15s', position: 'relative'
+              }}
+            >
+              {isSelected && (
+                <div style={{ position: 'absolute', top: '6px', right: '6px', background: '#fb8c36', color: '#fff', borderRadius: '50%', width: '18px', height: '18px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', fontWeight: 700, zIndex: 1 }}>
+                  {selIdx + 1}
+                </div>
+              )}
+              {r.annotated_image_path ? (
+                <img src={`${BASE_URL}/${r.annotated_image_path}`} alt={r.filename}
+                  style={{ width: '100%', height: '72px', objectFit: 'cover', borderRadius: '6px', display: 'block' }} />
+              ) : (
+                <div style={{ width: '100%', height: '72px', borderRadius: '6px', background: 'var(--border-mid)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <ImageIcon size={18} color="var(--t-muted)" />
+                </div>
+              )}
+              <div style={{ fontSize: '10px', color: 'var(--t-secondary)', marginTop: '5px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {r.filename}
+              </div>
+            </div>
+          );
+        })}
       </div>
     </div>
 
