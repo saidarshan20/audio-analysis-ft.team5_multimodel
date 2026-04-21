@@ -620,6 +620,36 @@ export async function askAboutImageCollection(
   return response.json();
 }
 
+export interface ImageCompareResponse {
+  status: string;
+  query: string;
+  shared_themes: string;
+  unique_to_img1: string;
+  unique_to_img2: string;
+  narrative: string;
+}
+
+/**
+ * Compare two images using metadata context and Groq for a deep intelligence narrative
+ */
+export async function compareImages(
+  query: string,
+  images: GroundedImageRecord[]
+): Promise<ImageCompareResponse> {
+  const response = await fetch(`${BASE_URL}/team5/image-compare`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ query, images }),
+  });
+
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({ detail: 'Unknown error' }));
+    throw new Error(err.detail || `Image comparison failed with status ${response.status}`);
+  }
+
+  return response.json();
+}
+
 // ── Audio Analysis Types ──────────────────────────────────────────────────────
 
 export interface SpeakerSegment {

@@ -385,3 +385,58 @@ class ImageAnalysisService:
                 }
                 for image in images
             ]
+
+    # ─────────────────── Side-by-Side Comparison ───────────────────
+
+    def compare_images(self, query: str, images: list[dict]) -> dict:
+        """
+        Grounded Side-by-Side Comparison:
+        Analyzes two selected images to find similarities, differences, and unique patterns.
+        """
+        if len(images) < 2:
+            return {"answer": "Please select exactly two images for comparison."}
+
+        image_data = []
+        for i, img in enumerate(images[:2]):
+            objects = ", ".join(img.get("objects", [])[:10]) or "none"
+            cluster = img.get("cluster_description") or img.get("cluster") or "Unknown"
+            caption = img.get("caption") or "No caption"
+            image_data.append(
+                f"Image {i+1} [{img['filename']}]:\n"
+                f"- Category: {cluster}\n"
+                f"- Key Objects: {objects}\n"
+                f"- Summary: {caption}"
+            )
+
+        try:
+            prompt = (
+                "You are an expert visual forensic analyst. Compare the two images described below "
+                "based on their categories, detected objects, and summaries. "
+                "1. Identify shared themes or objects.\n"
+                "2. Identify unique elements in each image.\n"
+                "3. Provide a final 'Deep Intelligence' narrative comparing the two (max 80 words).\n\n"
+                f"Comparison Context: {query or 'General Comparison'}\n\n"
+                "\n\n".join(image_data) + "\n\n"
+                "Return ONLY a JSON object with this schema: "
+                "{\"shared_themes\": \"...\", \"unique_to_img1\": \"...\", \"unique_to_img2\": \"...\", \"narrative\": \"...\"}"
+            )
+
+            response = ImageAnalysisService._groq_client.chat.completions.create(
+                model=self.settings.groq_model,
+                messages=[
+                    {"role": "system", "content": "You are a professional visual analyst. Always return valid JSON."},
+                    {"role": "user", "content": prompt}
+                ],
+                response_format={"type": "json_object"},
+                max_tokens=600,
+                temperature=0.3
+            )
+            return json.loads(response.choices[0].message.content.strip())
+        except Exception as e:
+            logger.error("Groq image comparison failed: %s", e)
+            return {
+                "shared_themes": "Error during analysis",
+                "unique_to_img1": "Error",
+                "unique_to_img2": "Error",
+                "narrative": "AI comparison is currently unavailable. Please check the metadata overlap manually below."
+            }

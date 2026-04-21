@@ -354,6 +354,34 @@ async def search_images(payload: ImageSearchRequest):
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 
+class ImageCompareRequest(BaseModel):
+    query: str
+    images: list[dict]
+
+
+@router.post("/image-compare")
+async def compare_images(payload: ImageCompareRequest):
+    """
+    Side-by-Side Comparison:
+    Compare two images using metadata context and Groq for a deep intelligence narrative.
+    """
+    if not payload.images or len(payload.images) < 2:
+        raise HTTPException(status_code=400, detail="Exactly two images are required for comparison.")
+
+    service = TeammateImageAnalysisService()
+
+    try:
+        result = service.compare_images(payload.query.strip(), payload.images)
+        return {
+            "status": "success",
+            "query": payload.query.strip(),
+            **result
+        }
+    except Exception as exc:
+        logger.exception("Image comparison failed")
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
 # ──────────────────────────────────────────────
 #  Multimodal Audio Pipeline (Diarization + Sync Text Analysis)
 # ──────────────────────────────────────────────

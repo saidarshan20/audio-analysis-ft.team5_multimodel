@@ -12,7 +12,7 @@ import { toast } from 'sonner';
 import {
   MultiImageAnalysisResponse, ImageZipAnalysisResponse, ImageQAResponse, ImageSearchResult,
   askAboutImage, askAboutExistingImage, searchImages, askAboutImageCollection,
-  ImageCollectionQAResponse
+  ImageCollectionQAResponse, compareImages, ImageCompareResponse
 } from '../services';
 
 export interface VisualRecord {
@@ -339,6 +339,9 @@ const ImageAnalysisView = ({ imgResult, imgZipResult, imgTokens, imgDuration, im
   const [collectionAnswer, setCollectionAnswer] = useState<ImageCollectionQAResponse | null>(null);
   const [compareSelection, setCompareSelection] = useState<string[]>([]);
   const [vizMode, setVizMode] = useState<'semantic' | 'geographic'>('semantic');
+  const [imageTab, setImageTab] = useState<'overview' | 'explorer' | 'intelligence'>('overview');
+  const [compareLoading, setCompareLoading] = useState(false);
+  const [aiCompareResult, setAiCompareResult] = useState<ImageCompareResponse | null>(null);
 
 
   const zipClusterLabelMap: Record<number, string> = {};
@@ -534,6 +537,35 @@ const ImageAnalysisView = ({ imgResult, imgZipResult, imgTokens, imgDuration, im
   };
 
 
+
+  useEffect(() => {
+    const runCompare = async () => {
+      if (compareSelection.length === 2) {
+        setCompareLoading(true);
+        try {
+          const records = compareSelection
+            .map(f => visualRecords.find(r => r.filename === f))
+            .filter(Boolean) as VisualRecord[];
+          const res = await compareImages('Compare these two images.', records.map(r => ({
+            filename: r.filename,
+            caption: r.caption,
+            objects: r.objects,
+            cluster: r.cluster,
+            cluster_description: r.cluster_description,
+          })));
+          setAiCompareResult(res);
+        } catch {
+          toast.error('AI comparison failed');
+        } finally {
+          setCompareLoading(false);
+        }
+      } else {
+        setAiCompareResult(null);
+      }
+    };
+    runCompare();
+  }, [compareSelection]);
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
 {imgResult && (
@@ -600,6 +632,33 @@ const ImageAnalysisView = ({ imgResult, imgZipResult, imgTokens, imgDuration, im
 {/* ZIP Image Analysis Result */}
 {imgZipResult && (
   <div className="img-analysis-view">
+      {/* ── 3-Tab Navigation ── */}
+      <div style={{ display: 'flex', gap: '8px', marginBottom: '24px', background: 'var(--bg-root)', borderRadius: '14px', padding: '6px', border: '1px solid var(--border-mid)' }}>
+        {([
+          { id: 'overview', label: 'Batch Overview', icon: '📊' },
+          { id: 'explorer', label: 'Gallery & Explorer', icon: '🗂️' },
+          { id: 'intelligence', label: 'AI Intelligence', icon: '✨' }
+        ] as const).map(tab => (
+          <button
+            key={tab.id}
+            onClick={() => setImageTab(tab.id)}
+            style={{
+              flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+              padding: '10px 16px', borderRadius: '10px', border: 'none', cursor: 'pointer',
+              fontWeight: 600, fontSize: '13px', transition: 'all 0.2s',
+              background: imageTab === tab.id ? '#fb8c36' : 'transparent',
+              color: imageTab === tab.id ? '#fff' : 'var(--t-secondary)',
+              boxShadow: imageTab === tab.id ? '0 4px 15px rgba(251,140,54,0.3)' : 'none',
+            }}
+          >
+            <span>{tab.icon}</span>
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      {imageTab === 'overview' && (
+      <>
     {/* ── Image Analysis Metrics Strip ── */}
     <div className="metrics-strip with-margin">
       {[
@@ -812,6 +871,11 @@ const ImageAnalysisView = ({ imgResult, imgZipResult, imgTokens, imgDuration, im
       </div>
     </div>
 
+      </>
+      )}
+
+      {imageTab === 'explorer' && (
+      <>
     {/* 5th Thing: Semantic Category Explorer */}
     <div style={{ padding: '40px 0 0' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
@@ -953,7 +1017,7 @@ const ImageAnalysisView = ({ imgResult, imgZipResult, imgTokens, imgDuration, im
   </div>
 )}
 
-{(imgResult || imgZipResult) && (
+{(imgResult || imgZipResult) && imageTab === 'intelligence' && (
   <div className="ai-intelligence-section">
     <h3 className="theme-heading" style={{ fontSize: '22px', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
       <Sparkles size={24} color="#fb8c36" /> Intelligent Visual Reasoning
@@ -1266,7 +1330,7 @@ const ImageAnalysisView = ({ imgResult, imgZipResult, imgTokens, imgDuration, im
   </div>
 )}
 
-{(imgResult || imgZipResult) && (
+{(imgResult || imgZipResult) && imageTab === 'intelligence' && (
   <div className="result-card" style={{ marginTop: '24px' }}>
     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '16px', flexWrap: 'wrap', marginBottom: '18px' }}>
       <div>
@@ -1353,7 +1417,15 @@ const ImageAnalysisView = ({ imgResult, imgZipResult, imgTokens, imgDuration, im
         </div>
         <div style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-mid)', borderRadius: '14px', padding: '16px' }}>
           <div style={{ color: 'var(--t-secondary)', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '10px' }}>Comparison Readout</div>
-          <div style={{ color: 'var(--t-primary)', fontSize: '14px', lineHeight: 1.6 }}>{compareNarrative}</div>
+          <div style={{ color: 'var(--t-primary)', fontSize: '14px', lineHeight: 1.6 }}>
+            {compareLoading ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', color: 'var(--t-secondary)' }}>
+                <Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} /> Analyzing via AI...
+              </div>
+            ) : (
+              aiCompareResult?.narrative || compareNarrative
+            )}
+          </div>
         </div>
       </div>
     )}
