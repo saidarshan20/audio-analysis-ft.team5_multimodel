@@ -411,10 +411,14 @@ class ImageAnalysisService:
         try:
             prompt = (
                 "You are an expert visual forensic analyst. Compare the two images described below "
-                "based on their categories, detected objects, and summaries. "
-                "1. Identify shared themes or objects.\n"
-                "2. Identify unique elements in each image.\n"
-                "3. Provide a final 'Deep Intelligence' narrative comparing the two (max 80 words).\n\n"
+                "based on their categories, detected objects, and AI-generated summaries. "
+                "Structure your response as follows:\n"
+                "1. shared_themes: Key visual themes and objects common to both images.\n"
+                "2. unique_to_img1: What stands out exclusively in Image 1 (objects, setting, mood).\n"
+                "3. unique_to_img2: What stands out exclusively in Image 2 (objects, setting, mood).\n"
+                "4. narrative: A rich, detailed Deep Intelligence analysis comparing the two images. "
+                "This MUST be at least 60 words and cover: thematic differences, visual environment, "
+                "subject matter, and what each image communicates in context.\n\n"
                 f"Comparison Context: {query or 'General Comparison'}\n\n"
                 "\n\n".join(image_data) + "\n\n"
                 "Return ONLY a JSON object with this schema: "
@@ -424,12 +428,12 @@ class ImageAnalysisService:
             response = ImageAnalysisService._groq_client.chat.completions.create(
                 model=self.settings.groq_model,
                 messages=[
-                    {"role": "system", "content": "You are a professional visual analyst. Always return valid JSON."},
+                    {"role": "system", "content": "You are a professional visual analyst. Always return valid JSON. The narrative field must be at least 60 words."},
                     {"role": "user", "content": prompt}
                 ],
                 response_format={"type": "json_object"},
-                max_tokens=600,
-                temperature=0.3
+                max_tokens=800,
+                temperature=0.4
             )
             return json.loads(response.choices[0].message.content.strip())
         except Exception as e:
