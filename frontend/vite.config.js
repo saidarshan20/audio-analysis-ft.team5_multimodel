@@ -47,7 +47,7 @@ export default defineConfig(({ mode }) => {
     process.env.VITE_API_URL ||
     env.VITE_API_BASE_URL ||
     env.VITE_API_URL ||
-    `http://localhost:${backendPort}`
+    `http://127.0.0.1:${backendPort}`
 
   const normalizedApiBaseUrl = String(apiBaseUrl).replace(/\/$/, '')
 

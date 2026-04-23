@@ -172,6 +172,7 @@ export interface AudioAnalysisResult {
   transcript_text: string;
   text_analysis: TextAnalysisResult | null;
   features?: AudioFeatures;  // ← acoustic features from Task 1
+  word_cloud_base64?: string;
 }
 
 export interface AudioAnalysisResponse {

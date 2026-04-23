@@ -219,6 +219,21 @@ class AudioAnalysisService:
                 dominant_noise_causes=(quality.background_noise.dominant_causes if quality.background_noise else []),
             )
 
+            # Generate Word Cloud
+            word_cloud_base64 = None
+            if transcript_text.strip():
+                try:
+                    from wordcloud import WordCloud
+                    import base64
+                    from io import BytesIO
+                    wc = WordCloud(width=800, height=400, background_color="rgba(15, 23, 42, 0)", mode="RGBA").generate(transcript_text)
+                    img = wc.to_image()
+                    buf = BytesIO()
+                    img.save(buf, format="PNG")
+                    word_cloud_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
+                except Exception as e:
+                    logger.warning(f"Word cloud generation failed: {e}")
+
             return AudioAnalysisResult(
                 duration=duration_sec,
                 segments=aligned_segments,
@@ -229,6 +244,7 @@ class AudioAnalysisService:
                 speaker_metrics=speaker_metrics_final,
                 audio_quality=quality,
                 interpretation=interp,
+                word_cloud_base64=word_cloud_base64,
             )
 
         except Exception as e:

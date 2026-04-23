@@ -583,6 +583,16 @@ const AudioAnalysisView = ({ result, file }: Props) => {
                   ) : null}
                 </div>
               ) : null}
+
+              {/* Word Cloud */}
+              {result.word_cloud_base64 && (
+                <div style={{ ...CARD }}>
+                  <h4 style={{ fontSize: '10px', textTransform: 'uppercase', color: '#64748b', fontWeight: 700, marginBottom: '0.75rem', marginTop: 0, letterSpacing: '0.5px' }}>Word Cloud</h4>
+                  <div style={{ display: 'flex', justifyContent: 'center' }}>
+                    <img src={`data:image/png;base64,${result.word_cloud_base64}`} alt="Word Cloud" style={{ maxWidth: '100%', height: 'auto', maxHeight: '400px', borderRadius: '8px' }} />
+                  </div>
+                </div>
+              )}
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>

@@ -407,6 +407,7 @@ class AudioAnalysisResult(BaseModel):
     verdict: AudioVerdict | None = None
     recommended_actions: list[str] = Field(default_factory=list)
     interpretation: AudioInterpretation | None = None
+    word_cloud_base64: str | None = None
 
 
 class AudioAnalysisResponse(BaseModel):
