@@ -3,11 +3,7 @@
  * Connects to the FastAPI backend endpoints /team5/analyze and /team5/code-analyze
  */
 
-<<<<<<< HEAD
-const BASE_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8742';
-=======
 const BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? import.meta.env.VITE_API_URL ?? 'http://localhost:9080').replace(/\/$/, '');
->>>>>>> audio-analysis
 
 export interface TextAnalysisResult {
   summary: string;

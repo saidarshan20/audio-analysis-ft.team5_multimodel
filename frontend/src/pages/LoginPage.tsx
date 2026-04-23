@@ -17,14 +17,9 @@ const LoginPage = () => {
   const [successMsg, setSuccessMsg] = useState('');
   const [loading, setLoading] = useState(false);
  
-<<<<<<< HEAD
   // API URL from environment variables
-  const API_BASE_URL = `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8742'}/auth`;
-=======
-  // API URL from environment variables
-  const API_ORIGIN = (import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000').replace(/\/$/, '');
+  const API_ORIGIN = (import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL || 'http://127.0.0.1:9080').replace(/\/$/, '');
   const API_BASE_URL = `${API_ORIGIN}/auth`;
->>>>>>> audio-analysis
  
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>): Promise<void> => {
     e.preventDefault();

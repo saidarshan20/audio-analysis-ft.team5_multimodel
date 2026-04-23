@@ -9,11 +9,7 @@ import './AutoMLWizard.css';
 type WizardStep = 'dataset' | 'configure' | 'configuration' | 'training' | 'results';
 type DatasetTab = 'catalog' | 'upload';
 
-<<<<<<< HEAD
-const AUTOML_API_BASE = (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? 'http://localhost:8742';
-=======
 const AUTOML_API_BASE = ((import.meta.env.VITE_API_BASE_URL as string | undefined) ?? (import.meta.env.VITE_API_URL as string | undefined) ?? 'http://localhost:9080').replace(/\/$/, '');
->>>>>>> audio-analysis
 const AUTOML_BACKEND_ENABLED = false;
 
 // ─── Step definitions ─────────────────────────────────────────────────────────

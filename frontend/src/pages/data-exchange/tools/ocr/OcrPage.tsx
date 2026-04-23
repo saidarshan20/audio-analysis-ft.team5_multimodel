@@ -4,11 +4,7 @@ import '../ToolPage.css';
 
 type OcrStep = 'upload' | 'processing' | 'results';
 
-<<<<<<< HEAD
-const OCR_API_BASE = (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? 'http://localhost:8742';
-=======
 const OCR_API_BASE = ((import.meta.env.VITE_API_BASE_URL as string | undefined) ?? (import.meta.env.VITE_API_URL as string | undefined) ?? 'http://localhost:9080').replace(/\/$/, '');
->>>>>>> audio-analysis
 const OCR_BACKEND_ENABLED = false;
 
 const OCR_STEPS: { id: OcrStep; label: string; Icon: React.ElementType }[] = [

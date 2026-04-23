@@ -20,16 +20,8 @@ function readRootEnv(envPath) {
 }
 
 // https://vite.dev/config/
-<<<<<<< HEAD
-// Port defaults to 3652 — a unique number to avoid clashes when multiple
-// developers share the same remote desktop. Override via VITE_PORT in .env.
-export default defineConfig({
-  plugins: [react()],
-  server: {
-    port: parseInt(process.env.VITE_PORT || '3652'),
-    strictPort: false,   // auto-increment if the port is already taken
-  },
-=======
+// Port defaults to 3652 — a unique number to avoid clashes on shared remote desktops.
+// Override via FRONTEND_PORT, VITE_PORT, or VITE_DEV_PORT in root .env.
 export default defineConfig(({ mode }) => {
   // Load both frontend env files (default Vite behavior) and root .env (project-level single source)
   const env = loadEnv(mode, process.cwd(), '')
@@ -39,10 +31,12 @@ export default defineConfig(({ mode }) => {
   const frontendPort = Number(
     rootEnv.FRONTEND_PORT ||
       process.env.FRONTEND_PORT ||
+      rootEnv.VITE_PORT ||
+      process.env.VITE_PORT ||
       rootEnv.VITE_DEV_PORT ||
       process.env.VITE_DEV_PORT ||
       env.VITE_DEV_PORT ||
-      5179
+      3652
   )
   const backendPort = Number(
     rootEnv.BACKEND_PORT ||
@@ -71,8 +65,8 @@ export default defineConfig(({ mode }) => {
     },
     server: {
       host: '0.0.0.0',
-      port: Number.isFinite(frontendPort) ? frontendPort : 5179,
+      port: Number.isFinite(frontendPort) ? frontendPort : 3652,
+      strictPort: false,   // auto-increment if the port is already taken
     },
   }
->>>>>>> audio-analysis
 })
