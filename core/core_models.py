@@ -2,7 +2,7 @@
 core_models.py  –  Pydantic schemas for authentication.
 """
 
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel
 
 
 class UserCreate(BaseModel):
@@ -12,7 +12,9 @@ class UserCreate(BaseModel):
 
 
 class UserLogin(BaseModel):
-    email: str
+    identifier: str | None = None
+    email: str | None = None
+    username: str | None = None
     password: str
 
 

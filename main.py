@@ -4,12 +4,16 @@ Creates the FastAPI app, auto-creates shared_workspace/ directories,
 and mounts all team routers + core auth routes.
 """
 
+import logging
 import os
 from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
+from dotenv import load_dotenv
+
+logger = logging.getLogger(__name__)
 
 # ──── Core routers (Integration Team) ────
 from core.auth_router import router as auth_router
@@ -21,10 +25,34 @@ from modules.team1_automl.router import router as team1_router
 from modules.team2_feature_eng.router import router as team2_router
 from modules.team3_ocr.router import router as team3_router
 from modules.team4_anonymization.router import router as team4_router
-from modules.team5_multimodal.router import router as team5_router
+try:
+    from modules.team5_multimodal.router import router as team5_router
+    _T5_AVAILABLE = True
+except Exception as _t5_err:
+    team5_router = None  # type: ignore[assignment]
+    _T5_AVAILABLE = False
+    logger.warning("Team 5 (Multimodal) router failed to load and will be skipped: %s", _t5_err)
 
 # ──── Shared workspace directories (auto-created) ────
 BASE_DIR = Path(__file__).resolve().parent
+load_dotenv(BASE_DIR / ".env")
+
+
+def _parse_cors_origins() -> list[str]:
+    raw = os.getenv("FRONTEND_ORIGINS", "")
+    if raw.strip():
+        return [origin.strip().rstrip("/") for origin in raw.split(",") if origin.strip()]
+
+    # FRONTEND_PORT takes precedence; VITE_PORT is the Vite-native alias; 3652 is the project default.
+    frontend_port = os.getenv("FRONTEND_PORT", os.getenv("VITE_PORT", "3652")).strip() or "3652"
+    return list({
+        "http://localhost:3000",
+        "http://localhost:5173",       # Vite default dev port
+        f"http://localhost:{frontend_port}",
+        f"http://127.0.0.1:{frontend_port}",
+    })
+
+
 WORKSPACE_DIRS = [
     BASE_DIR / "shared_workspace" / "1_raw_uploads",
     BASE_DIR / "shared_workspace" / "2_processed_data",
@@ -46,17 +74,9 @@ def create_app() -> FastAPI:
         version="0.1.0",
     )
 
-    # Include both the legacy Vite default (5173) and the new unique port (3652).
-    # Override FRONTEND_PORT in .env if you need a different value.
-    frontend_port = int(os.getenv("FRONTEND_PORT", os.getenv("VITE_PORT", "3652")))
-    cors_origins = list({
-        "http://localhost:3000",
-        "http://localhost:5173",
-        f"http://localhost:{frontend_port}",
-    })
     application.add_middleware(
         CORSMiddleware,
-        allow_origins=cors_origins,
+        allow_origins=_parse_cors_origins(),
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
@@ -73,7 +93,8 @@ def create_app() -> FastAPI:
     application.include_router(team2_router)
     application.include_router(team3_router)
     application.include_router(team4_router)
-    application.include_router(team5_router)
+    if _T5_AVAILABLE and team5_router is not None:
+        application.include_router(team5_router)
 
     return application
 

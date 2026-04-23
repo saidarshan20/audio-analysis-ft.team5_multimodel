@@ -324,6 +324,38 @@ class AudioQualityMetrics(BaseModel):
     cleanliness: float | None = None
 
 
+class BackgroundNoiseClass(BaseModel):
+    label: str
+    confidence: float = 0.0
+    time_share: float = 0.0
+    category: str = ""
+    penalty_weight: float = 0.0
+
+
+class BackgroundNoiseEvent(BaseModel):
+    label: str
+    start: float
+    end: float
+    confidence: float = 0.0
+    category: str = ""
+
+
+class BackgroundNoiseSummary(BaseModel):
+    top_background_classes: list[BackgroundNoiseClass] = Field(default_factory=list)
+    detected_instruments: list[BackgroundNoiseClass] = Field(default_factory=list)
+    noise_events_timeline: list[BackgroundNoiseEvent] = Field(default_factory=list)
+    dominant_causes: list[str] = Field(default_factory=list)
+    noise_severity_score: float = 0.0
+    noise_penalty_points: float = 0.0
+
+
+class AudioScoreComponents(BaseModel):
+    base_overall_score: float | None = None
+    noise_penalty_points: float = 0.0
+    adjusted_overall_score: float | None = None
+    dominant_causes: list[str] = Field(default_factory=list)
+
+
 class AudioQuality(BaseModel):
     score_version: str = ""
     content_type: str = "speech"   # speech | non_speech | silent
@@ -337,6 +369,10 @@ class AudioQuality(BaseModel):
     snr_db: float | None = None
     clip_ratio: float = 0.0
     speech_frame_ratio: float = 0.0
+    adjusted_overall_score: float | None = None
+    noise_penalty_points: float = 0.0
+    background_noise: BackgroundNoiseSummary | None = None
+    score_components: AudioScoreComponents | None = None
     metrics: AudioQualityMetrics = Field(default_factory=AudioQualityMetrics)
 
 
@@ -349,6 +385,7 @@ class AudioVerdict(BaseModel):
 class AudioInterpretation(BaseModel):
     """Rule-based interpretation layer: converts raw metrics → human labels."""
     noise_label: str = ""       # "High Noise" | "Moderate Noise" | "Clean Audio"
+    noise_root_cause: str = ""  # e.g. "fan, television"
     loudness_label: str = ""    # "Too Quiet" | "Normal" | "Too Loud"
     clarity_label: str = ""     # "Low" | "Moderate" | "High"
     speech_rate_label: str = "" # "Slow" | "Normal" | "Fast"
@@ -370,6 +407,7 @@ class AudioAnalysisResult(BaseModel):
     verdict: AudioVerdict | None = None
     recommended_actions: list[str] = Field(default_factory=list)
     interpretation: AudioInterpretation | None = None
+    word_cloud_base64: str | None = None
 
 
 class AudioAnalysisResponse(BaseModel):

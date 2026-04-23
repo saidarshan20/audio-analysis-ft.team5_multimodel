@@ -10,14 +10,21 @@ const LoginPage = () => {
  
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
+  const [loginIdentifier, setLoginIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
   const [loading, setLoading] = useState(false);
  
+<<<<<<< HEAD
   // API URL from environment variables
   const API_BASE_URL = `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8742'}/auth`;
+=======
+  // API URL from environment variables
+  const API_ORIGIN = (import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000').replace(/\/$/, '');
+  const API_BASE_URL = `${API_ORIGIN}/auth`;
+>>>>>>> audio-analysis
  
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>): Promise<void> => {
     e.preventDefault();
@@ -25,11 +32,11 @@ const LoginPage = () => {
     setSuccessMsg('');
  
     const isFormValid = isLogin 
-      ? email.trim() && password.trim() 
+      ? loginIdentifier.trim() && password.trim() 
       : username.trim() && email.trim() && password.trim();
 
     if (!isFormValid) {
-      setError(isLogin ? 'Please enter your email and password.' : 'Please fill in all fields.');
+      setError(isLogin ? 'Please enter username/email and password.' : 'Please fill in all fields.');
       return;
     }
  
@@ -38,7 +45,7 @@ const LoginPage = () => {
     try {
       const endpoint = isLogin ? '/login' : '/signup';
       const payload = isLogin 
-        ? { email: email.trim(), password: password.trim() }
+        ? { identifier: loginIdentifier.trim(), password: password.trim() }
         : { username: username.trim(), email: email.trim(), password: password.trim() };
 
       const response = await fetch(`${API_BASE_URL}${endpoint}`, {
@@ -62,7 +69,7 @@ const LoginPage = () => {
         sessionStorage.setItem('access_token', data.access_token);
        
         // Call your existing auth context
-        setStoredAuth({ username: data.username || email.trim() });
+        setStoredAuth({ username: data.username || loginIdentifier.trim() });
        
         // Full-page reload to mount authenticated app
         window.location.reload();
@@ -84,6 +91,7 @@ const LoginPage = () => {
     setError('');
     setSuccessMsg('');
     setPassword('');
+    setLoginIdentifier('');
   };
  
   return (
@@ -139,19 +147,34 @@ const LoginPage = () => {
             </div>
           )}
 
-          <div className="login-field">
-            <label htmlFor="email" className="login-label">Email Address</label>
-            <input
-              id="email"
-              type="email"
-              className="login-input"
-              placeholder="Enter your email"
-              value={email}
-              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEmail(e.target.value)}
-              autoComplete="email"
-              autoFocus={isLogin}
-            />
-          </div>
+          {isLogin ? (
+            <div className="login-field">
+              <label htmlFor="identifier" className="login-label">Email or Username</label>
+              <input
+                id="identifier"
+                type="text"
+                className="login-input"
+                placeholder="Enter your email or username"
+                value={loginIdentifier}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setLoginIdentifier(e.target.value)}
+                autoComplete="username"
+                autoFocus
+              />
+            </div>
+          ) : (
+            <div className="login-field">
+              <label htmlFor="email" className="login-label">Email Address</label>
+              <input
+                id="email"
+                type="email"
+                className="login-input"
+                placeholder="Enter your email"
+                value={email}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEmail(e.target.value)}
+                autoComplete="email"
+              />
+            </div>
+          )}
  
           <div className="login-field">
             <label htmlFor="password" className="login-label">Password</label>

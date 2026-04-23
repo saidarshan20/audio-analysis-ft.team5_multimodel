@@ -142,7 +142,13 @@ const AudioAnalysisView = ({ result, file }: Props) => {
 
     // Audio quality
     lines.push(`\n--- AUDIO QUALITY ---`);
-    lines.push(`Score: ${quality.score}/100 (${quality.rating}) | SNR: ${quality.snrDb} dB | Source: ${quality.source}${quality.showEstimatedBadge ? ' (estimated)' : ''}`);
+    lines.push(
+      `Base Score: ${quality.baseScore ?? quality.score}/100 | Adjusted Score: ${quality.adjustedScore ?? quality.score}/100 | ` +
+      `Penalty: ${quality.noisePenaltyPoints.toFixed(1)} | SNR: ${quality.snrDb} dB | Source: ${quality.source}${quality.showEstimatedBadge ? ' (estimated)' : ''}`
+    );
+    if (quality.dominantNoiseCauses.length) {
+      lines.push(`Dominant noise causes: ${quality.dominantNoiseCauses.join(', ')}`);
+    }
     lines.push(quality.summary);
 
     // NLP analysis
@@ -207,6 +213,26 @@ const AudioAnalysisView = ({ result, file }: Props) => {
   const qualityStatusColor = quality.score >= 70 ? '#4ade80' : quality.score >= 40 ? '#fbbf24' : '#f87171';
   const qualityStatusBorder = quality.score >= 70 ? 'rgba(34,197,94,0.35)' : quality.score >= 40 ? 'rgba(251,191,36,0.35)' : 'rgba(239,68,68,0.35)';
   const unscoredAudio = !!result.audio_quality && (result.audio_quality.overall_score === null || result.audio_quality.overall_score === undefined);
+
+  // ── Speech presence & YAMNet content tags ─────────────────────────────────
+  const hasNoSpeech = !result.transcript_text?.trim() || result.segments.length === 0;
+
+  const YAMNET_CATEGORY_META: Record<string, { label: string; color: string; bg: string; border: string; icon: string }> = {
+    music:      { label: 'Musical',           color: '#a78bfa', bg: 'rgba(167,139,250,0.12)', border: 'rgba(167,139,250,0.3)',  icon: '🎵' },
+    instrument: { label: 'Instrumental',      color: '#c084fc', bg: 'rgba(192,132,252,0.12)', border: 'rgba(192,132,252,0.3)',  icon: '🎸' },
+    animal:     { label: 'Animal Sounds',     color: '#34d399', bg: 'rgba(52,211,153,0.12)',  border: 'rgba(52,211,153,0.3)',   icon: '🐾' },
+    traffic:    { label: 'Traffic / Outdoor', color: '#fb923c', bg: 'rgba(251,146,60,0.12)',  border: 'rgba(251,146,60,0.3)',   icon: '🚗' },
+    ac_fan:     { label: 'Mechanical Noise',  color: '#94a3b8', bg: 'rgba(148,163,184,0.12)', border: 'rgba(148,163,184,0.3)',  icon: '💨' },
+    tv_media:   { label: 'Media / Broadcast', color: '#38bdf8', bg: 'rgba(56,189,248,0.12)',  border: 'rgba(56,189,248,0.3)',   icon: '📺' },
+    crowd:      { label: 'Crowd / Voices',    color: '#f472b6', bg: 'rgba(244,114,182,0.12)', border: 'rgba(244,114,182,0.3)',  icon: '👥' },
+  };
+
+  const _seenCategories = new Set<string>();
+  const contentTags = (result.audio_quality?.background_noise?.top_background_classes ?? [])
+    .filter(c => c.category && c.category !== 'other_noise' && YAMNET_CATEGORY_META[c.category])
+    .filter(c => { if (_seenCategories.has(c.category)) return false; _seenCategories.add(c.category); return true; })
+    .slice(0, 2)
+    .map(c => YAMNET_CATEGORY_META[c.category]);
 
   const TAB_STYLE = (active: boolean): React.CSSProperties => ({
     padding: '0.5rem 1.1rem', borderRadius: '8px', fontSize: '13px', fontWeight: 500,
@@ -280,7 +306,7 @@ const AudioAnalysisView = ({ result, file }: Props) => {
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
         <div style={{ display: 'flex', gap: '4px', background: 'rgba(15,23,42,0.6)', borderRadius: '10px', padding: '4px' }}>
           <button style={TAB_STYLE(activeTab === 'nlp')} onClick={() => setActiveTab('nlp')}>
-            <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><List size={13} /> NLP &amp; Context</span>
+            <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><List size={13} /> Insights</span>
           </button>
           <button style={TAB_STYLE(activeTab === 'chat')} onClick={() => setActiveTab('chat')}>
             <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><MessageCircle size={13} /> AI Chat &amp; Search</span>
@@ -318,6 +344,50 @@ const AudioAnalysisView = ({ result, file }: Props) => {
                 <div style={{ width: '88%', height: '10px', borderRadius: '999px', background: 'rgba(148,163,184,0.18)' }} />
               </>
             )}
+            {quality.dominantNoiseCauses.length > 0 && (
+              <div
+                style={{
+                  marginTop: '0.7rem',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.4rem',
+                  fontSize: '12px',
+                  color: '#fcd34d',
+                  background: 'rgba(251,191,36,0.12)',
+                  border: '1px solid rgba(251,191,36,0.3)',
+                  borderRadius: '999px',
+                  padding: '4px 10px',
+                }}
+              >
+                Root cause: {quality.dominantNoiseCauses.slice(0, 2).join(' + ')} noise
+              </div>
+            )}
+
+            {/* ── Speech + YAMNet content tags ── */}
+            {(hasNoSpeech || contentTags.length > 0) && (
+              <div style={{ marginTop: '0.6rem', display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                {hasNoSpeech && (
+                  <div style={{
+                    display: 'inline-flex', alignItems: 'center', gap: '0.35rem',
+                    fontSize: '12px', color: '#fbbf24',
+                    background: 'rgba(251,191,36,0.1)', border: '1px solid rgba(251,191,36,0.35)',
+                    borderRadius: '999px', padding: '4px 10px', fontWeight: 500,
+                  }}>
+                    🔇 Likely no speech
+                  </div>
+                )}
+                {contentTags.map((tag, i) => (
+                  <div key={i} style={{
+                    display: 'inline-flex', alignItems: 'center', gap: '0.35rem',
+                    fontSize: '12px', color: tag.color,
+                    background: tag.bg, border: `1px solid ${tag.border}`,
+                    borderRadius: '999px', padding: '4px 10px', fontWeight: 500,
+                  }}>
+                    {tag.icon} {tag.label}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.9rem' }}>
@@ -335,8 +405,16 @@ const AudioAnalysisView = ({ result, file }: Props) => {
                     </>
                   ) : (
                     <>
-                      <div style={{ fontSize: '22px', color: '#e2e8f0', fontWeight: 800 }}>{quality.score} / 100</div>
+                      <div style={{ fontSize: '22px', color: '#e2e8f0', fontWeight: 800 }}>{quality.adjustedScore ?? quality.score} / 100</div>
+                      <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '3px' }}>
+                        Original {quality.baseScore ?? quality.score} - Penalty {quality.noisePenaltyPoints.toFixed(1)}
+                      </div>
                       <div style={{ fontSize: '12px', color: '#94a3b8', marginTop: '2px' }}>{result.interpretation?.noise_label || quality.rating}</div>
+                      {result.interpretation?.noise_root_cause && (
+                        <div style={{ fontSize: '11px', color: '#fbbf24', marginTop: '3px' }}>
+                          {result.interpretation.noise_root_cause}
+                        </div>
+                      )}
                     </>
                   )}
                 </div>
@@ -505,6 +583,16 @@ const AudioAnalysisView = ({ result, file }: Props) => {
                   ) : null}
                 </div>
               ) : null}
+
+              {/* Word Cloud */}
+              {result.word_cloud_base64 && (
+                <div style={{ ...CARD }}>
+                  <h4 style={{ fontSize: '10px', textTransform: 'uppercase', color: '#64748b', fontWeight: 700, marginBottom: '0.75rem', marginTop: 0, letterSpacing: '0.5px' }}>Word Cloud</h4>
+                  <div style={{ display: 'flex', justifyContent: 'center' }}>
+                    <img src={`data:image/png;base64,${result.word_cloud_base64}`} alt="Word Cloud" style={{ maxWidth: '100%', height: 'auto', maxHeight: '400px', borderRadius: '8px' }} />
+                  </div>
+                </div>
+              )}
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
@@ -744,6 +832,25 @@ const AudioAnalysisView = ({ result, file }: Props) => {
                         </div>
                       )}
                     </div>
+                    {result.audio_quality?.background_noise && (
+                      <div style={{ marginTop: '0.9rem', borderTop: '1px solid #1e293b', paddingTop: '0.8rem' }}>
+                        <div style={{ fontSize: '10px', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '0.45rem' }}>
+                          Background Sounds
+                        </div>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                          {(result.audio_quality.background_noise.top_background_classes || []).slice(0, 6).map((n) => (
+                            <span key={`${n.label}-${n.confidence}`} style={{ fontSize: '11px', padding: '3px 8px', borderRadius: '999px', background: 'rgba(251,191,36,0.12)', color: '#fbbf24', border: '1px solid rgba(251,191,36,0.35)' }}>
+                              {n.label} ({Math.round((n.confidence || 0) * 100)}%)
+                            </span>
+                          ))}
+                        </div>
+                        {!!result.audio_quality.background_noise.detected_instruments?.length && (
+                          <div style={{ marginTop: '0.55rem', fontSize: '11px', color: '#cbd5e1' }}>
+                            Instruments: {result.audio_quality.background_noise.detected_instruments.slice(0, 4).map(i => i.label).join(', ')}
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 )}
 

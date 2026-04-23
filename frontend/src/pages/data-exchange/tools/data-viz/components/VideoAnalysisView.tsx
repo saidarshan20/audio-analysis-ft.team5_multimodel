@@ -6,7 +6,11 @@ interface Props {
   result: VideoAnalysisResult;
 }
 
+<<<<<<< HEAD
 const BASE_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8742';
+=======
+const BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? import.meta.env.VITE_API_URL ?? 'http://localhost:9080').replace(/\/$/, '');
+>>>>>>> audio-analysis
 
 const VideoAnalysisView = ({ result }: Props) => {
   const [videoTab, setVideoTab] = useState<'video' | 'audio' | 'text'>('video');

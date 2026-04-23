@@ -64,6 +64,11 @@ openai-whisper>=20231117      # Speech-to-text (open-source Whisper base model)
 #   3. Set HF_TOKEN in .env with a token that has accepted those terms
 #   4. pip install pyannote.audio
 pyannote.audio>=3.1.0         # Speaker diarization (gated model, needs HF_TOKEN)
+# YAMNet background-sound detection (TensorFlow, CPU-first)
+tensorflow>=2.15.0
+tensorflow-hub>=0.16.1
+wordcloud>=1.9.3
+nltk
 # NOTE: ffmpeg must be installed separately (system package or winget install Gyan.FFmpeg)
 # On a new machine: winget install Gyan.FFmpeg  OR  choco install ffmpeg
 # Then either add ffmpeg to PATH, or set FFMPEG_PATH and FFPROBE_PATH in .env

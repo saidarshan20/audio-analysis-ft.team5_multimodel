@@ -3,7 +3,11 @@
  * Connects to the FastAPI backend endpoints /team5/analyze and /team5/code-analyze
  */
 
+<<<<<<< HEAD
 const BASE_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8742';
+=======
+const BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? import.meta.env.VITE_API_URL ?? 'http://localhost:9080').replace(/\/$/, '');
+>>>>>>> audio-analysis
 
 // ── data.gov.in Catalog ──────────────────────────────────────────────────────
 
@@ -704,6 +708,37 @@ export interface AudioQualityMetrics {
   cleanliness: number | null;
 }
 
+export interface BackgroundNoiseClass {
+  label: string;
+  confidence: number;
+  time_share: number;
+  category: string;
+  penalty_weight: number;
+}
+
+export interface BackgroundNoiseEvent {
+  label: string;
+  start: number;
+  end: number;
+  confidence: number;
+  category: string;
+}
+
+export interface BackgroundNoiseSummary {
+  top_background_classes: BackgroundNoiseClass[];
+  detected_instruments: BackgroundNoiseClass[];
+  noise_events_timeline: BackgroundNoiseEvent[];
+  dominant_causes: string[];
+  noise_severity_score: number;
+}
+
+export interface AudioScoreComponents {
+  base_overall_score?: number | null;
+  noise_penalty_points?: number;
+  adjusted_overall_score?: number | null;
+  dominant_causes?: string[];
+}
+
 export interface AudioQuality {
   score_version?: string;
   content_type?: 'speech' | 'non_speech' | 'silent' | string;
@@ -711,12 +746,16 @@ export interface AudioQuality {
   duration_warning?: boolean;
   confidence?: number;
   overall_score?: number | null;
+  adjusted_overall_score?: number | null;
+  noise_penalty_points?: number;
   composite_percent?: number | null;
   rating?: string;
   summary?: string;
   snr_db?: number | null;
   clip_ratio?: number;
   speech_frame_ratio?: number;
+  background_noise?: BackgroundNoiseSummary;
+  score_components?: AudioScoreComponents;
   metrics?: AudioQualityMetrics;
 }
 
@@ -762,6 +801,8 @@ export interface AudioVerdict {
 export interface AudioInterpretation {
   /** "High Noise" | "Moderate Noise" | "Clean Audio" | "Unscored" */
   noise_label: string;
+  /** comma-separated root causes */
+  noise_root_cause?: string;
   /** "Too Quiet" | "Normal" | "Too Loud" | "Unscored" */
   loudness_label: string;
   /** "Low" | "Moderate" | "High" | "Unscored" */
@@ -930,7 +971,9 @@ export async function fetchAudioVerdict(params: {
   sentiment?: string;
   emotion?: string;
   quality_score?: number | null;
+  adjusted_quality_score?: number | null;
   quality_rating?: string;
+  noise_root_causes?: string[];
   duration_sec?: number | null;
 }): Promise<AudioVerdictResponse> {
   const response = await fetch(`${BASE_URL}/team5/audio-verdict`, {

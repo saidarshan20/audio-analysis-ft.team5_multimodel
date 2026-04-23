@@ -15,6 +15,8 @@ import {
   ImageCollectionQAResponse, compareImages, ImageCompareResponse
 } from '../services';
 
+const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? import.meta.env.VITE_API_URL ?? 'http://localhost:9080').replace(/\/$/, '');
+
 export interface VisualRecord {
   filename: string;
   caption: string;
@@ -109,7 +111,11 @@ const ImageMetadataPanel = ({ record, onClose }: { record: VisualRecord, onClose
           <div className="image-preview-pane">
             {record.annotated_image_path ? (
               <img
+<<<<<<< HEAD
                 src={`${import.meta.env.VITE_API_URL ?? 'http://localhost:8742'}/${record.annotated_image_path}`}
+=======
+                src={`${API_BASE_URL}/${record.annotated_image_path}`}
+>>>>>>> audio-analysis
                 alt={record.filename}
                 onError={(e) => {
                   const el = e.currentTarget;
@@ -302,7 +308,11 @@ interface Props {
   imgModel: string;
 }
 
+<<<<<<< HEAD
 const BASE_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8742';
+=======
+const BASE_URL = API_BASE_URL;
+>>>>>>> audio-analysis
 
 const CustomTooltip = ({ active, payload }: any) => {
   if (active && payload && payload.length) {
@@ -954,7 +964,11 @@ const ImageAnalysisView = ({ imgResult, imgZipResult, imgTokens, imgDuration, im
               {c.annotated_image_path ? (
                 <img
                   className="premium-gallery-img"
+<<<<<<< HEAD
                   src={`${import.meta.env.VITE_API_URL ?? 'http://localhost:8742'}/${c.annotated_image_path}`}
+=======
+                  src={`${API_BASE_URL}/${c.annotated_image_path}`}
+>>>>>>> audio-analysis
                   alt={c.filename}
                   onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
                 />

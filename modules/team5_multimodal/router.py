@@ -425,7 +425,9 @@ async def analyze_audio(file: UploadFile = File(...)):
                 sentiment=(text_analysis.sentiment.overall_label if text_analysis and text_analysis.sentiment else ""),
                 emotion=(text_analysis.emotion if text_analysis else ""),
                 quality_score=(quality.overall_score if quality else None),
+                adjusted_quality_score=(quality.adjusted_overall_score if quality else None),
                 quality_rating=(quality.rating if quality else ""),
+                noise_root_causes=(quality.background_noise.dominant_causes if quality and quality.background_noise else []),
                 duration_sec=analysis_result.duration,
             )
             verdict_data = await _generate_audio_verdict_raw(verdict_payload)
@@ -464,8 +466,50 @@ class AudioVerdictRequest(BaseModel):
     sentiment: str = ""
     emotion: str = ""
     quality_score: float | None = None
+    adjusted_quality_score: float | None = None
     quality_rating: str = ""
+    noise_root_causes: list[str] = []
     duration_sec: float | None = None
+
+
+class AudioChatRequest(BaseModel):
+    transcript_text: str
+    question: str
+    history: list[dict] = []
+
+
+@router.post("/audio-chat")
+async def audio_chat(payload: AudioChatRequest):
+    """
+    Multi-turn chat grounded on an analyzed audio transcript.
+    """
+    question = (payload.question or "").strip()
+    if not question:
+        raise HTTPException(status_code=400, detail="Question cannot be empty.")
+
+    transcript = (payload.transcript_text or "").strip()
+    if not transcript:
+        raise HTTPException(status_code=400, detail="Transcript context is required.")
+
+    settings = get_settings()
+    if not settings.groq_api_key:
+        raise HTTPException(status_code=503, detail="GROQ_API_KEY not configured")
+
+    # Normalize and cap history turns to avoid oversized payloads.
+    history: list[dict] = []
+    for msg in payload.history[-10:]:
+        role = str(msg.get("role", "")).strip()
+        content = str(msg.get("content", "")).strip()
+        if role in {"user", "assistant"} and content:
+            history.append({"role": role, "content": content})
+
+    try:
+        service = TextAnalysisService()
+        answer = await service.chat_with_transcript(transcript, history, question)
+        return {"answer": answer, "model": settings.groq_model}
+    except Exception as exc:
+        logger.error("audio-chat LLM error: %s", exc)
+        raise HTTPException(status_code=500, detail=str(exc))
 
 
 VERDICT_SYSTEM_PROMPT = """You are an expert audio analysis assistant. Given structured audio signal metrics, you will:
@@ -530,6 +574,10 @@ async def _generate_audio_verdict_raw(payload: AudioVerdictRequest) -> dict:
         signal_parts.append(f"Emotion: {payload.emotion}")
     if payload.quality_score is not None and payload.quality_rating:
         signal_parts.append(f"Overall Quality Score: {payload.quality_score:.0f}/100 ({payload.quality_rating})")
+    if payload.adjusted_quality_score is not None:
+        signal_parts.append(f"Noise-Adjusted Quality Score: {payload.adjusted_quality_score:.0f}/100")
+    if payload.noise_root_causes:
+        signal_parts.append("Background Noise Causes: " + ", ".join(payload.noise_root_causes[:3]))
     if payload.duration_sec is not None:
         mins = int(payload.duration_sec // 60)
         secs = int(payload.duration_sec % 60)

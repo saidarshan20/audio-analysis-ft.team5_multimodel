@@ -36,10 +36,18 @@ def signup(user: UserCreate):
 @router.post("/login", response_model=Token)
 def login(credentials: UserLogin):
     """Authenticate and return a JWT."""
+    identifier = (
+        (credentials.identifier or "").strip()
+        or (credentials.email or "").strip()
+        or (credentials.username or "").strip()
+    )
+    if not identifier:
+        raise HTTPException(status_code=400, detail="Username or email is required.")
+
     conn = get_connection()
     row = conn.execute(
-        "SELECT id, username, email, hashed_pwd FROM users WHERE email = ?",
-        (credentials.email,),
+        "SELECT id, username, email, hashed_pwd FROM users WHERE email = ? OR username = ?",
+        (identifier, identifier),
     ).fetchone()
     conn.close()
 

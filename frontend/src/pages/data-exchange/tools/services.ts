@@ -3,7 +3,11 @@
  * Connects to the FastAPI backend endpoints /team5/analyze and /team5/code-analyze
  */
 
+<<<<<<< HEAD
 const BASE_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8742';
+=======
+const BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? import.meta.env.VITE_API_URL ?? 'http://localhost:9080').replace(/\/$/, '');
+>>>>>>> audio-analysis
 
 export interface TextAnalysisResult {
   summary: string;
@@ -172,6 +176,7 @@ export interface AudioAnalysisResult {
   transcript_text: string;
   text_analysis: TextAnalysisResult | null;
   features?: AudioFeatures;  // ← acoustic features from Task 1
+  word_cloud_base64?: string;
 }
 
 export interface AudioAnalysisResponse {

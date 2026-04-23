@@ -1,0 +1,75 @@
+{
+  "default_confidence_threshold": 0.2,
+  "max_penalty_points": 25.0,
+  "weights": {
+    "ac_fan": 0.55,
+    "tv_media": 0.75,
+    "music": 0.6,
+    "instrument": 0.65,
+    "traffic": 0.7,
+    "crowd": 0.65,
+    "animal": 0.35,
+    "other_noise": 0.45
+  },
+  "aliases": {
+    "ac_fan": [
+      "air conditioning",
+      "air conditioner",
+      "electric fan",
+      "fan",
+      "ventilation",
+      "hvac"
+    ],
+    "tv_media": [
+      "television",
+      "tv",
+      "speech synthesizer",
+      "radio",
+      "video game"
+    ],
+    "music": [
+      "music",
+      "singing",
+      "song"
+    ],
+    "instrument": [
+      "guitar",
+      "piano",
+      "violin",
+      "cello",
+      "drum",
+      "percussion",
+      "flute",
+      "trumpet",
+      "saxophone",
+      "harmonica",
+      "ukulele",
+      "instrument"
+    ],
+    "traffic": [
+      "engine",
+      "car",
+      "motor vehicle",
+      "road",
+      "traffic",
+      "train",
+      "aircraft",
+      "siren"
+    ],
+    "crowd": [
+      "babble",
+      "crowd",
+      "conversation",
+      "speech",
+      "shout"
+    ],
+    "animal": [
+      "bird",
+      "chirp",
+      "dog",
+      "cat",
+      "animal",
+      "insect"
+    ]
+  }
+}

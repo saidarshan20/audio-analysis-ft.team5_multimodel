@@ -13,10 +13,22 @@ import shutil
 import time
 import soundfile as sf
 import numpy as np
-import torch
-import whisper
 import logging
 import asyncio
+
+try:
+    import torch
+    _TORCH_AVAILABLE = True
+except (ImportError, OSError, Exception):
+    torch = None  # type: ignore[assignment]
+    _TORCH_AVAILABLE = False
+
+try:
+    import whisper
+    _WHISPER_AVAILABLE = True
+except (ImportError, OSError, Exception):
+    whisper = None  # type: ignore[assignment]
+    _WHISPER_AVAILABLE = False
 
 # pyannote.audio is optional — requires HF token + accepted usage terms on HuggingFace.
 # If not installed, speaker diarization is silently skipped (segments get UNKNOWN speaker).
@@ -43,12 +55,15 @@ from modules.team5_multimodal.models import (
     AudioQuality,
     AudioVerdict,
     AudioInterpretation,
+    BackgroundNoiseSummary,
+    AudioScoreComponents,
     SpeakerSegment,
     SpeakerMetrics,
 )
 from modules.team5_multimodal.services import TextAnalysisService
 from modules.team5_multimodal.audio_feature_extractor import AudioFeatureExtractor
 from modules.team5_multimodal.audio_quality_service import AudioQualityService
+from modules.team5_multimodal.yamnet_service import YamnetNoiseService
 
 logger = logging.getLogger(__name__)
 
@@ -59,6 +74,11 @@ _diarize_pipeline = None
 
 def get_whisper_model(model_name="base"):
     global _whisper_model
+    if not _WHISPER_AVAILABLE or whisper is None:
+        raise RuntimeError(
+            "openai-whisper is not installed or failed to load. "
+            "Install with: pip install openai-whisper"
+        )
     if _whisper_model is None:
         logger.info(f"Loading Whisper model ({model_name})...")
         _whisper_model = whisper.load_model(model_name)
@@ -85,7 +105,8 @@ def get_diarization_pipeline():
             token=token,
         )
         # Move to CPU explicitly, or GPU if available
-        _diarize_pipeline.to(torch.device("cuda" if torch.cuda.is_available() else "cpu"))
+        if _TORCH_AVAILABLE and torch is not None:
+            _diarize_pipeline.to(torch.device("cuda" if torch.cuda.is_available() else "cpu"))
     return _diarize_pipeline
 
 
@@ -102,6 +123,7 @@ class AudioAnalysisService:
             ffprobe_exe=self.settings.ffprobe_path or "",
         )
         self._quality_service = AudioQualityService()
+        self._yamnet_service = YamnetNoiseService(self.settings)
 
     def process_audio(self, file_bytes: bytes, filename: str) -> AudioAnalysisResult:
         """
@@ -149,6 +171,8 @@ class AudioAnalysisService:
                 wav_path,
                 input_had_multiple_channels=input_audio.channels > 1,
             )
+            background_noise = self._safe_detect_background_noise(wav_path)
+            quality = self._apply_noise_adjustment(quality, background_noise)
 
             # 5. Transcribe (WAV only)
             transcript_out = self._transcribe(wav_path)
@@ -206,7 +230,27 @@ class AudioAnalysisService:
 
             # ── 8. Build rule-based interpretation ──────────────────────────────
             word_count = len(transcript_text.split()) if transcript_text else 0
-            interp = self._build_interpretation(quality, word_count, duration_sec)
+            interp = self._build_interpretation(
+                quality,
+                word_count,
+                duration_sec,
+                dominant_noise_causes=(quality.background_noise.dominant_causes if quality.background_noise else []),
+            )
+
+            # Generate Word Cloud
+            word_cloud_base64 = None
+            if transcript_text.strip():
+                try:
+                    from wordcloud import WordCloud
+                    import base64
+                    from io import BytesIO
+                    wc = WordCloud(width=800, height=400, background_color="rgba(15, 23, 42, 0)", mode="RGBA").generate(transcript_text)
+                    img = wc.to_image()
+                    buf = BytesIO()
+                    img.save(buf, format="PNG")
+                    word_cloud_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
+                except Exception as e:
+                    logger.warning(f"Word cloud generation failed: {e}")
 
             return AudioAnalysisResult(
                 duration=duration_sec,
@@ -218,6 +262,7 @@ class AudioAnalysisService:
                 speaker_metrics=speaker_metrics_final,
                 audio_quality=quality,
                 interpretation=interp,
+                word_cloud_base64=word_cloud_base64,
             )
 
         except Exception as e:
@@ -256,11 +301,48 @@ class AudioAnalysisService:
         )
         return AudioQuality.model_validate(raw_quality)
 
+    def _safe_detect_background_noise(self, wav_path: str) -> BackgroundNoiseSummary | None:
+        try:
+            raw = self._yamnet_service.analyze_wav(wav_path)
+            if not raw:
+                return None
+            return BackgroundNoiseSummary.model_validate(raw)
+        except Exception as exc:
+            logger.warning("YAMNet background-noise detection failed (non-fatal): %s", exc)
+            return None
+
+    @staticmethod
+    def _apply_noise_adjustment(
+        quality: AudioQuality,
+        background_noise: BackgroundNoiseSummary | None,
+    ) -> AudioQuality:
+        quality.background_noise = background_noise
+        base_score = quality.overall_score
+        penalty = background_noise.noise_penalty_points if background_noise else 0.0
+        if base_score is None:
+            quality.noise_penalty_points = 0.0
+        else:
+            quality.noise_penalty_points = round(float(max(penalty, 0.0)), 2)
+
+        if base_score is not None:
+            quality.adjusted_overall_score = round(float(np.clip(base_score - quality.noise_penalty_points, 0.0, 100.0)), 2)
+        else:
+            quality.adjusted_overall_score = None
+
+        quality.score_components = AudioScoreComponents(
+            base_overall_score=base_score,
+            noise_penalty_points=quality.noise_penalty_points,
+            adjusted_overall_score=quality.adjusted_overall_score,
+            dominant_causes=background_noise.dominant_causes if background_noise else [],
+        )
+        return quality
+
     @staticmethod
     def _build_interpretation(
         quality: AudioQuality,
         word_count: int,
         duration_sec: float,
+        dominant_noise_causes: list[str] | None = None,
     ) -> AudioInterpretation:
         """
         Convert raw quality scores into human-readable labels.
@@ -314,6 +396,7 @@ class AudioAnalysisService:
 
         return AudioInterpretation(
             noise_label=noise_label,
+            noise_root_cause=", ".join((dominant_noise_causes or [])[:3]),
             loudness_label=loudness_label,
             clarity_label=clarity_label,
             speech_rate_label=speech_rate_label,
@@ -517,6 +600,8 @@ class AudioAnalysisService:
         if waveform_np.shape[1] > 1:
             waveform_np = waveform_np.mean(axis=1, keepdims=True)
 
+        if not _TORCH_AVAILABLE or torch is None:
+            raise RuntimeError("torch is required for diarization but is not available.")
         waveform = torch.tensor(waveform_np.T)
         audio_input = {"waveform": waveform, "sample_rate": sample_rate}
 
