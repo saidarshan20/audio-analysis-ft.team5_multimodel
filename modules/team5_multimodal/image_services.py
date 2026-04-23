@@ -29,17 +29,60 @@ except Exception:
     register_heif_opener = None  # type: ignore[assignment]
     _HEIF_AVAILABLE = False
 
-# Machine Learning
-from ultralytics import YOLO
-import torch
-from transformers import CLIPProcessor, CLIPModel, BlipProcessor, BlipForConditionalGeneration
-from sklearn.cluster import KMeans
-import umap
-from groq import Groq
+# Machine Learning — each import is guarded individually so a single
+# broken native library (e.g. torchcodec DLL, missing CUDA) does not
+# prevent the rest of the stack from loading.
+try:
+    from ultralytics import YOLO
+    _YOLO_AVAILABLE = True
+except Exception:
+    YOLO = None  # type: ignore[assignment, misc]
+    _YOLO_AVAILABLE = False
 
-# Azure SDK
-from azure.cognitiveservices.vision.computervision import ComputerVisionClient
-from msrest.authentication import CognitiveServicesCredentials
+try:
+    import torch
+    _TORCH_AVAILABLE = True
+except Exception:
+    torch = None  # type: ignore[assignment]
+    _TORCH_AVAILABLE = False
+
+try:
+    from transformers import CLIPProcessor, CLIPModel, BlipProcessor, BlipForConditionalGeneration
+    _TRANSFORMERS_AVAILABLE = True
+except Exception:
+    CLIPProcessor = CLIPModel = BlipProcessor = BlipForConditionalGeneration = None  # type: ignore[assignment, misc]
+    _TRANSFORMERS_AVAILABLE = False
+
+try:
+    from sklearn.cluster import KMeans
+    _SKLEARN_AVAILABLE = True
+except Exception:
+    KMeans = None  # type: ignore[assignment, misc]
+    _SKLEARN_AVAILABLE = False
+
+try:
+    import umap
+    _UMAP_AVAILABLE = True
+except Exception:
+    umap = None  # type: ignore[assignment]
+    _UMAP_AVAILABLE = False
+
+try:
+    from groq import Groq
+    _GROQ_AVAILABLE = True
+except Exception:
+    Groq = None  # type: ignore[assignment, misc]
+    _GROQ_AVAILABLE = False
+
+# Azure SDK — optional; presence of credentials checked at request time
+try:
+    from azure.cognitiveservices.vision.computervision import ComputerVisionClient
+    from msrest.authentication import CognitiveServicesCredentials
+    _AZURE_CV_AVAILABLE = True
+except Exception:
+    ComputerVisionClient = None  # type: ignore[assignment, misc]
+    CognitiveServicesCredentials = None  # type: ignore[assignment, misc]
+    _AZURE_CV_AVAILABLE = False
 
 from modules.team5_multimodal.config import get_settings
 from modules.team5_multimodal.models import (
@@ -51,34 +94,40 @@ logger = logging.getLogger(__name__)
 # Pre-load models so they aren't painfully loaded every API call
 _groq_client = None
 
-try:
-    _yolo_model = YOLO("yolov8n.pt")  # Use nano for speed
-except Exception as e:
-    logger.error(f"Failed to load YOLO model: {e}")
+if _YOLO_AVAILABLE:
+    try:
+        _yolo_model = YOLO("yolov8n.pt")  # Use nano for speed
+    except Exception as e:
+        logger.error(f"Failed to load YOLO model: {e}")
+        _yolo_model = None
+else:
     _yolo_model = None
 
-try:
-    _clip_model = CLIPModel.from_pretrained("openai/clip-vit-base-patch32")
-    _clip_processor = CLIPProcessor.from_pretrained("openai/clip-vit-base-patch32")
-except Exception as e:
-    logger.error(f"Failed to load CLIP model: {e}")
-    _clip_model = None
-    _clip_processor = None
+if _TRANSFORMERS_AVAILABLE:
+    try:
+        _clip_model = CLIPModel.from_pretrained("openai/clip-vit-base-patch32")
+        _clip_processor = CLIPProcessor.from_pretrained("openai/clip-vit-base-patch32")
+    except Exception as e:
+        logger.error(f"Failed to load CLIP model: {e}")
+        _clip_model = None
+        _clip_processor = None
 
-try:
-    _blip_processor = BlipProcessor.from_pretrained("Salesforce/blip-image-captioning-base")
-    _blip_model = BlipForConditionalGeneration.from_pretrained("Salesforce/blip-image-captioning-base")
-except Exception as e:
-    logger.error(f"Failed to load BLIP model: {e}")
-    _blip_processor = None
-    _blip_model = None
+    try:
+        _blip_processor = BlipProcessor.from_pretrained("Salesforce/blip-image-captioning-base")
+        _blip_model = BlipForConditionalGeneration.from_pretrained("Salesforce/blip-image-captioning-base")
+    except Exception as e:
+        logger.error(f"Failed to load BLIP model: {e}")
+        _blip_processor = None
+        _blip_model = None
+else:
+    _clip_model = _clip_processor = _blip_processor = _blip_model = None
 
 
 class ImageAnalysisService:
     def __init__(self):
         self.settings = get_settings()
         global _groq_client
-        if _groq_client is None:
+        if _groq_client is None and _GROQ_AVAILABLE and Groq is not None:
             _groq_client = Groq(api_key=self.settings.groq_api_key)
 
         # Ensure workspace directories exist
@@ -293,7 +342,7 @@ class ImageAnalysisService:
             # --- CLIP Embeddings ---
             emb = np.zeros(512)
             try:
-                if _clip_model and _clip_processor:
+                if _clip_model and _clip_processor and _TORCH_AVAILABLE:
                     image = Image.open(str_path).convert("RGB")
                     inputs = _clip_processor(images=image, return_tensors="pt")
                     with torch.no_grad():
@@ -328,7 +377,7 @@ class ImageAnalysisService:
         X = np.array(embeddings)
         n_samples = len(X)
         
-        if n_samples <= 1:
+        if n_samples <= 1 or not _SKLEARN_AVAILABLE or KMeans is None:
             n_clusters = 1
             labels = np.zeros(n_samples, dtype=int)
         else:
@@ -353,7 +402,7 @@ class ImageAnalysisService:
         # 3. UMAP Dimensionality Reduction
         # UMAP requires n_neighbors >= 2 AND n_neighbors < n_samples,
         # so we need at least 3 samples. Handle smaller sets with trivial layouts.
-        if len(X) >= 3:
+        if len(X) >= 3 and _UMAP_AVAILABLE and umap is not None:
             # For small data, lower n_neighbors pulls clusters much tighter together.
             n_neighbors = min(5, max(2, len(X) - 1))
             reducer = umap.UMAP(n_neighbors=n_neighbors, min_dist=0.01, n_components=2, random_state=42, init="random")

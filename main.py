@@ -4,6 +4,7 @@ Creates the FastAPI app, auto-creates shared_workspace/ directories,
 and mounts all team routers + core auth routes.
 """
 
+import logging
 import os
 from pathlib import Path
 
@@ -11,6 +12,8 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
+
+logger = logging.getLogger(__name__)
 
 # ──── Core routers (Integration Team) ────
 from core.auth_router import router as auth_router
@@ -22,7 +25,13 @@ from modules.team1_automl.router import router as team1_router
 from modules.team2_feature_eng.router import router as team2_router
 from modules.team3_ocr.router import router as team3_router
 from modules.team4_anonymization.router import router as team4_router
-from modules.team5_multimodal.router import router as team5_router
+try:
+    from modules.team5_multimodal.router import router as team5_router
+    _T5_AVAILABLE = True
+except Exception as _t5_err:
+    team5_router = None  # type: ignore[assignment]
+    _T5_AVAILABLE = False
+    logger.warning("Team 5 (Multimodal) router failed to load and will be skipped: %s", _t5_err)
 
 # ──── Shared workspace directories (auto-created) ────
 BASE_DIR = Path(__file__).resolve().parent
@@ -82,7 +91,8 @@ def create_app() -> FastAPI:
     application.include_router(team2_router)
     application.include_router(team3_router)
     application.include_router(team4_router)
-    application.include_router(team5_router)
+    if _T5_AVAILABLE and team5_router is not None:
+        application.include_router(team5_router)
 
     return application
 

@@ -13,10 +13,22 @@ import shutil
 import time
 import soundfile as sf
 import numpy as np
-import torch
-import whisper
 import logging
 import asyncio
+
+try:
+    import torch
+    _TORCH_AVAILABLE = True
+except (ImportError, OSError, Exception):
+    torch = None  # type: ignore[assignment]
+    _TORCH_AVAILABLE = False
+
+try:
+    import whisper
+    _WHISPER_AVAILABLE = True
+except (ImportError, OSError, Exception):
+    whisper = None  # type: ignore[assignment]
+    _WHISPER_AVAILABLE = False
 
 # pyannote.audio is optional — requires HF token + accepted usage terms on HuggingFace.
 # If not installed, speaker diarization is silently skipped (segments get UNKNOWN speaker).
@@ -62,6 +74,11 @@ _diarize_pipeline = None
 
 def get_whisper_model(model_name="base"):
     global _whisper_model
+    if not _WHISPER_AVAILABLE or whisper is None:
+        raise RuntimeError(
+            "openai-whisper is not installed or failed to load. "
+            "Install with: pip install openai-whisper"
+        )
     if _whisper_model is None:
         logger.info(f"Loading Whisper model ({model_name})...")
         _whisper_model = whisper.load_model(model_name)
@@ -88,7 +105,8 @@ def get_diarization_pipeline():
             token=token,
         )
         # Move to CPU explicitly, or GPU if available
-        _diarize_pipeline.to(torch.device("cuda" if torch.cuda.is_available() else "cpu"))
+        if _TORCH_AVAILABLE and torch is not None:
+            _diarize_pipeline.to(torch.device("cuda" if torch.cuda.is_available() else "cpu"))
     return _diarize_pipeline
 
 
@@ -582,6 +600,8 @@ class AudioAnalysisService:
         if waveform_np.shape[1] > 1:
             waveform_np = waveform_np.mean(axis=1, keepdims=True)
 
+        if not _TORCH_AVAILABLE or torch is None:
+            raise RuntimeError("torch is required for diarization but is not available.")
         waveform = torch.tensor(waveform_np.T)
         audio_input = {"waveform": waveform, "sample_rate": sample_rate}
 
