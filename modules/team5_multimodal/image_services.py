@@ -177,19 +177,44 @@ class ImageAnalysisService:
                 f.write(file.file.read())
         return str(out_dir)
 
-    def get_image_description(self, img_path: str) -> str | None:
-        """Use Local BLIP Model to describe image"""
+    def get_image_description(self, img_path: str, detected_objects: list = None) -> str | None:
+        """Use Local BLIP Model + Groq Enrichment for detailed Visual Intelligence"""
         try:
+            base_caption = ""
             if _blip_model and _blip_processor:
                 img = Image.open(img_path).convert("RGB")
                 inputs = _blip_processor(img, return_tensors="pt")
-                out = _blip_model.generate(**inputs)
-                return _blip_processor.decode(out[0], skip_special_tokens=True)
+                # Generate a slightly longer base caption
+                out = _blip_model.generate(**inputs, min_length=20, max_length=50)
+                base_caption = _blip_processor.decode(out[0], skip_special_tokens=True)
             else:
-                return "Local BLIP Model Not Loaded"
+                base_caption = "An image containing various visual elements."
+
+            # --- AI Enrichment (Expand to 30-45 words) ---
+            objs_str = ", ".join([o.label for o in detected_objects]) if detected_objects else "general landscape"
+            
+            prompt = (
+                f"You are a visual intelligence expert. Expand this basic image caption: '{base_caption}' "
+                f"into a professional, detailed visual description of exactly 30 to 45 words. "
+                f"Incorporate the fact that these objects were detected: {objs_str}. "
+                f"Focus on the composition, lighting, and semantic meaning. Do not mention the word 'caption' or 'YOLO'."
+            )
+
+            response = _groq_client.chat.completions.create(
+                model=self.settings.groq_model,
+                messages=[
+                    {"role": "system", "content": "You provide detailed, sophisticated image descriptions for a visual intelligence dashboard."},
+                    {"role": "user", "content": prompt}
+                ],
+                max_tokens=100
+            )
+            
+            enriched_desc = response.choices[0].message.content.strip()
+            return enriched_desc
+
         except Exception as e:
-            logger.error(f"BLIP Captioning Error on {img_path}: {e}")
-        return None
+            logger.error(f"Visual Enrichment Error on {img_path}: {e}")
+            return base_caption if 'base_caption' in locals() else "Detailed description unavailable."
 
     def _name_clusters(self, labels: np.ndarray, metadata: list[dict], n_clusters: int) -> tuple[list[ClusterInfo], dict]:
         """Use Groq to name all clusters in a single batch request for maximum speed."""
@@ -313,8 +338,8 @@ class ImageAnalysisService:
             # --- Technical Metadata ---
             tech_meta = self._extract_exif_metadata(str_path)
 
-            # --- Azure Vision (Optional) ---
-            desc = self.get_image_description(str_path)
+            # --- AI Visual Intelligence (Enriched) ---
+            desc = self.get_image_description(str_path, detected_objects=objs)
 
             metadata_list.append({
                 "filename": img_path.name,

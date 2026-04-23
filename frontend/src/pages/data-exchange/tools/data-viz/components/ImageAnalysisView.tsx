@@ -127,21 +127,33 @@ const ImageMetadataPanel = ({ record, onClose }: { record: VisualRecord, onClose
           <div className="info-sidebar">
             {/* EXIF Quick Strip */}
             <div className="exif-strip">
-              <div className="exif-item">
+              <div className="exif-item" style={{ minWidth: 0 }}>
                 <span className="label">ISO</span>
-                <span className="value">{meta?.iso || '--'}</span>
+                <span className="value" style={{ width: '100%', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={String(meta?.iso || '--')}>
+                  {meta?.iso || '--'}
+                </span>
               </div>
-              <div className="exif-item">
+              <div className="exif-item" style={{ minWidth: 0 }}>
                 <span className="label">FOCAL</span>
-                <span className="value">{meta?.focal_length || '--'}</span>
+                <span className="value" style={{ width: '100%', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={String(meta?.focal_length || '--')}>
+                  {meta?.focal_length 
+                    ? (String(meta.focal_length).includes('mm') 
+                        ? parseFloat(String(meta.focal_length)).toFixed(1) + 'mm' 
+                        : String(meta.focal_length)) 
+                    : '--'}
+                </span>
               </div>
-              <div className="exif-item">
+              <div className="exif-item" style={{ minWidth: 0 }}>
                 <span className="label">APERTURE</span>
-                <span className="value">{meta?.aperture || '--'}</span>
+                <span className="value" style={{ width: '100%', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={String(meta?.aperture || '--')}>
+                  {meta?.aperture || '--'}
+                </span>
               </div>
-              <div className="exif-item">
+              <div className="exif-item" style={{ minWidth: 0 }}>
                 <span className="label">SHUTTER</span>
-                <span className="value">{meta?.shutter_speed || '--'}s</span>
+                <span className="value" style={{ width: '100%', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={meta?.shutter_speed ? `${meta.shutter_speed}s` : '--'}>
+                  {meta?.shutter_speed ? `${meta.shutter_speed}s` : '--'}
+                </span>
               </div>
             </div>
 
@@ -1440,27 +1452,29 @@ const ImageAnalysisView = ({ imgResult, imgZipResult, imgTokens, imgDuration, im
     )}
 
     {selectedCompareRecords.length === 2 && (
-      <div style={{ marginTop: '18px', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px' }}>
-        <div style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-mid)', borderRadius: '14px', padding: '16px' }}>
-          <div style={{ color: 'var(--t-secondary)', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '10px' }}>Shared Objects</div>
-          <div style={{ color: 'var(--t-primary)', fontSize: '14px', lineHeight: 1.6 }}>
-            {sharedObjects.length ? sharedObjects.join(', ') : 'No shared object labels'}
+      <div style={{ marginTop: '18px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
+          <div style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-mid)', borderRadius: '14px', padding: '16px' }}>
+            <div style={{ color: 'var(--t-secondary)', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '10px' }}>Shared Objects</div>
+            <div style={{ color: 'var(--t-primary)', fontSize: '14px', lineHeight: 1.6 }}>
+              {sharedObjects.length ? sharedObjects.join(', ') : 'No shared object labels'}
+            </div>
           </div>
-        </div>
-        <div style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-mid)', borderRadius: '14px', padding: '16px' }}>
-          <div style={{ color: 'var(--t-secondary)', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '10px' }}>
-            {leftCompare?.filename} only
+          <div style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-mid)', borderRadius: '14px', padding: '16px' }}>
+            <div style={{ color: 'var(--t-secondary)', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '10px' }}>
+              {leftCompare?.filename} only
+            </div>
+            <div style={{ color: 'var(--t-primary)', fontSize: '14px', lineHeight: 1.6 }}>
+              {leftOnlyObjects.length ? leftOnlyObjects.join(', ') : 'No unique object labels'}
+            </div>
           </div>
-          <div style={{ color: 'var(--t-primary)', fontSize: '14px', lineHeight: 1.6 }}>
-            {leftOnlyObjects.length ? leftOnlyObjects.join(', ') : 'No unique object labels'}
-          </div>
-        </div>
-        <div style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-mid)', borderRadius: '14px', padding: '16px' }}>
-          <div style={{ color: 'var(--t-secondary)', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '10px' }}>
-            {rightCompare?.filename} only
-          </div>
-          <div style={{ color: 'var(--t-primary)', fontSize: '14px', lineHeight: 1.6 }}>
-            {rightOnlyObjects.length ? rightOnlyObjects.join(', ') : 'No unique object labels'}
+          <div style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-mid)', borderRadius: '14px', padding: '16px' }}>
+            <div style={{ color: 'var(--t-secondary)', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '10px' }}>
+              {rightCompare?.filename} only
+            </div>
+            <div style={{ color: 'var(--t-primary)', fontSize: '14px', lineHeight: 1.6 }}>
+              {rightOnlyObjects.length ? rightOnlyObjects.join(', ') : 'No unique object labels'}
+            </div>
           </div>
         </div>
         <div style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-mid)', borderRadius: '14px', padding: '16px' }}>
