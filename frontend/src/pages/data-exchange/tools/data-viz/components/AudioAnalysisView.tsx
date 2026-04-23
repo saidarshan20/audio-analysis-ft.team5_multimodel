@@ -214,6 +214,26 @@ const AudioAnalysisView = ({ result, file }: Props) => {
   const qualityStatusBorder = quality.score >= 70 ? 'rgba(34,197,94,0.35)' : quality.score >= 40 ? 'rgba(251,191,36,0.35)' : 'rgba(239,68,68,0.35)';
   const unscoredAudio = !!result.audio_quality && (result.audio_quality.overall_score === null || result.audio_quality.overall_score === undefined);
 
+  // ── Speech presence & YAMNet content tags ─────────────────────────────────
+  const hasNoSpeech = !result.transcript_text?.trim() || result.segments.length === 0;
+
+  const YAMNET_CATEGORY_META: Record<string, { label: string; color: string; bg: string; border: string; icon: string }> = {
+    music:      { label: 'Musical',           color: '#a78bfa', bg: 'rgba(167,139,250,0.12)', border: 'rgba(167,139,250,0.3)',  icon: '🎵' },
+    instrument: { label: 'Instrumental',      color: '#c084fc', bg: 'rgba(192,132,252,0.12)', border: 'rgba(192,132,252,0.3)',  icon: '🎸' },
+    animal:     { label: 'Animal Sounds',     color: '#34d399', bg: 'rgba(52,211,153,0.12)',  border: 'rgba(52,211,153,0.3)',   icon: '🐾' },
+    traffic:    { label: 'Traffic / Outdoor', color: '#fb923c', bg: 'rgba(251,146,60,0.12)',  border: 'rgba(251,146,60,0.3)',   icon: '🚗' },
+    ac_fan:     { label: 'Mechanical Noise',  color: '#94a3b8', bg: 'rgba(148,163,184,0.12)', border: 'rgba(148,163,184,0.3)',  icon: '💨' },
+    tv_media:   { label: 'Media / Broadcast', color: '#38bdf8', bg: 'rgba(56,189,248,0.12)',  border: 'rgba(56,189,248,0.3)',   icon: '📺' },
+    crowd:      { label: 'Crowd / Voices',    color: '#f472b6', bg: 'rgba(244,114,182,0.12)', border: 'rgba(244,114,182,0.3)',  icon: '👥' },
+  };
+
+  const _seenCategories = new Set<string>();
+  const contentTags = (result.audio_quality?.background_noise?.top_background_classes ?? [])
+    .filter(c => c.category && c.category !== 'other_noise' && YAMNET_CATEGORY_META[c.category])
+    .filter(c => { if (_seenCategories.has(c.category)) return false; _seenCategories.add(c.category); return true; })
+    .slice(0, 2)
+    .map(c => YAMNET_CATEGORY_META[c.category]);
+
   const TAB_STYLE = (active: boolean): React.CSSProperties => ({
     padding: '0.5rem 1.1rem', borderRadius: '8px', fontSize: '13px', fontWeight: 500,
     cursor: 'pointer', border: 'none',
@@ -340,6 +360,32 @@ const AudioAnalysisView = ({ result, file }: Props) => {
                 }}
               >
                 Root cause: {quality.dominantNoiseCauses.slice(0, 2).join(' + ')} noise
+              </div>
+            )}
+
+            {/* ── Speech + YAMNet content tags ── */}
+            {(hasNoSpeech || contentTags.length > 0) && (
+              <div style={{ marginTop: '0.6rem', display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                {hasNoSpeech && (
+                  <div style={{
+                    display: 'inline-flex', alignItems: 'center', gap: '0.35rem',
+                    fontSize: '12px', color: '#fbbf24',
+                    background: 'rgba(251,191,36,0.1)', border: '1px solid rgba(251,191,36,0.35)',
+                    borderRadius: '999px', padding: '4px 10px', fontWeight: 500,
+                  }}>
+                    🔇 Likely no speech
+                  </div>
+                )}
+                {contentTags.map((tag, i) => (
+                  <div key={i} style={{
+                    display: 'inline-flex', alignItems: 'center', gap: '0.35rem',
+                    fontSize: '12px', color: tag.color,
+                    background: tag.bg, border: `1px solid ${tag.border}`,
+                    borderRadius: '999px', padding: '4px 10px', fontWeight: 500,
+                  }}>
+                    {tag.icon} {tag.label}
+                  </div>
+                ))}
               </div>
             )}
           </div>

@@ -64,3 +64,4 @@ build/
 
 *.pt
 *.zip
+.claude/
