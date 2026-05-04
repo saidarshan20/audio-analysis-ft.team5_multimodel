@@ -1,0 +1,1241 @@
+{
+  "status": "success",
+  "processed_count": 15,
+  "result": {
+    "clusters": [
+      {
+        "filename": "image_01.heic",
+        "cluster_id": 1,
+        "umap_x": 3.2874510288238525,
+        "umap_y": 1.4735068082809448,
+        "objects": [
+          {
+            "label": "cup",
+            "confidence": 0.9182968735694885,
+            "bbox": [
+              1614.9500732421875,
+              1345.5435791015625,
+              1771.2177734375,
+              1565.89794921875
+            ]
+          },
+          {
+            "label": "laptop",
+            "confidence": 0.9142661690711975,
+            "bbox": [
+              1523.017822265625,
+              1300.4261474609375,
+              2351.56298828125,
+              1907.6104736328125
+            ]
+          },
+          {
+            "label": "person",
+            "confidence": 0.9129056930541992,
+            "bbox": [
+              0.55535888671875,
+              379.83599853515625,
+              1654.7354736328125,
+              2136.30224609375
+            ]
+          },
+          {
+            "label": "person",
+            "confidence": 0.8950933218002319,
+            "bbox": [
+              1319.0626220703125,
+              330.9895935058594,
+              1983.4066162109375,
+              1249.12451171875
+            ]
+          },
+          {
+            "label": "person",
+            "confidence": 0.8676424026489258,
+            "bbox": [
+              2453.94140625,
+              311.9415283203125,
+              3443.531494140625,
+              1518.8944091796875
+            ]
+          },
+          {
+            "label": "laptop",
+            "confidence": 0.746619462966919,
+            "bbox": [
+              1822.0419921875,
+              1202.8685302734375,
+              2429.514892578125,
+              1540.2674560546875
+            ]
+          },
+          {
+            "label": "person",
+            "confidence": 0.7192276120185852,
+            "bbox": [
+              402.8631591796875,
+              194.912109375,
+              1106.6217041015625,
+              1385.7657470703125
+            ]
+          },
+          {
+            "label": "dining table",
+            "confidence": 0.5863030552864075,
+            "bbox": [
+              939.7408447265625,
+              1205.26611328125,
+              3838.31787109375,
+              2157.4169921875
+            ]
+          },
+          {
+            "label": "laptop",
+            "confidence": 0.5796921253204346,
+            "bbox": [
+              2655.81298828125,
+              1224.769775390625,
+              3386.33056640625,
+              1780.00341796875
+            ]
+          },
+          {
+            "label": "tie",
+            "confidence": 0.5585564374923706,
+            "bbox": [
+              632.4111938476562,
+              1038.57958984375,
+              764.5038452148438,
+              1397.5843505859375
+            ]
+          }
+        ],
+        "description": "A group of five individuals, dressed in professional attire, including one wearing a tie, engage in a meeting around a dining table. Soft, natural light illuminates the scene, highlighting a laptop and tablet, alongside a cup, as they facilitate discussion and collaboration.",
+        "annotated_image_path": "modules/team5_multimodal/result/demo_images/image_01.jpg",
+        "metadata": {
+          "make": "Apple",
+          "model": "iPhone 12 Pro",
+          "lens": "iPhone 12 Pro back triple camera 4.2mm f/1.6",
+          "focal_length": "4.2mm",
+          "focal_length_35mm": null,
+          "aperture": "f/1.6",
+          "shutter_speed": "1/9804",
+          "iso": "32",
+          "datetime": null,
+          "gps": {
+            "lat": 40.68919972222222,
+            "lng": -74.04449972222223,
+            "altitude": null
+          },
+          "width": 3840,
+          "height": 2160
+        }
+      },
+      {
+        "filename": "image_10.heic",
+        "cluster_id": 2,
+        "umap_x": 3.9056668281555176,
+        "umap_y": -0.9744048714637756,
+        "objects": [
+          {
+            "label": "person",
+            "confidence": 0.9385293126106262,
+            "bbox": [
+              145.05703735351562,
+              30.435148239135742,
+              231.60406494140625,
+              260.0597839355469
+            ]
+          },
+          {
+            "label": "person",
+            "confidence": 0.930298924446106,
+            "bbox": [
+              234.7621612548828,
+              21.29290199279785,
+              349.12432861328125,
+              260.2145690917969
+            ]
+          },
+          {
+            "label": "baseball bat",
+            "confidence": 0.5399052500724792,
+            "bbox": [
+              139.90899658203125,
+              13.513011932373047,
+              160.04403686523438,
+              100.42546081542969
+            ]
+          }
+        ],
+        "description": "Two uniformed men, one in red and the other in blue, stand centrally on a cricket field, grasping fire torches. A baseball bat lies nearby. The stadium's bright lights illuminate the scene, casting a warm glow on the duo, conveying a sense of energetic spectacle.",
+        "annotated_image_path": "modules/team5_multimodal/result/demo_images/image_10.jpg",
+        "metadata": {
+          "make": "Apple",
+          "model": "iPhone 12 Pro",
+          "lens": "iPhone 12 Pro back triple camera 4.2mm f/1.6",
+          "focal_length": "4.2mm",
+          "focal_length_35mm": null,
+          "aperture": "f/1.6",
+          "shutter_speed": "1/9804",
+          "iso": "32",
+          "datetime": null,
+          "gps": {
+            "lat": 37.819899722222225,
+            "lng": -122.4783,
+            "altitude": null
+          },
+          "width": 477,
+          "height": 280
+        }
+      },
+      {
+        "filename": "image_06.heic",
+        "cluster_id": 0,
+        "umap_x": 1.0258708000183105,
+        "umap_y": 0.9069716930389404,
+        "objects": [
+          {
+            "label": "dog",
+            "confidence": 0.9149040579795837,
+            "bbox": [
+              68.90959167480469,
+              7.049960613250732,
+              179.51292419433594,
+              137.95437622070312
+            ]
+          }
+        ],
+        "description": "\"A dynamic canine subject traverses lush green grass in a sun-kissed park at dusk, with warm, golden light filtering through the silhouetted trees behind, creating a serene atmosphere; the dog's motion conveys a sense of freedom and joy in a harmonious natural setting.\"",
+        "annotated_image_path": "modules/team5_multimodal/result/demo_images/image_06.jpg",
+        "metadata": {
+          "make": "Apple",
+          "model": "iPhone 12 Pro",
+          "lens": "iPhone 12 Pro back triple camera 4.2mm f/1.6",
+          "focal_length": "4.2mm",
+          "focal_length_35mm": null,
+          "aperture": "f/1.6",
+          "shutter_speed": "1/9804",
+          "iso": "32",
+          "datetime": null,
+          "gps": {
+            "lat": 36.054399999999994,
+            "lng": -112.1401,
+            "altitude": null
+          },
+          "width": 300,
+          "height": 168
+        }
+      },
+      {
+        "filename": "image_07.heic",
+        "cluster_id": 1,
+        "umap_x": 3.269742727279663,
+        "umap_y": 0.8392530679702759,
+        "objects": [
+          {
+            "label": "person",
+            "confidence": 0.9072763323783875,
+            "bbox": [
+              118.49536895751953,
+              1357.6201171875,
+              1744.7657470703125,
+              3705.923828125
+            ]
+          },
+          {
+            "label": "person",
+            "confidence": 0.8376525640487671,
+            "bbox": [
+              2777.632568359375,
+              1316.197998046875,
+              3536.226806640625,
+              3036.259521484375
+            ]
+          },
+          {
+            "label": "couch",
+            "confidence": 0.8115876317024231,
+            "bbox": [
+              3882.001708984375,
+              2248.42626953125,
+              5596.66845703125,
+              3701.401123046875
+            ]
+          },
+          {
+            "label": "person",
+            "confidence": 0.805665135383606,
+            "bbox": [
+              3938.861572265625,
+              892.2158203125,
+              5169.11474609375,
+              2510.48046875
+            ]
+          },
+          {
+            "label": "laptop",
+            "confidence": 0.716164767742157,
+            "bbox": [
+              1811.424072265625,
+              2524.539794921875,
+              2689.30859375,
+              3134.10498046875
+            ]
+          },
+          {
+            "label": "chair",
+            "confidence": 0.5679717659950256,
+            "bbox": [
+              0.7155036926269531,
+              2029.666748046875,
+              1295.228271484375,
+              3717.20654296875
+            ]
+          },
+          {
+            "label": "person",
+            "confidence": 0.42463889718055725,
+            "bbox": [
+              2069.247314453125,
+              1526.2159423828125,
+              2888.990966796875,
+              2514.053466796875
+            ]
+          },
+          {
+            "label": "person",
+            "confidence": 0.4115941524505615,
+            "bbox": [
+              1292.740966796875,
+              1245.172119140625,
+              2434.85791015625,
+              3443.48583984375
+            ]
+          }
+        ],
+        "description": "A group of six individuals sit around a central laptop on a couch and chair, engaged and attentive. Soft, ambient lighting illuminates their focused faces as a gesturing man points at the screen, conveying collaborative discussion and problem-solving in a relaxed, informal setting.",
+        "annotated_image_path": "modules/team5_multimodal/result/demo_images/image_07.jpg",
+        "metadata": {
+          "make": "Apple",
+          "model": "iPhone 12 Pro",
+          "lens": "iPhone 12 Pro back triple camera 4.2mm f/1.6",
+          "focal_length": "4.2mm",
+          "focal_length_35mm": null,
+          "aperture": "f/1.6",
+          "shutter_speed": "1/9804",
+          "iso": "32",
+          "datetime": null,
+          "gps": {
+            "lat": 25.235499722222222,
+            "lng": 55.3003,
+            "altitude": null
+          },
+          "width": 5600,
+          "height": 3738
+        }
+      },
+      {
+        "filename": "image_11.heic",
+        "cluster_id": 2,
+        "umap_x": 4.228181838989258,
+        "umap_y": -0.4084409475326538,
+        "objects": [
+          {
+            "label": "person",
+            "confidence": 0.9228767156600952,
+            "bbox": [
+              35.854576110839844,
+              166.1580047607422,
+              216.6713104248047,
+              572.8887329101562
+            ]
+          },
+          {
+            "label": "person",
+            "confidence": 0.9102335572242737,
+            "bbox": [
+              301.451171875,
+              215.24070739746094,
+              497.0519714355469,
+              652.4793701171875
+            ]
+          },
+          {
+            "label": "person",
+            "confidence": 0.8810418248176575,
+            "bbox": [
+              496.6623229980469,
+              402.62408447265625,
+              716.7552490234375,
+              664.0393676757812
+            ]
+          },
+          {
+            "label": "person",
+            "confidence": 0.8580226898193359,
+            "bbox": [
+              1033.8348388671875,
+              335.1104736328125,
+              1375.1636962890625,
+              696.3917846679688
+            ]
+          },
+          {
+            "label": "person",
+            "confidence": 0.8294035196304321,
+            "bbox": [
+              646.5363159179688,
+              76.37506103515625,
+              810.964599609375,
+              572.5332641601562
+            ]
+          },
+          {
+            "label": "person",
+            "confidence": 0.8241338729858398,
+            "bbox": [
+              512.647705078125,
+              159.3279571533203,
+              658.9215087890625,
+              483.8913269042969
+            ]
+          },
+          {
+            "label": "baseball bat",
+            "confidence": 0.45723411440849304,
+            "bbox": [
+              188.34176635742188,
+              364.94097900390625,
+              218.4230194091797,
+              566.873046875
+            ]
+          } 
+        ],
+        "description": "Six men engage in a spirited cricket match on a lush green field, partially obscured by a vast expanse of white cloth. Warm sunlight casts a gentle glow, accentuating the vibrant grass and the players' focused expressions as one wields a baseball bat with intent.",
+        "annotated_image_path": "modules/team5_multimodal/result/demo_images/image_11.jpg",
+        "metadata": {
+          "make": "Apple",
+          "model": "iPhone 12 Pro",
+          "lens": "iPhone 12 Pro back triple camera 4.2mm f/1.6",
+          "focal_length": "4.2mm",
+          "focal_length_35mm": null,
+          "aperture": "f/1.6",
+          "shutter_speed": "1/9804",
+          "iso": "32",
+          "datetime": null,
+          "gps": {
+            "lat": 25.197199722222223,
+            "lng": 55.27439972222222,
+            "altitude": null
+          },
+          "width": 1400,
+          "height": 795
+        }
+      },
+      {
+        "filename": "image_08.heic",
+        "cluster_id": 0,
+        "umap_x": 1.492537260055542,
+        "umap_y": 0.8215118646621704,
+        "objects": [
+          {
+            "label": "bird",
+            "confidence": 0.8997193574905396,
+            "bbox": [
+              26.768543243408203,
+              20.892900466918945,
+              208.0596160888672,
+              149.02508544921875
+            ]
+          }
+        ],
+        "description": "\"A lone bird perches atop a rugged rock, set against a softly blurred backdrop of undifferentiated hues, evoking a sense of serene solitude. Warm, diffused light accentuates the bird's tranquil form, masterfully isolating it through subtle depth-of-field effects.\"",
+        "annotated_image_path": "modules/team5_multimodal/result/demo_images/image_08.jpg",
+        "metadata": {
+          "make": "Apple",
+          "model": "iPhone 12 Pro",
+          "lens": "iPhone 12 Pro back triple camera 4.2mm f/1.6",
+          "focal_length": "4.2mm",
+          "focal_length_35mm": null,
+          "aperture": "f/1.6",
+          "shutter_speed": "1/9804",
+          "iso": "32",
+          "datetime": null,
+          "gps": {
+            "lat": 35.744799722222226,
+            "lng": 51.3753,
+            "altitude": null
+          },
+          "width": 275,
+          "height": 183
+        }
+      },
+      {
+        "filename": "image_04.heic",
+        "cluster_id": 0,
+        "umap_x": 1.629530429840088,
+        "umap_y": 0.2688561975955963,
+        "objects": [
+          {
+            "label": "bird",
+            "confidence": 0.9082444310188293,
+            "bbox": [
+              77.98528289794922,
+              13.659261703491211,
+              192.483642578125,
+              146.6378173828125
+            ]
+          }
+        ],
+        "description": "\"A serene blue bird perches on a slender branch, set against a lush backdrop of vibrant green leaves. Soft, natural light accentuates the bird's tranquil demeanor, evoking a sense of peaceful coexistence with its surroundings, in this high-definition, AI-generated stock image.\"",
+        "annotated_image_path": "modules/team5_multimodal/result/demo_images/image_04.jpg",
+        "metadata": {
+          "make": "Apple",
+          "model": "iPhone 12 Pro",
+          "lens": "iPhone 12 Pro back triple camera 4.2mm f/1.6",
+          "focal_length": "4.2mm",
+          "focal_length_35mm": null,
+          "aperture": "f/1.6",
+          "shutter_speed": "1/9804",
+          "iso": "32",
+          "datetime": null,
+          "gps": {
+            "lat": 35.69969972222222,
+            "lng": 51.338,
+            "altitude": null
+          },
+          "width": 298,
+          "height": 169
+        }
+      },
+      {
+        "filename": "image_12.heic",
+        "cluster_id": 0,
+        "umap_x": 1.0135973691940308,
+        "umap_y": 0.28457438945770264,
+        "objects": [
+          {
+            "label": "dog",
+            "confidence": 0.8563380837440491,
+            "bbox": [
+              97.6460189819336,
+              4.750254154205322,
+              292.08013916015625,
+              143.1106719970703
+            ]
+          }
+        ],
+        "description": "\"A vibrant scene unfolds in a lush UK park on a sunny day, featuring a joyful dog as the central subject. The canine, surrounded by a sea of green grass, enthusiastically plays with a ball, bathed in warm, soft light, exuding carefree delight and serenity.\"",
+        "annotated_image_path": "modules/team5_multimodal/result/demo_images/image_12.jpg",
+        "metadata": {
+          "make": "Apple",
+          "model": "iPhone 12 Pro",
+          "lens": "iPhone 12 Pro back triple camera 4.2mm f/1.6",
+          "focal_length": "4.2mm",
+          "focal_length_35mm": null,
+          "aperture": "f/1.6",
+          "shutter_speed": "1/9804",
+          "iso": "32",
+          "datetime": null,
+          "gps": {
+            "lat": 25.1124,
+            "lng": 55.139,
+            "altitude": null
+          },
+          "width": 310,
+          "height": 163
+        }
+      },
+      {
+        "filename": "image_13.heic",
+        "cluster_id": 0,
+        "umap_x": 0.6623117923736572,
+        "umap_y": 0.6629216074943542,
+        "objects": [
+          {
+            "label": "dog",
+            "confidence": 0.9266278147697449,
+            "bbox": [
+              69.21684265136719,
+              269.9745788574219,
+              575.4219360351562,
+              628.807861328125
+            ]
+          },
+          {
+            "label": "dog",
+            "confidence": 0.8928868770599365,
+            "bbox": [
+              562.260009765625,
+              45.89051818847656,
+              962.2939453125,
+              626.94970703125
+            ]
+          }
+        ],
+        "description": "Two dogs, detected in mid-play, dominate the foreground: one leaps with joyful abandon while the other crouches, poised to pounce. Warm sunlight bathes the scene, with distant canines strolling along the shoreline, creating a lively atmosphere of carefree recreation and social interaction.",
+        "annotated_image_path": "modules/team5_multimodal/result/demo_images/image_13.jpg",
+        "metadata": {
+          "make": "Apple",
+          "model": "iPhone 12 Pro",
+          "lens": "iPhone 12 Pro back triple camera 4.2mm f/1.6",
+          "focal_length": "4.2mm",
+          "focal_length_35mm": null,
+          "aperture": "f/1.6",
+          "shutter_speed": "1/9804",
+          "iso": "32",
+          "datetime": null,
+          "gps": {
+            "lat": 35.69969972222222,
+            "lng": 51.338,
+            "altitude": null
+          },
+          "width": 1200,
+          "height": 630
+        }
+      },
+      {
+        "filename": "image_05.heic",
+        "cluster_id": 2,
+        "umap_x": 4.313831329345703,
+        "umap_y": -0.8033663034439087,
+        "objects": [
+          {
+            "label": "person",
+            "confidence": 0.9259183406829834,
+            "bbox": [
+              18.60007095336914,
+              16.478137969970703,
+              93.65769958496094,
+              174.38323974609375
+            ]
+          },
+          {
+            "label": "person",
+            "confidence": 0.8967017531394958,
+            "bbox": [
+              132.36669921875,
+              6.224095821380615,
+              249.81597900390625,
+              174.0401153564453
+            ]
+          }
+        ],
+        "description": "A group of men in casual attire engage in a lively game of cricket on a lush green field, surrounded by towering trees. A batsman in a crisp white shirt prepares to strike the ball, set against warm, natural light and a serene background.",
+        "annotated_image_path": "modules/team5_multimodal/result/demo_images/image_05.jpg",
+        "metadata": {
+          "make": "Apple",
+          "model": "iPhone 12 Pro",
+          "lens": "iPhone 12 Pro back triple camera 4.2mm f/1.6",
+          "focal_length": "4.2mm",
+          "focal_length_35mm": null,
+          "aperture": "f/1.6",
+          "shutter_speed": "1/9804",
+          "iso": "32",
+          "datetime": null,
+          "gps": {
+            "lat": 32.65769972222222,
+            "lng": 51.677299999999995,
+            "altitude": null
+          },
+          "width": 275,
+          "height": 183
+        }
+      },
+      {
+        "filename": "image_09.heic",
+        "cluster_id": 3,
+        "umap_x": 4.083937644958496,
+        "umap_y": 0.5656605958938599,
+        "objects": [
+          {
+            "label": "car",
+            "confidence": 0.9178290963172913,
+            "bbox": [
+              82.14264678955078,
+              337.7076110839844,
+              173.7641143798828,
+              435.6358337402344
+            ]
+          },
+          {
+            "label": "car",
+            "confidence": 0.8430084586143494,
+            "bbox": [
+              3.7058136463165283,
+              290.1985168457031,
+              91.95657348632812,
+              374.7848815917969
+            ]
+          },
+          {
+            "label": "car",
+            "confidence": 0.8417965769767761,
+            "bbox": [
+              0.20674186944961548,
+              350.9414978027344,
+              59.65936279296875,
+              440.96893310546875
+            ]
+          },
+          {
+            "label": "car",
+            "confidence": 0.8049010634422302,
+            "bbox": [
+              50.39695739746094,
+              263.4530944824219,
+              112.17723083496094,
+              321.2363586425781
+            ]
+          },
+          {
+            "label": "car",
+            "confidence": 0.7032737731933594,
+            "bbox": [
+              79.50523376464844,
+              234.16664123535156,
+              130.88951110839844,
+              282.01971435546875
+            ]
+          },
+          {
+            "label": "car",
+            "confidence": 0.6255665421485901,
+            "bbox": [
+              117.60596466064453,
+              265.3138122558594,
+              187.82028198242188,
+              341.06787109375
+            ]
+          },
+          {
+            "label": "car",
+            "confidence": 0.6252645254135132,
+            "bbox": [
+              96.9383544921875,
+              209.07907104492188,
+              144.5216064453125,
+              250.19015502929688
+            ]
+          },
+          {
+            "label": "car",
+            "confidence": 0.6111041903495789,
+            "bbox": [
+              142.12158203125,
+              242.58872985839844,
+              191.9824676513672,
+              296.0867004394531
+            ]
+          },
+          {
+            "label": "person",
+            "confidence": 0.5270200371742249,
+            "bbox": [
+              15.584524154663086,
+              233.99147033691406,
+              30.962583541870117,
+              274.361083984375
+            ]
+          },
+          {
+            "label": "car",
+            "confidence": 0.49894699454307556,
+            "bbox": [
+              123.65443420410156,
+              195.29444885253906,
+              155.5167236328125,
+              224.64993286132812
+            ]
+          },
+          {
+            "label": "car",
+            "confidence": 0.4843303859233856,
+            "bbox": [
+              263.1683349609375,
+              142.02645874023438,
+              280.6450500488281,
+              157.00965881347656
+            ]
+          },
+          {
+            "label": "bus",
+            "confidence": 0.47782230377197266,
+            "bbox": [
+              54.37399673461914,
+              161.44839477539062,
+              124.93199157714844,
+              230.5237579345703
+            ]
+          },
+          {
+            "label": "car",
+            "confidence": 0.4570724070072174,
+            "bbox": [
+              233.61871337890625,
+              168.87193298339844,
+              243.45753479003906,
+              177.72434997558594
+            ]
+          },
+          {
+            "label": "car",
+            "confidence": 0.45617571473121643,
+            "bbox": [
+              222.35214233398438,
+              125.07491302490234,
+              236.6140594482422,
+              136.50164794921875
+            ]
+          }
+        ],
+        "description": "\"A bustling urban scene unfolds with nine cars and one bus traversing the street, while pedestrians navigate the sidewalk. Tall buildings, bathed in natural daylight, form a dense backdrop, accentuating the vibrant city life and human activity under a radiant daytime illumination.\"",
+        "annotated_image_path": "modules/team5_multimodal/result/demo_images/image_09.jpg",
+        "metadata": {
+          "make": "Apple",
+          "model": "iPhone 12 Pro",
+          "lens": "iPhone 12 Pro back triple camera 4.2mm f/1.6",
+          "focal_length": "4.2mm",
+          "focal_length_35mm": null,
+          "aperture": "f/1.6",
+          "shutter_speed": "1/9804",
+          "iso": "32",
+          "datetime": null,
+          "gps": {
+            "lat": 40.758,
+            "lng": -73.9855,
+            "altitude": null
+          },
+          "width": 360,
+          "height": 441
+        }
+      },
+      {
+        "filename": "image_02.heic",
+        "cluster_id": 0,
+        "umap_x": 2.1470389366149902,
+        "umap_y": 0.9604755640029907,
+        "objects": [
+          {
+            "label": "bird",
+            "confidence": 0.7885276079177856,
+            "bbox": [
+              369.1070251464844,
+              94.28180694580078,
+              592.0233154296875,
+              482.3662109375
+            ]
+          },
+          {
+            "label": "bird",
+            "confidence": 0.6655386090278625,
+            "bbox": [
+              157.3517608642578,
+              34.694061279296875,
+              337.4229431152344,
+              500.7905578613281
+            ]
+          }
+        ],
+        "description": "\"Two birds perch on a slender branch amidst a vibrant tapestry of grass and flowers, bathed in warm, soft light. The serene scene exudes tranquility, with the birds' gentle presence harmonizing with the lush surroundings, creating a sense of peaceful coexistence in a natural setting.\"",
+        "annotated_image_path": "modules/team5_multimodal/result/demo_images/image_02.jpg",
+        "metadata": {
+          "make": "Apple",
+          "model": "iPhone 12 Pro",
+          "lens": "iPhone 12 Pro back triple camera 4.2mm f/1.6",
+          "focal_length": "4.2mm",
+          "focal_length_35mm": null,
+          "aperture": "f/1.6",
+          "shutter_speed": "1/9804",
+          "iso": "32",
+          "datetime": null,
+          "gps": {
+            "lat": 37.819899722222225,
+            "lng": -122.4783,
+            "altitude": null
+          },
+          "width": 800,
+          "height": 532
+        }
+      },
+      {
+        "filename": "image_14.heic",
+        "cluster_id": 3,
+        "umap_x": 3.494137763977051,
+        "umap_y": 0.44409874081611633,
+        "objects": [
+          {
+            "label": "car",
+            "confidence": 0.9320740699768066,
+            "bbox": [
+              483.726806640625,
+              601.4611206054688,
+              870.4866333007812,
+              752.369140625
+            ]
+          },
+          {
+            "label": "person",
+            "confidence": 0.7648017406463623,
+            "bbox": [
+              133.57809448242188,
+              584.2915649414062,
+              189.27024841308594,
+              707.26953125
+            ]
+          },
+          {
+            "label": "person",
+            "confidence": 0.6891417503356934,
+            "bbox": [
+              491.7608337402344,
+              564.606689453125,
+              527.4327392578125,
+              654.7470092773438
+            ]
+          },
+          {
+            "label": "person",
+            "confidence": 0.6561967730522156,
+            "bbox": [
+              213.11672973632812,
+              608.1278076171875,
+              273.0561218261719,
+              720.1395874023438
+            ]
+          },
+          {
+            "label": "person",
+            "confidence": 0.6286818981170654,
+            "bbox": [
+              52.86278533935547,
+              580.2797241210938,
+              103.04830169677734,
+              722.0825805664062
+            ]
+          },
+          {
+            "label": "umbrella",
+            "confidence": 0.6176659464836121,
+            "bbox": [
+              202.76202392578125,
+              587.197021484375,
+              262.7431945800781,
+              611.2669067382812
+            ]
+          },
+          {
+            "label": "person",
+            "confidence": 0.612879753112793,
+            "bbox": [
+              447.33270263671875,
+              574.3181762695312,
+              496.2963562011719,
+              701.566162109375
+            ]
+          },
+          {
+            "label": "person",
+            "confidence": 0.6028420925140381,
+            "bbox": [
+              303.4457702636719,
+              572.1358032226562,
+              337.8489990234375,
+              667.0860595703125
+            ]
+          },
+          {
+            "label": "person",
+            "confidence": 0.6011419296264648,
+            "bbox": [
+              372.673828125,
+              576.148681640625,
+              407.4065246582031,
+              687.011474609375
+            ]
+          },
+          {
+            "label": "person",
+            "confidence": 0.5939767956733704,
+            "bbox": [
+              623.8367309570312,
+              568.66845703125,
+              652.5934448242188,
+              606.439453125
+            ]
+          },
+          {
+            "label": "umbrella",
+            "confidence": 0.5915374755859375,
+            "bbox": [
+              119.25723266601562,
+              561.9415283203125,
+              198.37281799316406,
+              588.6217651367188
+            ]
+          },
+          {
+            "label": "person",
+            "confidence": 0.5480046272277832,
+            "bbox": [
+              419.3545837402344,
+              571.1646118164062,
+              453.62530517578125,
+              675.2385864257812
+            ]
+          },
+          {
+            "label": "umbrella",
+            "confidence": 0.5270326137542725,
+            "bbox": [
+              429.9136047363281,
+              552.9033203125,
+              503.7497253417969,
+              588.0247802734375
+            ]
+          },
+          {
+            "label": "umbrella",
+            "confidence": 0.4315987229347229,
+            "bbox": [
+              42.36192321777344,
+              555.96240234375,
+              120.24860382080078,
+              595.1570434570312
+            ]
+          },
+          {
+            "label": "umbrella",
+            "confidence": 0.4172005355358124,
+            "bbox": [
+              365.4457092285156,
+              556.2867431640625,
+              412.78826904296875,
+              576.1159057617188
+            ]
+          }
+        ],
+        "description": "A vibrant nighttime cityscape in Tokyo, Japan, featuring a bustling street lined with neon signs, dense pedestrian traffic comprising 13 individuals, some shielded by umbrellas, and moving vehicles, all under the warm glow of urban illumination, conveying a dynamic, cosmopolitan atmosphere.",
+        "annotated_image_path": "modules/team5_multimodal/result/demo_images/image_14.jpg",
+        "metadata": {
+          "make": "Apple",
+          "model": "iPhone 12 Pro",
+          "lens": "iPhone 12 Pro back triple camera 4.2mm f/1.6",
+          "focal_length": "4.2mm",
+          "focal_length_35mm": null,
+          "aperture": "f/1.6",
+          "shutter_speed": "1/9804",
+          "iso": "32",
+          "datetime": null,
+          "gps": {
+            "lat": 32.65769972222222,
+            "lng": 51.677299999999995,
+            "altitude": null
+          },
+          "width": 900,
+          "height": 1200
+        }
+      },
+      {
+        "filename": "IMG_7735.HEIC",
+        "cluster_id": 3,
+        "umap_x": 3.6635618209838867,
+        "umap_y": -0.4352109730243683,
+        "objects": [
+          {
+            "label": "car",
+            "confidence": 0.8907089829444885,
+            "bbox": [
+              0.0,
+              2792.25244140625,
+              1559.315185546875,
+              3868.4541015625
+            ]
+          },
+          {
+            "label": "car",
+            "confidence": 0.7788249254226685,
+            "bbox": [
+              3084.52880859375,
+              2509.567138671875,
+              3751.743896484375,
+              3150.0458984375
+            ]
+          },
+          {
+            "label": "car",
+            "confidence": 0.6614119410514832,
+            "bbox": [
+              2289.577392578125,
+              2176.689697265625,
+              2773.63330078125,
+              2561.462158203125
+            ]
+          },
+          {
+            "label": "car",
+            "confidence": 0.5511418581008911,
+            "bbox": [
+              3544.175048828125,
+              2212.40771484375,
+              3868.19873046875,
+              2543.6435546875
+            ]
+          },
+          {
+            "label": "motorcycle",
+            "confidence": 0.4756179451942444,
+            "bbox": [
+              2541.682373046875,
+              4184.2880859375,
+              2945.34375,
+              5041.81103515625
+            ]
+          }
+        ],
+        "description": "\"A residential scene features a row of parked vehicles in a driveway adjacent to a house. Four white cars and one motorcycle are aligned in a diagonal composition, illuminated by soft, natural daylight, suggesting a quiet suburban setting with a focus on personal transportation.\"",
+        "annotated_image_path": "modules/team5_multimodal/result/demo_images/IMG_7735.jpg",
+        "metadata": {
+          "make": "Apple",
+          "model": "iPhone 16 Plus",
+          "lens": "iPhone 16 Plus back dual wide camera 5.96mm f/1.6",
+          "focal_length": "5.960000038146973mm",
+          "focal_length_35mm": "26mm",
+          "aperture": "f/1.6",
+          "shutter_speed": "1/50",
+          "iso": "160",
+          "datetime": "2026:04:27 18:17:27",
+          "gps": {
+            "lat": 16.75307777777778,
+            "lng": 78.03826944444444,
+            "altitude": 521.4206241519674
+          },
+          "width": 4284,
+          "height": 5712
+        }
+      },
+      {
+        "filename": "image_15.heic",
+        "cluster_id": 1,
+        "umap_x": 3.774872064590454,
+        "umap_y": 1.1850885152816772,
+        "objects": [
+          {
+            "label": "laptop",
+            "confidence": 0.92103111743927,
+            "bbox": [
+              2997.189453125,
+              1774.0587158203125,
+              4120.73193359375,
+              2653.490478515625
+            ]
+          },
+          {
+            "label": "person",
+            "confidence": 0.9069728255271912,
+            "bbox": [
+              56.18846130371094,
+              817.7904052734375,
+              1483.5963134765625,
+              2656.945068359375
+            ]
+          },
+          {
+            "label": "person",
+            "confidence": 0.9008678197860718,
+            "bbox": [
+              1277.5704345703125,
+              822.2512817382812,
+              2620.00927734375,
+              2303.44482421875
+            ]
+          },
+          {
+            "label": "cup",
+            "confidence": 0.8608726263046265,
+            "bbox": [
+              1204.895751953125,
+              2363.19580078125,
+              1470.5172119140625,
+              2829.796142578125
+            ]
+          },
+          {
+            "label": "person",
+            "confidence": 0.853316605091095,
+            "bbox": [
+              3439.008544921875,
+              905.6503295898438,
+              4998.0048828125,
+              3278.17724609375
+            ]
+          },
+          {
+            "label": "book",
+            "confidence": 0.6070922613143921,
+            "bbox": [
+              0.0,
+              2640.974365234375,
+              1120.7266845703125,
+              3053.776123046875
+            ]
+          }
+        ],
+        "description": "Three individuals sit at a table, surrounded by laptops, papers, and a cup, engaged in a collaborative discussion. One person gestures towards another, while a book lies open, bathed in soft, natural light, conveying a sense of focused teamwork and intellectual pursuit.",
+        "annotated_image_path": "modules/team5_multimodal/result/demo_images/image_15.jpg",
+        "metadata": {
+          "make": "Apple",
+          "model": "iPhone 12 Pro",
+          "lens": "iPhone 12 Pro back triple camera 4.2mm f/1.6",
+          "focal_length": "4.2mm",
+          "focal_length_35mm": null,
+          "aperture": "f/1.6",
+          "shutter_speed": "1/9804",
+          "iso": "32",
+          "datetime": null,
+          "gps": {
+            "lat": 36.054399999999994,
+            "lng": -112.1401,
+            "altitude": null
+          },
+          "width": 5000,
+          "height": 3337
+        }
+      }
+    ],
+    "cluster_summaries": [
+      {
+        "cluster_id": 0,
+        "description": "Nature Scenes",
+        "count": 6
+      },
+      {
+        "cluster_id": 1,
+        "description": "Team Meetings",
+        "count": 3
+      },
+      {
+        "cluster_id": 2,
+        "description": "Cricket Games",
+        "count": 3
+      },
+      {
+        "cluster_id": 3,
+        "description": "City Streets",
+        "count": 3
+      }
+    ],
+    "plot_file_path": "shared_workspace/2_processed_data/cluster_plot_9f13ec6f.png",
+    "metadata": {
+      "total_duration_sec": 48.94,
+      "input_tokens": 881,
+      "output_tokens": 43,
+      "total_tokens": 924,
+      "model": "llama-3.3-70b-versatile",
+      "provider": "Groq",
+      "vision_model": "meta-llama/llama-4-scout-17b-16e-instruct",
+      "vision_provider": "Groq Vision"
+    }
+  }
+}

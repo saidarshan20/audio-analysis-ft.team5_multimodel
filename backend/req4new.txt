@@ -1,0 +1,8 @@
+openai
+azure-ai-formrecognizer
+azure-storage-blob
+presidio-analyzer
+presidio-anonymizer
+numpy
+python-dotenv
+httpx

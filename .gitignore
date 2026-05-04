@@ -1,0 +1,60 @@
+# ── Environment & Secrets ──────────────────────────────────────────────────────
+.env
+.env.*
+!.env.example
+
+# ── Python ─────────────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.egg-info/
+*.egg
+.eggs/
+dist/
+build/
+*.so
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# ── Virtual Environment ────────────────────────────────────────────────────────
+venv/
+.venv/
+env/
+
+# ── Node / Frontend ────────────────────────────────────────────────────────────
+node_modules/
+frontend/dist/
+frontend/.vite/
+*.tsbuildinfo
+
+# ── Uploads & User Data ────────────────────────────────────────────────────────
+backend/uploads/
+backend/shared_workspace/1_raw_uploads/
+backend/shared_workspace/2_processed_data/
+backend/shared_workspace/feature_eng_intermediate_data/
+backend/shared_workspace/data_gov_staging/
+backend/data/search_index/
+
+# ── ML Models (large binaries) ────────────────────────────────────────────────
+*.pt
+*.pth
+*.onnx
+*.h5
+*.pkl
+*.joblib
+
+# ── Logs ──────────────────────────────────────────────────────────────────────
+*.log
+logs/
+
+# ── OS & Editor ───────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# ── Installers ────────────────────────────────────────────────────────────────
+*.exe
+*.msi

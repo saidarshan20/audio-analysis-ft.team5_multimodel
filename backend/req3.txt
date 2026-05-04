@@ -1,0 +1,60 @@
+# ===== Core API =====
+fastapi
+uvicorn[standard]
+python-multipart
+pydantic
+pydantic-settings
+python-dotenv
+
+# ===== Database =====
+sqlalchemy
+aiosqlite
+
+# ===== Auth =====
+bcrypt
+python-jose
+
+# ===== AutoML =====
+pandas
+scikit-learn
+lightgbm
+joblib
+
+# ===== OCR =====
+pytesseract
+easyocr
+pdf2image
+Pillow
+PyPDF2
+
+# ===== Table Extraction =====
+camelot-py[cv]
+tabula-py
+
+# ===== NLP =====
+spacy
+nltk
+textblob
+langdetect
+
+# ===== Visualization =====
+wordcloud
+matplotlib
+networkx
+
+# ===== Semantic Search =====
+sentence-transformers
+faiss-cpu
+chromadb
+
+# ===== Azure (install when access is granted) =====
+azure-ai-documentintelligence
+# azure-ai-textanalytics
+# azure-identity
+azure-storage-blob
+openai
+
+# ===== Utilities =====
+aiofiles
+uuid6
+httpx

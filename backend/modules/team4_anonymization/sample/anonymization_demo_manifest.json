@@ -1,0 +1,196 @@
+{
+  "samples": [
+    {
+      "id": "structured",
+      "label": "Structured CSV Demo",
+      "kind": "structured",
+      "description": "Synthetic customer data with direct identifiers, quasi-identifiers, and financial attributes.",
+      "source_file": "synthetic_customers.csv",
+      "result_file": "synthetic_customers_anonymized_sample.csv",
+      "selected_policies": ["Global", "US"],
+      "technique_map": {
+        "name": "anonymize",
+        "email": "mask",
+        "age": "generalize",
+        "city": "generalize",
+        "income": "perturb",
+        "first_purchase_date": "k-anonymize",
+        "last_purchase_date": "k-anonymize"
+      },
+      "classification": {
+        "status": "success",
+        "result": {
+          "Column Name": ["customer_id", "name", "email", "age", "gender", "city", "country", "income", "credit_score", "loyalty_points", "first_purchase_date", "last_purchase_date", "total_spent", "avg_order_value", "favorite_category", "device_type", "churn_risk", "subscription", "marketing_opt_in", "support_tickets"],
+          "Data Types": ["object", "object", "object", "int64", "object", "object", "object", "float64", "int64", "int64", "object", "object", "float64", "float64", "object", "object", "float64", "bool", "bool", "int64"],
+          "PII_Type_LLM": ["NONE", "PERSON_NAME", "EMAIL_ADDRESS", "AGE", "NONE", "LOCATION", "NONE", "FINANCIAL_INFORMATION", "NONE", "NONE", "DATE_TIME", "DATE_TIME", "NONE", "NONE", "NONE", "NONE", "NONE", "NONE", "NONE", "NONE"],
+          "PII_Type_NER": [null, "PERSON", "EMAIL_ADDRESS", null, null, "LOCATION", null, null, null, null, "DATE_TIME", "DATE_TIME", null, null, null, null, null, null, null, null],
+          "Sensiivity": ["PUBLIC", "CONFIDENTIAL", "CONFIDENTIAL", "INTERNAL", "PUBLIC", "INTERNAL", "PUBLIC", "RESTRICTED", "PUBLIC", "PUBLIC", "INTERNAL", "INTERNAL", "PUBLIC", "PUBLIC", "PUBLIC", "PUBLIC", "PUBLIC", "PUBLIC", "PUBLIC", "PUBLIC"],
+          "Risk": ["LOW", "HIGH", "HIGH", "MEDIUM", "LOW", "MEDIUM", "LOW", "HIGH", "LOW", "LOW", "MEDIUM", "MEDIUM", "LOW", "LOW", "LOW", "LOW", "LOW", "LOW", "LOW", "LOW"],
+          "Sample Value": ["CUST-45131", "Jessica Jenkins", "jennajones@example.org", "65", "Non-binary", "Walshshire", "Equatorial Guinea", "131479.15", "481", "4822", "2022-10-23", "2024-10-27", "3265.97", "71.0", "Toys", "Mobile", "0.38", "False", "True", "1"]
+        },
+        "raw_preview": [
+          { "customer_id": "CUST-45131", "name": "Jessica Jenkins", "email": "jennajones@example.org", "age": 65, "gender": "Non-binary", "city": "Walshshire", "country": "Equatorial Guinea", "income": 131479.15, "credit_score": 481, "loyalty_points": 4822, "first_purchase_date": "2022-10-23", "last_purchase_date": "2024-10-27", "total_spent": 3265.97, "avg_order_value": 71.0, "favorite_category": "Toys", "device_type": "Mobile", "churn_risk": 0.38, "subscription": false, "marketing_opt_in": true, "support_tickets": 1 },
+          { "customer_id": "CUST-74728", "name": "Miranda Turner", "email": "paulmcgee@example.com", "age": 66, "gender": "Female", "city": "Port Louisside", "country": "Heard Island and McDonald Islands", "income": 104820.03, "credit_score": 715, "loyalty_points": 1998, "first_purchase_date": "2022-03-18", "last_purchase_date": "2024-07-20", "total_spent": 8016.76, "avg_order_value": 190.88, "favorite_category": "Electronics", "device_type": "Desktop", "churn_risk": 0.13, "subscription": false, "marketing_opt_in": true, "support_tickets": 8 },
+          { "customer_id": "CUST-57845", "name": "Kelly Smith", "email": "iprince@example.com", "age": 44, "gender": "Female", "city": "Lake Corychester", "country": "Estonia", "income": 109749.17, "credit_score": 312, "loyalty_points": 1486, "first_purchase_date": "2020-09-04", "last_purchase_date": "2025-01-25", "total_spent": 7828.5, "avg_order_value": 186.39, "favorite_category": "Books", "device_type": "Desktop", "churn_risk": 0.19, "subscription": false, "marketing_opt_in": false, "support_tickets": 6 },
+          { "customer_id": "CUST-88800", "name": "Kenneth Smith", "email": "dsaunders@example.org", "age": 55, "gender": "Non-binary", "city": "North Robert", "country": "Gibraltar", "income": 82404.93, "credit_score": 732, "loyalty_points": 2697, "first_purchase_date": "2022-10-16", "last_purchase_date": "2024-05-10", "total_spent": 4184.57, "avg_order_value": 92.99, "favorite_category": "Beauty", "device_type": "Desktop", "churn_risk": 0.05, "subscription": true, "marketing_opt_in": true, "support_tickets": 3 },
+          { "customer_id": "CUST-91943", "name": "Brian Miller", "email": "tmorris@example.com", "age": 22, "gender": "Non-binary", "city": "Annefurt", "country": "Falkland Islands (Malvinas)", "income": 52149.52, "credit_score": 795, "loyalty_points": 3362, "first_purchase_date": "2020-06-21", "last_purchase_date": "2024-07-25", "total_spent": 2559.5, "avg_order_value": 134.71, "favorite_category": "Home & Kitchen", "device_type": "Mobile", "churn_risk": 0.05, "subscription": false, "marketing_opt_in": true, "support_tickets": 8 }
+        ],
+        "ai_summary": "Customer identity, contact, location, temporal, and income fields were detected. Recommended strategy mixes pseudonymization, masking, generalization, and perturbation to preserve utility.",
+        "num_rows": 5000,
+        "num_cols": 20
+      },
+      "results": {
+        "status": "success",
+        "filename": "synthetic_customers_anonymized_sample.csv",
+        "masked_preview": [
+          { "customer_id": "CUST-45131", "name": "User_5208", "email": "j***@e**************", "age": "65-69", "gender": "Non-binary", "city": "Regional Cluster A", "country": "Equatorial Guinea", "income": "129100", "credit_score": "481", "loyalty_points": "4822", "first_purchase_date": "2022", "last_purchase_date": "2024", "total_spent": "3265.97", "avg_order_value": "71", "favorite_category": "Toys", "device_type": "Mobile", "churn_risk": "0.38", "subscription": "False", "marketing_opt_in": "True", "support_tickets": "1" },
+          { "customer_id": "CUST-74728", "name": "User_5312", "email": "p***@e***********", "age": "65-69", "gender": "Female", "city": "Regional Cluster B", "country": "Heard Island and McDonald Islands", "income": "106900", "credit_score": "715", "loyalty_points": "1998", "first_purchase_date": "2022", "last_purchase_date": "2024", "total_spent": "8016.76", "avg_order_value": "190.88", "favorite_category": "Electronics", "device_type": "Desktop", "churn_risk": "0.13", "subscription": "False", "marketing_opt_in": "True", "support_tickets": "8" },
+          { "customer_id": "CUST-57845", "name": "User_4743", "email": "i***@e***********", "age": "40-44", "gender": "Female", "city": "Regional Cluster C", "country": "Estonia", "income": "111800", "credit_score": "312", "loyalty_points": "1486", "first_purchase_date": "2020", "last_purchase_date": "2025", "total_spent": "7828.5", "avg_order_value": "186.39", "favorite_category": "Books", "device_type": "Desktop", "churn_risk": "0.19", "subscription": "False", "marketing_opt_in": "False", "support_tickets": "6" },
+          { "customer_id": "CUST-88800", "name": "User_5019", "email": "d***@e**************", "age": "55-59", "gender": "Non-binary", "city": "Regional Cluster D", "country": "Gibraltar", "income": "83800", "credit_score": "732", "loyalty_points": "2697", "first_purchase_date": "2022", "last_purchase_date": "2024", "total_spent": "4184.57", "avg_order_value": "92.99", "favorite_category": "Beauty", "device_type": "Desktop", "churn_risk": "0.05", "subscription": "True", "marketing_opt_in": "True", "support_tickets": "3" },
+          { "customer_id": "CUST-91943", "name": "User_4337", "email": "t***@e***********", "age": "20-24", "gender": "Non-binary", "city": "Regional Cluster E", "country": "Falkland Islands (Malvinas)", "income": "53200", "credit_score": "795", "loyalty_points": "3362", "first_purchase_date": "2020", "last_purchase_date": "2024", "total_spent": "2559.5", "avg_order_value": "134.71", "favorite_category": "Home & Kitchen", "device_type": "Mobile", "churn_risk": "0.05", "subscription": "False", "marketing_opt_in": "True", "support_tickets": "8" }
+        ],
+        "num_copies": 1
+      }
+    },
+    {
+      "id": "unstructured",
+      "label": "Unstructured Document Demo",
+      "kind": "unstructured",
+      "description": "Research-paper style excerpt with author names, email addresses, affiliations, and phone contact details.",
+      "source_file": "Paper_57-Personally_Identifiable_Information_PII_Detection.pdf",
+      "result_file": "pii_paper_excerpt_anonymized.txt",
+      "selected_policies": ["Global"],
+      "technique_map": {
+        "PERSON_NAME": "suppress",
+        "EMAIL_ADDRESS": "mask",
+        "PHONE_NUMBER": "suppress",
+        "LOCATION": "generalize"
+      },
+      "classification": {
+        "status": "success",
+        "results": [
+          { "line_number": 2, "line_text": "Authors: Dr. Emily Carter, Ravi Menon and Sofia Lee...", "text_span": "Dr. Emily Carter", "llm_pii_type": "PERSON_NAME", "presidio_pii_type": "PERSON", "status": "DETECTED" },
+          { "line_number": 2, "line_text": "Authors: Dr. Emily Carter, Ravi Menon and Sofia Lee...", "text_span": "Ravi Menon", "llm_pii_type": "PERSON_NAME", "presidio_pii_type": "PERSON", "status": "DETECTED" },
+          { "line_number": 2, "line_text": "Authors: Dr. Emily Carter, Ravi Menon and Sofia Lee...", "text_span": "Sofia Lee", "llm_pii_type": "PERSON_NAME", "presidio_pii_type": "PERSON", "status": "DETECTED" },
+          { "line_number": 3, "line_text": "Contact: emily.carter@healthlab.org | +1 202-555-0142", "text_span": "emily.carter@healthlab.org", "llm_pii_type": "EMAIL_ADDRESS", "presidio_pii_type": "EMAIL_ADDRESS", "status": "DETECTED" },
+          { "line_number": 3, "line_text": "Contact: emily.carter@healthlab.org | +1 202-555-0142", "text_span": "+1 202-555-0142", "llm_pii_type": "PHONE_NUMBER", "presidio_pii_type": "PHONE_NUMBER", "status": "DETECTED" },
+          { "line_number": 4, "line_text": "Affiliation: Center for Medical Analytics, Boston, Massachusetts", "text_span": "Boston, Massachusetts", "llm_pii_type": "LOCATION", "presidio_pii_type": "LOCATION", "status": "DETECTED" }
+        ],
+        "entities": [
+          { "type": "PERSON_NAME", "label": "Person Name", "confidence": "95.0%", "status": "CRITICAL", "defaultTech": "anonymize", "count": 3 },
+          { "type": "EMAIL_ADDRESS", "label": "Email Address", "confidence": "96.0%", "status": "CRITICAL", "defaultTech": "mask", "count": 1 },
+          { "type": "PHONE_NUMBER", "label": "Phone Number", "confidence": "94.0%", "status": "CRITICAL", "defaultTech": "mask", "count": 1 },
+          { "type": "LOCATION", "label": "Location", "confidence": "90.0%", "status": "QUASI", "defaultTech": "generalize", "count": 1 }
+        ],
+        "raw_entities": [
+          { "entity": "PERSON_NAME", "value": "Dr. Emily Carter", "start": 56, "end": 72, "confidence": 0.97, "source": "LLM" },
+          { "entity": "PERSON_NAME", "value": "Ravi Menon", "start": 74, "end": 84, "confidence": 0.95, "source": "LLM" },
+          { "entity": "PERSON_NAME", "value": "Sofia Lee", "start": 89, "end": 98, "confidence": 0.94, "source": "LLM" },
+          { "entity": "EMAIL_ADDRESS", "value": "emily.carter@healthlab.org", "start": 108, "end": 135, "confidence": 0.98, "source": "Regex" },
+          { "entity": "PHONE_NUMBER", "value": "+1 202-555-0142", "start": 138, "end": 153, "confidence": 0.96, "source": "Regex" },
+          { "entity": "LOCATION", "value": "Boston, Massachusetts", "start": 194, "end": 215, "confidence": 0.9, "source": "NER" }
+        ],
+        "lines_processed": 7,
+        "pii_candidates_found": 6,
+        "pii_confirmed": 6,
+        "ai_summary": "The document contains direct identifiers in author and contact sections. Suppression for names and phone numbers with masking for email keeps the academic context readable.",
+        "metrics": { "risk_score": 87, "risk_level": "High", "pii_density": 0.31, "top_entity": "PERSON_NAME" },
+        "preview": "Title: Personally Identifiable Information Detection in Clinical Narratives\nAuthors: Dr. Emily Carter, Ravi Menon and Sofia Lee\nContact: emily.carter@healthlab.org | +1 202-555-0142\nAffiliation: Center for Medical Analytics, Boston, Massachusetts\nThis paper evaluates contextual privacy-preserving pipelines for mixed medical and administrative text.\nThe experimental section compares regex, NER, and LLM-assisted detectors for recall and precision.\n"
+      },
+      "results": {
+        "status": "success",
+        "filename": "pii_paper_excerpt_anonymized.txt",
+        "media_type": "text/plain",
+        "preview": "Title: Personally Identifiable Information Detection in Clinical Narratives\nAuthors: [PERSON_REMOVED], [PERSON_REMOVED] and [PERSON_REMOVED]\nContact: e***********************@h************.*** | [PHONE_REDACTED]\nAffiliation: Center for Medical Analytics, [REGION_GENERALIZED]\nThis paper evaluates contextual privacy-preserving pipelines for mixed medical and administrative text.\nThe experimental section compares regex, NER, and LLM-assisted detectors for recall and precision.\n",
+        "full_text": "Title: Personally Identifiable Information Detection in Clinical Narratives\nAuthors: [PERSON_REMOVED], [PERSON_REMOVED] and [PERSON_REMOVED]\nContact: e***********************@h************.*** | [PHONE_REDACTED]\nAffiliation: Center for Medical Analytics, [REGION_GENERALIZED]\nThis paper evaluates contextual privacy-preserving pipelines for mixed medical and administrative text.\nThe experimental section compares regex, NER, and LLM-assisted detectors for recall and precision.\n",
+        "entities": [
+          { "entity": "PERSON_NAME", "value": "Dr. Emily Carter" },
+          { "entity": "PERSON_NAME", "value": "Ravi Menon" },
+          { "entity": "PERSON_NAME", "value": "Sofia Lee" },
+          { "entity": "EMAIL_ADDRESS", "value": "emily.carter@healthlab.org" },
+          { "entity": "PHONE_NUMBER", "value": "+1 202-555-0142" },
+          { "entity": "LOCATION", "value": "Boston, Massachusetts" }
+        ],
+        "entity_summary": [
+          { "type": "PERSON_NAME", "label": "Person Name", "confidence": "95.0%", "status": "CRITICAL", "defaultTech": "suppress", "count": 3 },
+          { "type": "EMAIL_ADDRESS", "label": "Email Address", "confidence": "96.0%", "status": "CRITICAL", "defaultTech": "mask", "count": 1 },
+          { "type": "PHONE_NUMBER", "label": "Phone Number", "confidence": "94.0%", "status": "CRITICAL", "defaultTech": "suppress", "count": 1 },
+          { "type": "LOCATION", "label": "Location", "confidence": "90.0%", "status": "QUASI", "defaultTech": "generalize", "count": 1 }
+        ],
+        "ai_summary": "Precomputed demo output removed named contacts and generalized the affiliation location while preserving the research narrative.",
+        "num_copies": 1
+      }
+    },
+    {
+      "id": "image",
+      "label": "Image Demo",
+      "kind": "image",
+      "description": "Identity card sample with a detected face region plus direct identifiers that are pre-anonymized for the demo.",
+      "source_file": "download.jpg",
+      "result_file": "redacted_download.jpg",
+      "selected_policies": ["Global"],
+      "technique_map": {
+        "FACE": "blur",
+        "PERSON_NAME": "blur",
+        "DATE_TIME": "none",
+        "LOCATION": "none"
+      },
+      "classification": {
+        "status": "success",
+        "entities": [
+          { "entity_type": "FACE", "score": 0.99, "left": 9, "top": 116, "width": 123, "height": 123 },
+          { "entity_type": "PERSON_NAME", "score": 0.98, "left": 145, "top": 108, "width": 187, "height": 38 },
+          { "entity_type": "DATE_TIME", "score": 0.95, "left": 146, "top": 204, "width": 142, "height": 35 },
+          { "entity_type": "LOCATION", "score": 0.96, "left": 145, "top": 240, "width": 211, "height": 26 }
+        ],
+        "ai_summary": "The sample ID contains a visible face plus direct identifiers in the header, name, birth date, and address lines. Face blur is applied to the portrait while text identifiers are fully masked.",
+        "metrics": { "risk_score": 93, "risk_level": "High", "pii_density": 0.41, "top_entity": "FACE" }
+      },
+      "results": {
+        "status": "success",
+        "filename": "redacted_download.jpg",
+        "media_type": "image/jpeg",
+        "metadata": { "entities_found": 4 },
+        "num_copies": 1
+      }
+    },
+    {
+      "id": "audio",
+      "label": "Audio Demo",
+      "kind": "audio",
+      "description": "Speech sample with person, passport, phone, date, location, and phone number entities preloaded for mute-based demo playback.",
+      "source_file": "speechma_audio_Prabhat_at_3_53_17 PM_on_April_22nd_2026.mp3",
+      "result_file": "redacted_speechma_audio_Prabhat_at_3_53_17 PM_on_April_22nd_2026.wav",
+      "selected_policies": ["Global", "US"],
+      "technique_map": {
+        "PERSON": "mute",
+        "PASSPORT": "mute",
+        "PHONE": "mute",
+        "DATE_TIME": "mute",
+        "LOCATION": "mute",
+        "PHONE_NUMBER": "mute"
+      },
+      "classification": {
+        "status": "success",
+        "transcript": "This is Rahul Sharma speaking. My passport is 458921. My phone is 9876543210. My date of birth is 14th March 1998. I am from Noida. Alternate phone number is 3456789012.",
+        "entities": [
+          { "entity_type": "PERSON", "value": "Rahul Sharma", "score": 0.96, "start_time": 0.8, "end_time": 1.9 },
+          { "entity_type": "PASSPORT", "value": "458921", "score": 0.95, "start_time": 3.1, "end_time": 3.8 },
+          { "entity_type": "PHONE", "value": "9876543210", "score": 0.97, "start_time": 5.2, "end_time": 6.3 },
+          { "entity_type": "DATE_TIME", "value": "14th March 1998", "score": 0.94, "start_time": 7.4, "end_time": 8.9 },
+          { "entity_type": "LOCATION", "value": "Noida", "score": 0.92, "start_time": 10.1, "end_time": 10.7 },
+          { "entity_type": "PHONE_NUMBER", "value": "3456789012", "score": 0.97, "start_time": 12.4, "end_time": 13.5 }
+        ],
+        "duration": 15.9,
+        "metrics": { "risk_score": 90, "risk_level": "High", "pii_density": 0.36, "top_entity": "PERSON" },
+        "ai_summary": "The sample transcript contains direct spoken identifiers across identity, document, contact, date, and location fields. All detected audio entities are configured to use mute in the demo output."
+      },
+      "results": {
+        "status": "success",
+        "filename": "redacted_speechma_audio_Prabhat_at_3_53_17 PM_on_April_22nd_2026.wav",
+        "media_type": "audio/wav",
+        "num_copies": 1
+      }
+    }
+  ]
+}

@@ -1,0 +1,12 @@
+[
+    {
+        "id": "housing",
+        "name": "Housing Prices",
+        "filename": "housing_sample.csv",
+        "category": "Outliers & Regression",
+        "description": "Estimate sale prices based on house features. Ideal for outlier detection and skewed distributions.",
+        "target": "price",
+        "rows": 1460,
+        "cols": 11
+    }
+]

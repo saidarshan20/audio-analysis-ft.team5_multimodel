@@ -1,0 +1,525 @@
+/* ── Base Layout ── */
+.dp-page {
+  min-height: 100vh;
+  padding: 32px 24px;
+  background: var(--bg-main);
+}
+
+.dp-container {
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+/* ── Header ── */
+.dp-header-section {
+  text-align: center;
+  margin-bottom: 48px;
+}
+
+.dp-title {
+  font-size: 42px;
+  font-weight: 800;
+  background: linear-gradient(135deg, var(--brand), var(--brand-light));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  margin-bottom: 8px;
+}
+
+.dp-subtitle {
+  color: var(--t-secondary);
+  font-size: 18px;
+}
+
+.dp-search-bar {
+  display: flex;
+  max-width: 600px;
+  margin: 24px auto 0;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-mid);
+  border-radius: 999px;
+  padding: 6px 6px 6px 20px;
+  box-shadow: var(--shadow-sm);
+}
+
+.dp-search-input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--t-primary);
+}
+
+.dp-search-btn {
+  background: var(--brand);
+  color: white;
+  border: none;
+  border-radius: 999px;
+  padding: 10px 24px;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+/* ── Grid Layout with Sidebar ── */
+.dp-content-grid {
+  display: grid;
+  grid-template-columns: 320px 1fr;
+  gap: 32px;
+}
+
+/* ── Filter Sidebar ── */
+.dp-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  position: sticky;
+  top: 24px;
+  height: fit-content;
+}
+
+.dp-filter-panel {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-mid);
+  border-radius: var(--r-lg);
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.df-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.df-label {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--t-primary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.df-search-wrapper {
+  position: relative;
+  width: 100%;
+}
+
+/* ── Famous Tags Additions ── */
+.df-famous-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  max-height: 250px;
+  overflow-y: auto;
+  padding-bottom: 4px;
+}
+
+.df-famous-tags::-webkit-scrollbar {
+  width: 4px;
+}
+
+.df-famous-tags::-webkit-scrollbar-thumb {
+  background: var(--border-mid);
+  border-radius: 4px;
+}
+
+.df-famous-tag {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-mid);
+  color: var(--t-secondary);
+  font-size: 12px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: all 0.2s;
+  outline: none;
+}
+
+.df-famous-tag:hover {
+  border-color: var(--brand);
+  color: var(--t-primary);
+}
+
+.df-famous-tag.active {
+  background: var(--brand);
+  color: white;
+  border-color: var(--brand);
+}
+
+/* Size range */
+.df-range {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.df-num-input {
+  width: 100%;
+  padding: 10px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-mid);
+  border-radius: 8px;
+  color: var(--t-primary);
+  font-size: 14px;
+}
+
+.df-num-input::-webkit-outer-spin-button,
+.df-num-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.df-num-input[type=number] {
+  -moz-appearance: textfield;
+}
+
+/* Filter Pills */
+.df-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.df-pill {
+  padding: 8px 14px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-mid);
+  border-radius: 999px;
+  color: var(--t-secondary);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.df-pill:hover {
+  border-color: var(--brand);
+}
+
+.df-pill.active {
+  background: var(--brand);
+  border-color: var(--brand);
+  color: white;
+}
+
+.df-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border-dim);
+}
+
+.df-btn {
+  padding: 10px 20px;
+  border-radius: 999px;
+  font-weight: 600;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.df-btn--ghost {
+  background: transparent;
+  border: none;
+  color: var(--t-secondary);
+}
+
+.df-btn--primary {
+  background: white;
+  color: black;
+  border: none;
+}
+
+/* ── Main Content Area ── */
+.dp-main {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.dp-main-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.dp-sort-select {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-mid);
+  padding: 8px 12px;
+  border-radius: 8px;
+  color: var(--t-primary);
+  cursor: pointer;
+  outline: none;
+  font-size: 14px;
+}
+
+.dp-sort-select:hover, .dp-sort-select:focus {
+  border-color: var(--brand);
+}
+
+.dp-sort-select option {
+  background: var(--bg-surface);
+  color: var(--t-primary);
+}
+
+/* Cards */
+.dp-dataset-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 24px;
+}
+
+.dp-dataset-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-mid);
+  border-radius: var(--r-lg);
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  transition: transform 0.3s;
+  height: 100%;
+}
+
+.dp-dataset-card:hover {
+  transform: translateY(-4px);
+  border-color: var(--brand);
+}
+
+.dp-card-header {
+  display: flex;
+  gap: 12px;
+}
+
+.dp-card-icon {
+  color: var(--brand);
+}
+
+.dp-card-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--t-primary);
+  margin-bottom: 4px;
+}
+
+.dp-card-author {
+  font-size: 13px;
+  color: var(--t-secondary);
+}
+
+.dp-card-desc {
+  font-size: 14px;
+  color: var(--t-secondary);
+  line-height: 1.5;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* Tags on Card */
+.dp-card-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: auto;
+}
+
+.dp-card-tag {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-mid);
+  color: var(--t-secondary);
+  font-size: 11px;
+  padding: 3px 8px;
+  border-radius: 4px;
+  white-space: nowrap;
+}
+
+/* Footer & Actions */
+.dp-card-footer {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  border-top: 1px solid var(--border-dim);
+  padding-top: 16px;
+}
+
+.dp-card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  font-size: 13px;
+  color: var(--t-secondary);
+  align-items: center;
+}
+/* --- Add this new block --- */
+.dp-stat-dl {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px; /* Space between icon and number */
+  color: var(--t-secondary); /* Matches your other stats */
+}
+
+.dp-dl-icon {
+  color: var(--t-secondary); /* Matches the color of the text */
+  flex-shrink: 0;
+}
+.dp-card-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+}
+
+.dp-kaggle-link {
+  color: var(--brand);
+  text-decoration: none;
+  font-size: 13px;
+  font-weight: 600;
+  transition: opacity 0.2s;
+}
+
+.dp-kaggle-link:hover {
+  opacity: 0.8;
+  text-decoration: underline;
+}
+
+.dp-download-btn {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-mid);
+  color: var(--t-primary);
+  padding: 8px 16px;
+  border-radius: 8px;
+  cursor: pointer;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  font-weight: 600;
+}
+
+.dp-download-btn:hover {
+  background: var(--brand);
+  color: white;
+}
+
+/* Pagination */
+.dp-pagination {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 16px;
+  margin-top: 40px;
+}
+
+.dp-page-btn {
+  padding: 10px 20px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-mid);
+  border-radius: 8px;
+  color: var(--t-primary);
+}
+
+.dp-page-btn:disabled {
+  opacity: 0.3;
+}
+.dp-divider {
+  margin: 0 12px;
+  color: var(--border-mid);
+  font-weight: 300;
+}
+
+.dp-credential {
+  font-family: 'Roboto Mono', monospace; /* Or any mono font */
+  font-size: 14px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--brand); /* Gives it the 'official' look */
+}
+/* ═══════════════════════════════════════════════════════════
+   FOOTER – Premium Glassmorphism (Inspired by Navbar)
+═══════════════════════════════════════════════════════════ */
+
+.dp-footer {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 1000;
+  /* Matches Navbar Background & Blur exactly */
+  background: rgba(4, 6, 15, 0.85);
+  backdrop-filter: blur(24px) saturate(200%);
+  -webkit-backdrop-filter: blur(24px) saturate(200%);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 14px 0;
+  transition: background 0.35s ease;
+}
+
+/* The Animated Glow Line at the TOP of the footer */
+.footer-glow-line {
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(251, 140, 54, 0.65) 25%, /* Navbar Brand Orange */
+    rgba(56, 189, 248, 0.55) 75%, /* Navbar Blue Accent */
+    transparent 100%
+  );
+  background-size: 200% 100%;
+  animation: footerGlowSweep 4s ease-in-out infinite alternate;
+  opacity: 0.8;
+}
+
+@keyframes footerGlowSweep {
+  from { background-position: 0% 0; }
+  to   { background-position: 200% 0; }
+}
+
+.dp-footer-container {
+  max-width: 1600px;
+  margin: 0 auto;
+  padding: 0 28px;
+  display: flex;
+  justify-content: center;
+}
+
+.dp-footer-text {
+  font-size: 11px;
+  font-weight: 500;
+  /* Premium silver-white text like Navbar brand */
+  color: rgba(238, 241, 255, 0.7);
+  letter-spacing: 0.03em;
+  margin: 0;
+  line-height: 1.5;
+  text-align: center;
+}
+
+.dp-footer-ntt {
+  color: #fff;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.dp-footer-tag {
+  color: #fb8c36; /* Using your exact Navbar brand orange */
+  font-weight: 600;
+  margin-left: 8px;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.dp-footer-divider {
+  margin: 0 14px;
+  opacity: 0.2;
+}
+
+/* Adjust page bottom so content isn't clipped */
+.dp-page {
+  padding-bottom: 80px !important;
+}

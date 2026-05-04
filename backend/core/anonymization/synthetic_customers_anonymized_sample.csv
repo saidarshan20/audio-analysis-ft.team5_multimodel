@@ -1,0 +1,6 @@
+﻿customer_id,name,email,age,gender,city,country,income,credit_score,loyalty_points,first_purchase_date,last_purchase_date,total_spent,avg_order_value,favorite_category,device_type,churn_risk,subscription,marketing_opt_in,support_tickets
+CUST-45131,User_5208,j***@e**************,65-69,Non-binary,Regional Cluster A,Equatorial Guinea,129100,481,4822,2022,2024,3265.97,71.0,Toys,Mobile,0.38,False,True,1
+CUST-74728,User_5312,p***@e***********,65-69,Female,Regional Cluster B,Heard Island and McDonald Islands,106900,715,1998,2022,2024,8016.76,190.88,Electronics,Desktop,0.13,False,True,8
+CUST-57845,User_4743,i***@e***********,40-44,Female,Regional Cluster C,Estonia,111800,312,1486,2020,2025,7828.5,186.39,Books,Desktop,0.19,False,False,6
+CUST-88800,User_5019,d***@e**************,55-59,Non-binary,Regional Cluster D,Gibraltar,83800,732,2697,2022,2024,4184.57,92.99,Beauty,Desktop,0.05,True,True,3
+CUST-91943,User_4337,t***@e***********,20-24,Non-binary,Regional Cluster E,Falkland Islands (Malvinas),53200,795,3362,2020,2024,2559.5,134.71,Home & Kitchen,Mobile,0.05,False,True,8

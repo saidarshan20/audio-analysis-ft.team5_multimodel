@@ -1,0 +1,1121 @@
+﻿{
+    "status":  "success",
+    "processed_count":  15,
+    "result":  {
+                   "clusters":  [
+                                    {
+                                        "filename":  "image_01.jpg",
+                                        "cluster_id":  2,
+                                        "umap_x":  1.0133342742919922,
+                                        "umap_y":  -9.578536033630371,
+                                        "objects":  [
+                                                        {
+                                                            "label":  "person",
+                                                            "confidence":  0.9219812750816345,
+                                                            "bbox":  [
+                                                                         382.8147277832031,
+                                                                         339.388916015625,
+                                                                         1849.72314453125,
+                                                                         3477.8994140625
+                                                                     ]
+                                                        },
+                                                        {
+                                                            "label":  "person",
+                                                            "confidence":  0.8424451351165771,
+                                                            "bbox":  [
+                                                                         3006.36083984375,
+                                                                         99.67633056640625,
+                                                                         4974.91357421875,
+                                                                         3472.01171875
+                                                                     ]
+                                                        },
+                                                        {
+                                                            "label":  "baseball bat",
+                                                            "confidence":  0.5751452445983887,
+                                                            "bbox":  [
+                                                                         2631.794189453125,
+                                                                         952.54541015625,
+                                                                         3778.73095703125,
+                                                                         1790.4698486328125
+                                                                     ]
+                                                        },
+                                                        {
+                                                            "label":  "sports ball",
+                                                            "confidence":  0.561596691608429,
+                                                            "bbox":  [
+                                                                         2268.9384765625,
+                                                                         1015.4411010742188,
+                                                                         2448.338134765625,
+                                                                         1186.3824462890625
+                                                                     ]
+                                                        }
+                                                    ],
+                                        "description":  "\"A centrally framed batter in a crisp white uniform dynamically swings a baseball bat at an incoming sports ball, while a teammate or coach stands attentively to the right, under soft, natural lighting that accentuates their focused expressions and textures of their uniforms.\"",
+                                        "annotated_image_path":  "team5/demo-images/image_01.jpg",
+                                        "metadata":  {
+                                                         "make":  null,
+                                                         "model":  null,
+                                                         "lens":  null,
+                                                         "focal_length":  null,
+                                                         "focal_length_35mm":  null,
+                                                         "aperture":  null,
+                                                         "shutter_speed":  null,
+                                                         "iso":  null,
+                                                         "datetime":  null,
+                                                         "gps":  null,
+                                                         "width":  5472,
+                                                         "height":  3648
+                                                     }
+                                    },
+                                    {
+                                        "filename":  "image_02.jpg",
+                                        "cluster_id":  1,
+                                        "umap_x":  -2.4761507511138916,
+                                        "umap_y":  -7.851143836975098,
+                                        "objects":  [
+                                                        {
+                                                            "label":  "dog",
+                                                            "confidence":  0.9067898988723755,
+                                                            "bbox":  [
+                                                                         68.58914184570312,
+                                                                         6.36171293258667,
+                                                                         179.38992309570312,
+                                                                         137.6607208251953
+                                                                     ]
+                                                        }
+                                                    ],
+                                        "description":  "\"A joyful dog sprints through lush green grass in a serene park at sunset. Warm, golden light bathes the scene, casting a long shadow behind. The composition emphasizes freedom and playfulness, with the dog centered, conveying a sense of carefree abandon.\"",
+                                        "annotated_image_path":  "team5/demo-images/image_02.jpg",
+                                        "metadata":  {
+                                                         "make":  null,
+                                                         "model":  null,
+                                                         "lens":  null,
+                                                         "focal_length":  null,
+                                                         "focal_length_35mm":  null,
+                                                         "aperture":  null,
+                                                         "shutter_speed":  null,
+                                                         "iso":  null,
+                                                         "datetime":  null,
+                                                         "gps":  null,
+                                                         "width":  300,
+                                                         "height":  168
+                                                     }
+                                    },
+                                    {
+                                        "filename":  "image_04.jpg",
+                                        "cluster_id":  1,
+                                        "umap_x":  -1.864849328994751,
+                                        "umap_y":  -7.785279273986816,
+                                        "objects":  [
+                                                        {
+                                                            "label":  "bird",
+                                                            "confidence":  0.9061387181282043,
+                                                            "bbox":  [
+                                                                         78.2674331665039,
+                                                                         13.742474555969238,
+                                                                         192.58087158203125,
+                                                                         144.67518615722656
+                                                                     ]
+                                                        }
+                                                    ],
+                                        "description":  "\"A large bird dominates the scene, centered on a slender branch against a lush green backdrop. A smaller bird perches on a nearby branch, creating a sense of depth. Soft, diffused light accentuates the verdant foliage, highlighting the avian subjects in a serene, natural setting.\"",
+                                        "annotated_image_path":  "team5/demo-images/image_04.jpg",
+                                        "metadata":  {
+                                                         "make":  null,
+                                                         "model":  null,
+                                                         "lens":  null,
+                                                         "focal_length":  null,
+                                                         "focal_length_35mm":  null,
+                                                         "aperture":  null,
+                                                         "shutter_speed":  null,
+                                                         "iso":  null,
+                                                         "datetime":  null,
+                                                         "gps":  null,
+                                                         "width":  298,
+                                                         "height":  169
+                                                     }
+                                    },
+                                    {
+                                        "filename":  "image_05.jpg",
+                                        "cluster_id":  1,
+                                        "umap_x":  -2.0355420112609863,
+                                        "umap_y":  -7.2512688636779785,
+                                        "objects":  [
+                                                        {
+                                                            "label":  "bird",
+                                                            "confidence":  0.9046323895454407,
+                                                            "bbox":  [
+                                                                         25.229782104492188,
+                                                                         21.17552375793457,
+                                                                         208.8978271484375,
+                                                                         149.31663513183594
+                                                                     ]
+                                                        }
+                                                    ],
+                                        "description":  "\"A lone bird perches on a weathered ledge, set against a softly focused urban backdrop. Warm, diffused light casts a subtle glow, accentuating the bird\u0027s textured plumage. The blurred surroundings emphasize the subject\u0027s prominence, inviting contemplation of its serene, elevated presence.\"",
+                                        "annotated_image_path":  "team5/demo-images/image_05.jpg",
+                                        "metadata":  {
+                                                         "make":  null,
+                                                         "model":  null,
+                                                         "lens":  null,
+                                                         "focal_length":  null,
+                                                         "focal_length_35mm":  null,
+                                                         "aperture":  null,
+                                                         "shutter_speed":  null,
+                                                         "iso":  null,
+                                                         "datetime":  null,
+                                                         "gps":  null,
+                                                         "width":  275,
+                                                         "height":  183
+                                                     }
+                                    },
+                                    {
+                                        "filename":  "image_06.jpg",
+                                        "cluster_id":  1,
+                                        "umap_x":  -3.0419058799743652,
+                                        "umap_y":  -7.817989826202393,
+                                        "objects":  [
+                                                        {
+                                                            "label":  "dog",
+                                                            "confidence":  0.6480587124824524,
+                                                            "bbox":  [
+                                                                         67.27268981933594,
+                                                                         47.4942741394043,
+                                                                         133.34747314453125,
+                                                                         166.80831909179688
+                                                                     ]
+                                                        }
+                                                    ],
+                                        "description":  "Two canine subjects occupy a lush, green grassy terrain, positioned centrally, with their tongues lolling outward in a relaxed state. Soft, diffuse lighting accentuates their calm demeanor, set against a homogeneous verdant backdrop, conveying a serene atmosphere and emphasizing their carefree, joyful presence.",
+                                        "annotated_image_path":  "team5/demo-images/image_06.jpg",
+                                        "metadata":  {
+                                                         "make":  null,
+                                                         "model":  null,
+                                                         "lens":  null,
+                                                         "focal_length":  null,
+                                                         "focal_length_35mm":  null,
+                                                         "aperture":  null,
+                                                         "shutter_speed":  null,
+                                                         "iso":  null,
+                                                         "datetime":  null,
+                                                         "gps":  null,
+                                                         "width":  259,
+                                                         "height":  194
+                                                     }
+                                    },
+                                    {
+                                        "filename":  "image_07.jpg",
+                                        "cluster_id":  0,
+                                        "umap_x":  -1.5348968505859375,
+                                        "umap_y":  -10.254688262939453,
+                                        "objects":  [
+                                                        {
+                                                            "label":  "laptop",
+                                                            "confidence":  0.919127881526947,
+                                                            "bbox":  [
+                                                                         2997.623779296875,
+                                                                         1776.3660888671875,
+                                                                         4119.54931640625,
+                                                                         2654.570068359375
+                                                                     ]
+                                                        },
+                                                        {
+                                                            "label":  "person",
+                                                            "confidence":  0.906224250793457,
+                                                            "bbox":  [
+                                                                         56.68735122680664,
+                                                                         817.8560180664062,
+                                                                         1483.74169921875,
+                                                                         2658.8359375
+                                                                     ]
+                                                        },
+                                                        {
+                                                            "label":  "person",
+                                                            "confidence":  0.9020392894744873,
+                                                            "bbox":  [
+                                                                         1278.533447265625,
+                                                                         822.4222412109375,
+                                                                         2619.881103515625,
+                                                                         2305.0751953125
+                                                                     ]
+                                                        },
+                                                        {
+                                                            "label":  "cup",
+                                                            "confidence":  0.8554592728614807,
+                                                            "bbox":  [
+                                                                         1205.2099609375,
+                                                                         2363.2763671875,
+                                                                         1470.916015625,
+                                                                         2810.119140625
+                                                                     ]
+                                                        },
+                                                        {
+                                                            "label":  "person",
+                                                            "confidence":  0.85539710521698,
+                                                            "bbox":  [
+                                                                         3437.257568359375,
+                                                                         905.5039672851562,
+                                                                         4998.13818359375,
+                                                                         3278.7900390625
+                                                                     ]
+                                                        },
+                                                        {
+                                                            "label":  "book",
+                                                            "confidence":  0.6091737747192383,
+                                                            "bbox":  [
+                                                                         0,
+                                                                         2641.5244140625,
+                                                                         1120.865478515625,
+                                                                         3053.068359375
+                                                                     ]
+                                                        }
+                                                    ],
+                                        "description":  "Two individuals, a man and woman, engage in a collaborative discussion at a table, surrounded by productivity tools. Laptops and papers are arranged before them, with a cup and book nearby, under soft, diffused lighting that conveys a sense of focused teamwork and intellectual pursuit.",
+                                        "annotated_image_path":  "team5/demo-images/image_07.jpg",
+                                        "metadata":  {
+                                                         "make":  "NIKON CORPORATION",
+                                                         "model":  "NIKON D800E",
+                                                         "lens":  "Nikon AF-S Micro-Nikkor 60mm f/2.8G ED",
+                                                         "focal_length":  "60.0mm",
+                                                         "focal_length_35mm":  "60mm",
+                                                         "aperture":  "f/5.6",
+                                                         "shutter_speed":  "1/250",
+                                                         "iso":  "800",
+                                                         "datetime":  "2017:10:23 10:14:20",
+                                                         "gps":  null,
+                                                         "width":  5000,
+                                                         "height":  3337
+                                                     }
+                                    },
+                                    {
+                                        "filename":  "image_08.jpg",
+                                        "cluster_id":  0,
+                                        "umap_x":  -1.7526741027832031,
+                                        "umap_y":  -9.776032447814941,
+                                        "objects":  [
+                                                        {
+                                                            "label":  "person",
+                                                            "confidence":  0.9033553004264832,
+                                                            "bbox":  [
+                                                                         121.6537857055664,
+                                                                         1359.212646484375,
+                                                                         1773.7757568359375,
+                                                                         3705.197509765625
+                                                                     ]
+                                                        },
+                                                        {
+                                                            "label":  "person",
+                                                            "confidence":  0.8371939659118652,
+                                                            "bbox":  [
+                                                                         2777.230224609375,
+                                                                         1316.1102294921875,
+                                                                         3537.268310546875,
+                                                                         3036.7509765625
+                                                                     ]
+                                                        },
+                                                        {
+                                                            "label":  "person",
+                                                            "confidence":  0.8153389096260071,
+                                                            "bbox":  [
+                                                                         3939.11181640625,
+                                                                         892.2743530273438,
+                                                                         5169.58154296875,
+                                                                         2510.6044921875
+                                                                     ]
+                                                        },
+                                                        {
+                                                            "label":  "couch",
+                                                            "confidence":  0.8072167634963989,
+                                                            "bbox":  [
+                                                                         3882.41845703125,
+                                                                         2249.40576171875,
+                                                                         5596.671875,
+                                                                         3700.826904296875
+                                                                     ]
+                                                        },
+                                                        {
+                                                            "label":  "laptop",
+                                                            "confidence":  0.7926644682884216,
+                                                            "bbox":  [
+                                                                         1811.417724609375,
+                                                                         2525.453857421875,
+                                                                         2686.79736328125,
+                                                                         3135.243896484375
+                                                                     ]
+                                                        },
+                                                        {
+                                                            "label":  "chair",
+                                                            "confidence":  0.5548586845397949,
+                                                            "bbox":  [
+                                                                         0.7598304748535156,
+                                                                         2030.165283203125,
+                                                                         1296.94140625,
+                                                                         3717.621826171875
+                                                                     ]
+                                                        },
+                                                        {
+                                                            "label":  "person",
+                                                            "confidence":  0.4081108868122101,
+                                                            "bbox":  [
+                                                                         1289.7322998046875,
+                                                                         1245.4066162109375,
+                                                                         2433.9150390625,
+                                                                         3555.27783203125
+                                                                     ]
+                                                        }
+                                                    ],
+                                        "description":  "A group of four individuals sit around a laptop on a couch and chair, engaged and focused. A standing male figure looms behind, overseeing the collaborative scene. Soft, ambient lighting illuminates the intimate gathering, emphasizing their interactive dynamic and collective attention on the laptop screen.",
+                                        "annotated_image_path":  "team5/demo-images/image_08.jpg",
+                                        "metadata":  {
+                                                         "make":  "NIKON CORPORATION",
+                                                         "model":  "NIKON D810",
+                                                         "lens":  "24.0-70.0 mm f/2.8",
+                                                         "focal_length":  "70.0mm",
+                                                         "focal_length_35mm":  null,
+                                                         "aperture":  "f/3.2",
+                                                         "shutter_speed":  "1/200",
+                                                         "iso":  null,
+                                                         "datetime":  "2018:12:19 13:47:21",
+                                                         "gps":  null,
+                                                         "width":  5600,
+                                                         "height":  3738
+                                                     }
+                                    },
+                                    {
+                                        "filename":  "image_09.jpg",
+                                        "cluster_id":  2,
+                                        "umap_x":  0.7634084224700928,
+                                        "umap_y":  -9.708386421203613,
+                                        "objects":  [
+                                                        {
+                                                            "label":  "person",
+                                                            "confidence":  0.9170756340026855,
+                                                            "bbox":  [
+                                                                         19.016672134399414,
+                                                                         16.67527961730957,
+                                                                         93.81317138671875,
+                                                                         174.1300048828125
+                                                                     ]
+                                                        },
+                                                        {
+                                                            "label":  "person",
+                                                            "confidence":  0.9054479598999023,
+                                                            "bbox":  [
+                                                                         132.64341735839844,
+                                                                         5.270175933837891,
+                                                                         249.65463256835938,
+                                                                         174.27622985839844
+                                                                     ]
+                                                        }
+                                                    ],
+                                        "description":  "The image showcases a dynamic scene of two persons engaged in a game of cricket. A batsman, centrally framed, swings a bat at an incoming ball. Trees form a natural backdrop. Soft, diffused lighting enhances the lush field and verdant surroundings. Composition emphasizes action and sport.",
+                                        "annotated_image_path":  "team5/demo-images/image_09.jpg",
+                                        "metadata":  {
+                                                         "make":  null,
+                                                         "model":  null,
+                                                         "lens":  null,
+                                                         "focal_length":  null,
+                                                         "focal_length_35mm":  null,
+                                                         "aperture":  null,
+                                                         "shutter_speed":  null,
+                                                         "iso":  null,
+                                                         "datetime":  null,
+                                                         "gps":  null,
+                                                         "width":  275,
+                                                         "height":  183
+                                                     }
+                                    },
+                                    {
+                                        "filename":  "image_10.jpg",
+                                        "cluster_id":  1,
+                                        "umap_x":  -2.7970387935638428,
+                                        "umap_y":  -7.362942218780518,
+                                        "objects":  [
+                                                        {
+                                                            "label":  "dog",
+                                                            "confidence":  0.925974428653717,
+                                                            "bbox":  [
+                                                                         48.79008483886719,
+                                                                         60.94394302368164,
+                                                                         118.854736328125,
+                                                                         158.52708435058594
+                                                                     ]
+                                                        },
+                                                        {
+                                                            "label":  "dog",
+                                                            "confidence":  0.823036253452301,
+                                                            "bbox":  [
+                                                                         190.61376953125,
+                                                                         67.69898986816406,
+                                                                         247.71603393554688,
+                                                                         159.7165985107422
+                                                                     ]
+                                                        },
+                                                        {
+                                                            "label":  "bear",
+                                                            "confidence":  0.8020767569541931,
+                                                            "bbox":  [
+                                                                         134.125244140625,
+                                                                         40.93586730957031,
+                                                                         183.2864227294922,
+                                                                         157.70335388183594
+                                                                     ]
+                                                        },
+                                                        {
+                                                            "label":  "dog",
+                                                            "confidence":  0.45156049728393555,
+                                                            "bbox":  [
+                                                                         134.0491180419922,
+                                                                         41.19874954223633,
+                                                                         183.26907348632812,
+                                                                         157.734130859375
+                                                                     ]
+                                                        }
+                                                    ],
+                                        "description":  "Three canines and a bear sit in a row on the ground before a building, with a vibrant green door centered in the background. Warm sunlight casts gentle shadows under a cloudless blue sky, highlighting the animals\u0027 distinct features in a harmonious, natural composition.",
+                                        "annotated_image_path":  "team5/demo-images/image_10.jpg",
+                                        "metadata":  {
+                                                         "make":  null,
+                                                         "model":  null,
+                                                         "lens":  null,
+                                                         "focal_length":  null,
+                                                         "focal_length_35mm":  null,
+                                                         "aperture":  null,
+                                                         "shutter_speed":  null,
+                                                         "iso":  null,
+                                                         "datetime":  null,
+                                                         "gps":  null,
+                                                         "width":  284,
+                                                         "height":  177
+                                                     }
+                                    },
+                                    {
+                                        "filename":  "image_11.jpg",
+                                        "cluster_id":  3,
+                                        "umap_x":  -1.2726794481277466,
+                                        "umap_y":  -9.700087547302246,
+                                        "objects":  [
+                                                        {
+                                                            "label":  "car",
+                                                            "confidence":  0.9336163997650146,
+                                                            "bbox":  [
+                                                                         483.9754333496094,
+                                                                         601.6504516601562,
+                                                                         869.10546875,
+                                                                         752.0781860351562
+                                                                     ]
+                                                        },
+                                                        {
+                                                            "label":  "person",
+                                                            "confidence":  0.7716206908226013,
+                                                            "bbox":  [
+                                                                         132.63833618164062,
+                                                                         585.697021484375,
+                                                                         189.38929748535156,
+                                                                         707.334228515625
+                                                                     ]
+                                                        },
+                                                        {
+                                                            "label":  "person",
+                                                            "confidence":  0.6833472847938538,
+                                                            "bbox":  [
+                                                                         491.89971923828125,
+                                                                         564.513427734375,
+                                                                         527.265625,
+                                                                         654.824951171875
+                                                                     ]
+                                                        },
+                                                        {
+                                                            "label":  "person",
+                                                            "confidence":  0.6457725763320923,
+                                                            "bbox":  [
+                                                                         213.36741638183594,
+                                                                         607.3917236328125,
+                                                                         273.2767639160156,
+                                                                         719.3980102539062
+                                                                     ]
+                                                        },
+                                                        {
+                                                            "label":  "person",
+                                                            "confidence":  0.6245319843292236,
+                                                            "bbox":  [
+                                                                         52.01830291748047,
+                                                                         580.741943359375,
+                                                                         103.10777282714844,
+                                                                         721.5935668945312
+                                                                     ]
+                                                        },
+                                                        {
+                                                            "label":  "person",
+                                                            "confidence":  0.6098615527153015,
+                                                            "bbox":  [
+                                                                         448.5377197265625,
+                                                                         573.58447265625,
+                                                                         496.3075256347656,
+                                                                         702.5617065429688
+                                                                     ]
+                                                        },
+                                                        {
+                                                            "label":  "person",
+                                                            "confidence":  0.6070759296417236,
+                                                            "bbox":  [
+                                                                         303.26690673828125,
+                                                                         572.2330322265625,
+                                                                         337.72625732421875,
+                                                                         667.7772827148438
+                                                                     ]
+                                                        },
+                                                        {
+                                                            "label":  "umbrella",
+                                                            "confidence":  0.600643515586853,
+                                                            "bbox":  [
+                                                                         201.6158447265625,
+                                                                         587.3558349609375,
+                                                                         261.5215148925781,
+                                                                         611.0455932617188
+                                                                     ]
+                                                        },
+                                                        {
+                                                            "label":  "person",
+                                                            "confidence":  0.5991259217262268,
+                                                            "bbox":  [
+                                                                         372.6231689453125,
+                                                                         576.7169799804688,
+                                                                         407.24200439453125,
+                                                                         687.6564331054688
+                                                                     ]
+                                                        },
+                                                        {
+                                                            "label":  "person",
+                                                            "confidence":  0.5869563817977905,
+                                                            "bbox":  [
+                                                                         624.1976928710938,
+                                                                         568.5957641601562,
+                                                                         652.5714721679688,
+                                                                         606.5790405273438
+                                                                     ]
+                                                        },
+                                                        {
+                                                            "label":  "umbrella",
+                                                            "confidence":  0.5691664218902588,
+                                                            "bbox":  [
+                                                                         118.7960433959961,
+                                                                         561.7439575195312,
+                                                                         199.09425354003906,
+                                                                         589.2778930664062
+                                                                     ]
+                                                        },
+                                                        {
+                                                            "label":  "person",
+                                                            "confidence":  0.5521406531333923,
+                                                            "bbox":  [
+                                                                         419.5359191894531,
+                                                                         570.934814453125,
+                                                                         454.3846130371094,
+                                                                         674.9633178710938
+                                                                     ]
+                                                        },
+                                                        {
+                                                            "label":  "umbrella",
+                                                            "confidence":  0.47922536730766296,
+                                                            "bbox":  [
+                                                                         430.1260681152344,
+                                                                         552.67919921875,
+                                                                         502.9213562011719,
+                                                                         587.6775512695312
+                                                                     ]
+                                                        },
+                                                        {
+                                                            "label":  "umbrella",
+                                                            "confidence":  0.42621156573295593,
+                                                            "bbox":  [
+                                                                         43.17092514038086,
+                                                                         556.8505859375,
+                                                                         118.4271240234375,
+                                                                         593.9154663085938
+                                                                     ]
+                                                        },
+                                                        {
+                                                            "label":  "umbrella",
+                                                            "confidence":  0.4042794704437256,
+                                                            "bbox":  [
+                                                                         365.6329345703125,
+                                                                         556.493896484375,
+                                                                         412.5998229980469,
+                                                                         576.3621826171875
+                                                                     ]
+                                                        }
+                                                    ],
+                                        "description":  "A vibrant nighttime cityscape in Tokyo, Japan, featuring a bustling street lined with neon signs, sleek cars, and pedestrians, including multiple individuals with umbrellas, set against a dark backdrop illuminated by bright, colorful lights, capturing the urban energy and dynamism of Asia\u0027s metropolitan hub.",
+                                        "annotated_image_path":  "team5/demo-images/image_11.jpg",
+                                        "metadata":  {
+                                                         "make":  null,
+                                                         "model":  null,
+                                                         "lens":  null,
+                                                         "focal_length":  null,
+                                                         "focal_length_35mm":  null,
+                                                         "aperture":  null,
+                                                         "shutter_speed":  null,
+                                                         "iso":  null,
+                                                         "datetime":  null,
+                                                         "gps":  null,
+                                                         "width":  900,
+                                                         "height":  1200
+                                                     }
+                                    },
+                                    {
+                                        "filename":  "image_12.jpg",
+                                        "cluster_id":  2,
+                                        "umap_x":  0.8087212443351746,
+                                        "umap_y":  -10.140207290649414,
+                                        "objects":  [
+                                                        {
+                                                            "label":  "person",
+                                                            "confidence":  0.9193646907806396,
+                                                            "bbox":  [
+                                                                         36.40568923950195,
+                                                                         166.31661987304688,
+                                                                         216.85980224609375,
+                                                                         572.7855834960938
+                                                                     ]
+                                                        },
+                                                        {
+                                                            "label":  "person",
+                                                            "confidence":  0.910636842250824,
+                                                            "bbox":  [
+                                                                         301.4022216796875,
+                                                                         215.2277069091797,
+                                                                         496.6649169921875,
+                                                                         652.5286254882812
+                                                                     ]
+                                                        },
+                                                        {
+                                                            "label":  "person",
+                                                            "confidence":  0.8797032237052917,
+                                                            "bbox":  [
+                                                                         499.1369934082031,
+                                                                         402.6092224121094,
+                                                                         715.0439453125,
+                                                                         664.0057373046875
+                                                                     ]
+                                                        },
+                                                        {
+                                                            "label":  "person",
+                                                            "confidence":  0.8553917407989502,
+                                                            "bbox":  [
+                                                                         1033.745849609375,
+                                                                         332.0869140625,
+                                                                         1375.6527099609375,
+                                                                         696.434814453125
+                                                                     ]
+                                                        },
+                                                        {
+                                                            "label":  "person",
+                                                            "confidence":  0.8412224650382996,
+                                                            "bbox":  [
+                                                                         511.77618408203125,
+                                                                         159.66119384765625,
+                                                                         658.5946655273438,
+                                                                         482.98736572265625
+                                                                     ]
+                                                        },
+                                                        {
+                                                            "label":  "person",
+                                                            "confidence":  0.8061869144439697,
+                                                            "bbox":  [
+                                                                         646.36474609375,
+                                                                         76.2052001953125,
+                                                                         810.9221801757812,
+                                                                         572.6422119140625
+                                                                     ]
+                                                        },
+                                                        {
+                                                            "label":  "baseball bat",
+                                                            "confidence":  0.4948500394821167,
+                                                            "bbox":  [
+                                                                         188.36892700195312,
+                                                                         367.839599609375,
+                                                                         218.2178497314453,
+                                                                         567.1729125976562
+                                                                     ]
+                                                        }
+                                                    ],
+                                        "description":  "The image depicts six men engaged in a cricket game on a lush green field covered with a white cloth, likely a makeshift playing surface. Warm sunlight illuminates the scene, casting gentle shadows. The men interact dynamically, with one holding a baseball bat, conveying a sense of camaraderie and friendly competition.",
+                                        "annotated_image_path":  "team5/demo-images/image_12.jpg",
+                                        "metadata":  {
+                                                         "make":  null,
+                                                         "model":  null,
+                                                         "lens":  null,
+                                                         "focal_length":  null,
+                                                         "focal_length_35mm":  null,
+                                                         "aperture":  null,
+                                                         "shutter_speed":  null,
+                                                         "iso":  null,
+                                                         "datetime":  null,
+                                                         "gps":  null,
+                                                         "width":  1400,
+                                                         "height":  795
+                                                     }
+                                    },
+                                    {
+                                        "filename":  "image_13.jpg",
+                                        "cluster_id":  1,
+                                        "umap_x":  -2.6693663597106934,
+                                        "umap_y":  -8.339828491210938,
+                                        "objects":  [
+                                                        {
+                                                            "label":  "dog",
+                                                            "confidence":  0.9186342358589172,
+                                                            "bbox":  [
+                                                                         581.3457641601562,
+                                                                         45.82683181762695,
+                                                                         962.45654296875,
+                                                                         626.0293579101562
+                                                                     ]
+                                                        },
+                                                        {
+                                                            "label":  "dog",
+                                                            "confidence":  0.9153394103050232,
+                                                            "bbox":  [
+                                                                         66.4468002319336,
+                                                                         273.11083984375,
+                                                                         577.9047241210938,
+                                                                         628.5357055664062
+                                                                     ]
+                                                        }
+                                                    ],
+                                        "description":  "\"Two dogs engage in dynamic play on a sun-kissed beach, with one dog jumping upward and the other mirroring the action. Warm light illuminates the scene, while additional canines in the background add depth to the lively, joyful atmosphere, showcasing carefree interaction.\"",
+                                        "annotated_image_path":  "team5/demo-images/image_13.jpg",
+                                        "metadata":  {
+                                                         "make":  null,
+                                                         "model":  null,
+                                                         "lens":  null,
+                                                         "focal_length":  null,
+                                                         "focal_length_35mm":  null,
+                                                         "aperture":  null,
+                                                         "shutter_speed":  null,
+                                                         "iso":  null,
+                                                         "datetime":  null,
+                                                         "gps":  null,
+                                                         "width":  1200,
+                                                         "height":  630
+                                                     }
+                                    },
+                                    {
+                                        "filename":  "image_14.jpg",
+                                        "cluster_id":  1,
+                                        "umap_x":  -1.7781063318252563,
+                                        "umap_y":  -8.965662956237793,
+                                        "objects":  [
+                                                        {
+                                                            "label":  "bird",
+                                                            "confidence":  0.8134903311729431,
+                                                            "bbox":  [
+                                                                         369.4838562011719,
+                                                                         94.34402465820312,
+                                                                         594.9903564453125,
+                                                                         495.2284851074219
+                                                                     ]
+                                                        },
+                                                        {
+                                                            "label":  "bird",
+                                                            "confidence":  0.5856407880783081,
+                                                            "bbox":  [
+                                                                         157.8289794921875,
+                                                                         33.88755798339844,
+                                                                         337.382568359375,
+                                                                         502.5615539550781
+                                                                     ]
+                                                        }
+                                                    ],
+                                        "description":  "\"Two avian subjects, detected as birds, perched on a slender branch amidst a lush tapestry of vibrant flowers and undulating grass, bathed in soft, natural light. The serene composition exudes tranquility, inviting contemplation of the harmonious coexistence of fauna and flora in a picturesque setting.\"",
+                                        "annotated_image_path":  "team5/demo-images/image_14.jpg",
+                                        "metadata":  {
+                                                         "make":  null,
+                                                         "model":  null,
+                                                         "lens":  null,
+                                                         "focal_length":  null,
+                                                         "focal_length_35mm":  null,
+                                                         "aperture":  null,
+                                                         "shutter_speed":  null,
+                                                         "iso":  null,
+                                                         "datetime":  null,
+                                                         "gps":  null,
+                                                         "width":  800,
+                                                         "height":  532
+                                                     }
+                                    },
+                                    {
+                                        "filename":  "image_15.jpg",
+                                        "cluster_id":  3,
+                                        "umap_x":  -1.0744191408157349,
+                                        "umap_y":  -10.384398460388184,
+                                        "objects":  [
+                                                        {
+                                                            "label":  "car",
+                                                            "confidence":  0.8880293965339661,
+                                                            "bbox":  [
+                                                                         82.51119232177734,
+                                                                         337.6324462890625,
+                                                                         173.5252685546875,
+                                                                         435.64453125
+                                                                     ]
+                                                        },
+                                                        {
+                                                            "label":  "car",
+                                                            "confidence":  0.8492888808250427,
+                                                            "bbox":  [
+                                                                         3.916138172149658,
+                                                                         289.7520751953125,
+                                                                         91.63761138916016,
+                                                                         374.4213562011719
+                                                                     ]
+                                                        },
+                                                        {
+                                                            "label":  "car",
+                                                            "confidence":  0.8129708766937256,
+                                                            "bbox":  [
+                                                                         0.17895269393920898,
+                                                                         350.73040771484375,
+                                                                         60.06808090209961,
+                                                                         440.96209716796875
+                                                                     ]
+                                                        },
+                                                        {
+                                                            "label":  "car",
+                                                            "confidence":  0.7390463948249817,
+                                                            "bbox":  [
+                                                                         50.400367736816406,
+                                                                         263.4949951171875,
+                                                                         112.3238525390625,
+                                                                         321.3804931640625
+                                                                     ]
+                                                        },
+                                                        {
+                                                            "label":  "car",
+                                                            "confidence":  0.7141859531402588,
+                                                            "bbox":  [
+                                                                         78.52516174316406,
+                                                                         234.18341064453125,
+                                                                         131.10995483398438,
+                                                                         282.1357421875
+                                                                     ]
+                                                        },
+                                                        {
+                                                            "label":  "car",
+                                                            "confidence":  0.6580719947814941,
+                                                            "bbox":  [
+                                                                         96.45591735839844,
+                                                                         208.89431762695312,
+                                                                         145.08592224121094,
+                                                                         249.10630798339844
+                                                                     ]
+                                                        },
+                                                        {
+                                                            "label":  "car",
+                                                            "confidence":  0.64020174741745,
+                                                            "bbox":  [
+                                                                         263.2603759765625,
+                                                                         141.58279418945312,
+                                                                         280.6005554199219,
+                                                                         156.57469177246094
+                                                                     ]
+                                                        },
+                                                        {
+                                                            "label":  "car",
+                                                            "confidence":  0.6349306106567383,
+                                                            "bbox":  [
+                                                                         117.52470397949219,
+                                                                         264.4190673828125,
+                                                                         186.4031982421875,
+                                                                         343.3835144042969
+                                                                     ]
+                                                        },
+                                                        {
+                                                            "label":  "car",
+                                                            "confidence":  0.6114374995231628,
+                                                            "bbox":  [
+                                                                         143.71983337402344,
+                                                                         242.3186798095703,
+                                                                         191.7222137451172,
+                                                                         296.9423522949219
+                                                                     ]
+                                                        },
+                                                        {
+                                                            "label":  "bus",
+                                                            "confidence":  0.5408193469047546,
+                                                            "bbox":  [
+                                                                         54.39300537109375,
+                                                                         174.93658447265625,
+                                                                         106.00607299804688,
+                                                                         231.12596130371094
+                                                                     ]
+                                                        },
+                                                        {
+                                                            "label":  "person",
+                                                            "confidence":  0.5155972242355347,
+                                                            "bbox":  [
+                                                                         15.581448554992676,
+                                                                         234.203857421875,
+                                                                         31.27499008178711,
+                                                                         274.839111328125
+                                                                     ]
+                                                        },
+                                                        {
+                                                            "label":  "car",
+                                                            "confidence":  0.49117806553840637,
+                                                            "bbox":  [
+                                                                         123.84693145751953,
+                                                                         195.3350830078125,
+                                                                         156.26332092285156,
+                                                                         225.3565673828125
+                                                                     ]
+                                                        },
+                                                        {
+                                                            "label":  "car",
+                                                            "confidence":  0.4584786593914032,
+                                                            "bbox":  [
+                                                                         222.26734924316406,
+                                                                         125.21281433105469,
+                                                                         236.5765838623047,
+                                                                         136.3955078125
+                                                                     ]
+                                                        },
+                                                        {
+                                                            "label":  "car",
+                                                            "confidence":  0.42585086822509766,
+                                                            "bbox":  [
+                                                                         166.02322387695312,
+                                                                         201.45379638671875,
+                                                                         200.52381896972656,
+                                                                         234.7769317626953
+                                                                     ]
+                                                        },
+                                                        {
+                                                            "label":  "car",
+                                                            "confidence":  0.4050697088241577,
+                                                            "bbox":  [
+                                                                         234.03260803222656,
+                                                                         168.9440155029297,
+                                                                         243.3478546142578,
+                                                                         177.8378143310547
+                                                                     ]
+                                                        }
+                                                    ],
+                                        "description":  "\"A bustling urban scene unfolds with a procession of 14 cars and 1 bus traversing the street, surrounded by pedestrians on the sidewalks, set against a backdrop of towering buildings under a bright, daylight sky with subtle shadows accentuating the city\u0027s vibrant, daily activity.\"",
+                                        "annotated_image_path":  "team5/demo-images/image_15.jpg",
+                                        "metadata":  {
+                                                         "make":  null,
+                                                         "model":  null,
+                                                         "lens":  null,
+                                                         "focal_length":  null,
+                                                         "focal_length_35mm":  null,
+                                                         "aperture":  null,
+                                                         "shutter_speed":  null,
+                                                         "iso":  null,
+                                                         "datetime":  null,
+                                                         "gps":  null,
+                                                         "width":  360,
+                                                         "height":  441
+                                                     }
+                                    },
+                                    {
+                                        "filename":  "IMG_7735.jpg",
+                                        "cluster_id":  2,
+                                        "umap_x":  1.2473514080047607,
+                                        "umap_y":  -9.949018478393555,
+                                        "objects":  [
+                                                        {
+                                                            "label":  "person",
+                                                            "confidence":  0.9346011281013489,
+                                                            "bbox":  [
+                                                                         234.3350067138672,
+                                                                         21.268291473388672,
+                                                                         348.3965759277344,
+                                                                         259.8944396972656
+                                                                     ]
+                                                        },
+                                                        {
+                                                            "label":  "person",
+                                                            "confidence":  0.9320163130760193,
+                                                            "bbox":  [
+                                                                         144.9347381591797,
+                                                                         30.47811508178711,
+                                                                         231.72315979003906,
+                                                                         259.8108825683594
+                                                                     ]
+                                                        },
+                                                        {
+                                                            "label":  "baseball bat",
+                                                            "confidence":  0.5490763783454895,
+                                                            "bbox":  [
+                                                                         139.54058837890625,
+                                                                         13.535688400268555,
+                                                                         160.2490692138672,
+                                                                         100.98217010498047
+                                                                     ]
+                                                        },
+                                                        {
+                                                            "label":  "sports ball",
+                                                            "confidence":  0.4393365681171417,
+                                                            "bbox":  [
+                                                                         268.0196228027344,
+                                                                         152.98892211914062,
+                                                                         283.1789245605469,
+                                                                         164.92578125
+                                                                     ]
+                                                        }
+                                                    ],
+                                        "description":  "Two cricket players stand resolute in front of a stadium, bat in hand, amidst a fiery atmosphere. Warm orange glow illuminates their determined faces, casting dynamic shadows. A sports ball rests nearby, adding to the intense pre-match scene unfolding before the stadium\u0027s backdrop.",
+                                        "annotated_image_path":  "team5/demo-images/IMG_7735.jpg",
+                                        "metadata":  {
+                                                         "make":  null,
+                                                         "model":  null,
+                                                         "lens":  null,
+                                                         "focal_length":  null,
+                                                         "focal_length_35mm":  null,
+                                                         "aperture":  null,
+                                                         "shutter_speed":  null,
+                                                         "iso":  null,
+                                                         "datetime":  null,
+                                                         "gps":  null,
+                                                         "width":  477,
+                                                         "height":  280
+                                                     }
+                                    }
+                                ],
+                   "cluster_summaries":  [
+                                             {
+                                                 "cluster_id":  0,
+                                                 "description":  "Team Meeting",
+                                                 "count":  2
+                                             },
+                                             {
+                                                 "cluster_id":  1,
+                                                 "description":  "Wild Animals",
+                                                 "count":  7
+                                             },
+                                             {
+                                                 "cluster_id":  2,
+                                                 "description":  "Sports Action",
+                                                 "count":  4
+                                             },
+                                             {
+                                                 "cluster_id":  3,
+                                                 "description":  "City Scenes",
+                                                 "count":  2
+                                             }
+                                         ],
+                   "plot_file_path":  "shared_workspace/2_processed_data/cluster_plot_91ad435f.png",
+                   "metadata":  {
+                                    "total_duration_sec":  68.11,
+                                    "input_tokens":  903,
+                                    "output_tokens":  42,
+                                    "total_tokens":  945,
+                                    "model":  "llama-3.3-70b-versatile",
+                                    "provider":  "Groq",
+                                    "vision_model":  "meta-llama/llama-4-scout-17b-16e-instruct",
+                                    "vision_provider":  "Groq Vision"
+                                }
+               }
+}

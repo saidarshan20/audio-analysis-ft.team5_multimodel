@@ -1,0 +1,75 @@
+{
+  "score_version": "v1.0",
+  "target_sample_rate": 16000,
+  "vad": {
+    "frame_ms": 25,
+    "hop_ms": 10,
+    "noise_percentile": 20,
+    "threshold_db_above_noise": 6.0,
+    "min_voiced_run_frames": 3,
+    "max_fill_unvoiced_gap_frames": 2,
+    "min_speech_ratio": 0.2,
+    "min_long_voiced_run_frames": 30,
+    "min_unvoiced_ratio_for_speech": 0.05
+  },
+  "silence_dbfs_threshold": -60.0,
+  "short_clip_seconds": 1.5,
+  "clip_amplitude_threshold": 0.999,
+  "clip_ratio_cap_threshold": 0.01,
+  "snr": {
+    "max_db": 40.0,
+    "segments": [
+      { "x0": 0.0, "x1": 5.0, "y0": 0.0, "y1": 20.0 },
+      { "x0": 5.0, "x1": 15.0, "y0": 20.0, "y1": 60.0 },
+      { "x0": 15.0, "x1": 25.0, "y0": 60.0, "y1": 85.0 },
+      { "x0": 25.0, "x1": 40.0, "y0": 85.0, "y1": 100.0 }
+    ]
+  },
+  "loudness_dbfs_segments": [
+    { "x0": -60.0, "x1": -35.0, "y0": 0.0, "y1": 0.0 },
+    { "x0": -35.0, "x1": -23.0, "y0": 0.0, "y1": 75.0 },
+    { "x0": -23.0, "x1": -12.0, "y0": 75.0, "y1": 100.0 },
+    { "x0": -12.0, "x1": -6.0, "y0": 100.0, "y1": 60.0 },
+    { "x0": -6.0, "x1": 0.0, "y0": 60.0, "y1": 30.0 }
+  ],
+  "loudness_clip_cap_score": 60.0,
+  "clarity": {
+    "voice_band_hz": [300.0, 3400.0],
+    "total_band_hz": [0.0, 8000.0],
+    "segments": [
+      { "x0": 0.0, "x1": 0.35, "y0": 0.0, "y1": 30.0 },
+      { "x0": 0.35, "x1": 0.50, "y0": 30.0, "y1": 65.0 },
+      { "x0": 0.50, "x1": 0.65, "y0": 65.0, "y1": 85.0 },
+      { "x0": 0.65, "x1": 1.0, "y0": 85.0, "y1": 100.0 }
+    ]
+  },
+  "cleanliness": {
+    "stationary_weight": 0.7,
+    "transient_weight": 0.3,
+    "transient_window_sec": 1.0,
+    "transient_sigma": 3.0,
+    "stationary_segments_inverse": [
+      { "x0": 0.0, "x1": 0.10, "y0": 100.0, "y1": 100.0 },
+      { "x0": 0.10, "x1": 0.25, "y0": 100.0, "y1": 70.0 },
+      { "x0": 0.25, "x1": 0.45, "y0": 70.0, "y1": 35.0 },
+      { "x0": 0.45, "x1": 1.0, "y0": 35.0, "y1": 0.0 }
+    ],
+    "transient_segments_inverse": [
+      { "x0": 0.0, "x1": 0.01, "y0": 100.0, "y1": 100.0 },
+      { "x0": 0.01, "x1": 0.05, "y0": 100.0, "y1": 70.0 },
+      { "x0": 0.05, "x1": 0.12, "y0": 70.0, "y1": 35.0 },
+      { "x0": 0.12, "x1": 1.0, "y0": 35.0, "y1": 0.0 }
+    ]
+  },
+  "overall_weights": {
+    "snr": 0.4,
+    "loudness": 0.2,
+    "clarity": 0.25,
+    "cleanliness": 0.15
+  },
+  "rating_bands": {
+    "poor_max": 39.0,
+    "fair_max": 59.0,
+    "good_max": 79.0
+  }
+}

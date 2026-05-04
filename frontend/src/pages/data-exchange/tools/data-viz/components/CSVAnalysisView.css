@@ -1,0 +1,812 @@
+.csvv-root {
+  --csvv-surface: #0f172a;
+  --csvv-surface-light: #1e293b;
+  --csvv-border: #334155;
+  --csvv-text: #f8fafc;
+  --csvv-muted: #94a3b8;
+  --csvv-subtle: #64748b;
+  margin-top: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  animation: fadeIn 0.35s ease-out;
+}
+
+:root[data-theme="light"] .csvv-root {
+  --csvv-surface: #ffffff;
+  --csvv-surface-light: #f8fafc;
+  --csvv-border: rgba(20, 56, 108, 0.16);
+  --csvv-text: #0f172a;
+  --csvv-muted: #475569;
+  --csvv-subtle: #64748b;
+}
+
+.csvv-warning-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 16px;
+  border-radius: 10px;
+  background: rgba(251, 191, 36, 0.08);
+  border: 1px solid rgba(251, 191, 36, 0.25);
+}
+
+.csvv-warning-icon {
+  line-height: 1;
+  font-size: 18px;
+}
+
+.csvv-warning-text {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.csvv-warning-text strong {
+  color: #fbbf24;
+}
+
+.csvv-warning-text span {
+  color: var(--csvv-muted);
+}
+
+.csvv-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+}
+
+.csvv-summary-card {
+  margin-bottom: 0;
+  padding: 1.2rem;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.csvv-summary-icon {
+  padding: 10px;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+}
+
+.csvv-summary-icon--orange {
+  background: rgba(251, 140, 54, 0.14);
+  color: #fb8c36;
+}
+
+.csvv-summary-icon--blue {
+  background: rgba(56, 189, 248, 0.14);
+  color: #38bdf8;
+}
+
+.csvv-summary-icon--violet {
+  background: rgba(129, 140, 248, 0.14);
+  color: #818cf8;
+}
+
+.csvv-summary-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--csvv-muted);
+}
+
+.csvv-summary-value {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--csvv-text);
+}
+
+.csvv-tab-strip {
+  width: fit-content;
+  display: flex;
+  gap: 6px;
+  background: rgba(15, 23, 42, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 12px;
+  padding: 4px;
+}
+
+:root[data-theme="light"] .csvv-tab-strip {
+  background: #f1f5f9;
+  border-color: #e2e8f0;
+}
+
+.csvv-tab-btn {
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--csvv-subtle);
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 0.6rem 1.15rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  transition: all 0.2s ease;
+}
+
+.csvv-tab-btn.active {
+  background: rgba(251, 140, 54, 0.16);
+  color: #fb8c36;
+}
+
+.csvv-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 1rem;
+}
+
+.csvv-col-card {
+  margin-bottom: 0;
+  padding: 1.2rem;
+  cursor: pointer;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  transition: transform 0.2s ease, border-color 0.2s ease;
+}
+
+.csvv-col-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(251, 140, 54, 0.35);
+}
+
+.csvv-col-card.selected {
+  border-color: #fb8c36;
+}
+
+.csvv-col-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 1rem;
+}
+
+.csvv-col-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.csvv-col-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--csvv-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.csvv-type-badge {
+  font-size: 10px;
+  text-transform: uppercase;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  border-radius: 999px;
+  padding: 3px 8px;
+  align-self: flex-start;
+}
+
+.csvv-type-badge--numeric {
+  background: rgba(59, 130, 246, 0.14);
+  color: #60a5fa;
+}
+
+.csvv-type-badge--categorical {
+  background: rgba(148, 163, 184, 0.14);
+  color: var(--csvv-muted);
+}
+
+.csvv-metrics-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  font-size: 12px;
+}
+
+.csvv-metric-label {
+  font-size: 10px;
+  color: var(--csvv-subtle);
+  text-transform: uppercase;
+}
+
+.csvv-metric-value {
+  margin-top: 2px;
+  font-weight: 600;
+  color: var(--csvv-text);
+}
+
+.csvv-metric-value.is-good {
+  color: #22c55e;
+}
+
+.csvv-metric-value.is-bad {
+  color: #ef4444;
+}
+
+.csvv-metric-value.is-blue {
+  color: #60a5fa;
+}
+
+.csvv-range-wrap {
+  grid-column: 1 / -1;
+  margin-top: 4px;
+}
+
+.csvv-range-meta {
+  display: flex;
+  justify-content: space-between;
+  color: var(--csvv-subtle);
+  font-size: 10px;
+  margin-bottom: 4px;
+}
+
+.csvv-range-track {
+  position: relative;
+  height: 4px;
+  border-radius: 6px;
+  background: #334155;
+  overflow: hidden;
+}
+
+.csvv-range-fill {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, #fb8c36, #f97316);
+}
+
+.csvv-top-category {
+  grid-column: 1 / -1;
+}
+
+.csvv-top-category-value {
+  color: #38bdf8;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.csvv-table-card {
+  margin-bottom: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+.csvv-table-scroll {
+  overflow-x: auto;
+  max-height: 500px;
+}
+
+.csvv-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  text-align: left;
+}
+
+.csvv-table thead {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.csvv-table th {
+  background: #0f172a;
+  color: var(--csvv-text);
+  font-weight: 600;
+  border-bottom: 1px solid #1e293b;
+  padding: 12px 15px;
+  min-width: 150px;
+}
+
+.csvv-table td {
+  color: #cbd5e1;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+  padding: 10px 15px;
+  max-width: 220px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+:root[data-theme="light"] .csvv-table th {
+  background: #f8fafc;
+  border-bottom-color: #e2e8f0;
+}
+
+:root[data-theme="light"] .csvv-table td {
+  color: #334155;
+  border-bottom-color: #f1f5f9;
+}
+
+.csvv-row-id {
+  width: 44px;
+  min-width: 44px;
+  color: #64748b;
+}
+
+.csvv-table-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  font-size: 11px;
+  color: var(--csvv-subtle);
+  border-top: 1px solid #1e293b;
+  background: #0f172a;
+  padding: 12px 18px;
+}
+
+:root[data-theme="light"] .csvv-table-footer {
+  border-top-color: #e2e8f0;
+  background: #f8fafc;
+}
+
+.csvv-viz-layout {
+  display: grid;
+  grid-template-columns: 300px 1fr;
+  gap: 1.2rem;
+}
+
+.csvv-config-card {
+  margin-bottom: 0;
+  padding: 1.25rem;
+}
+
+.csvv-config-title {
+  margin: 0 0 1rem;
+  color: #fb8c36;
+  font-size: 14px;
+}
+
+.csvv-ai-ideas-btn {
+  width: 100%;
+  border: none;
+  border-radius: 12px;
+  background: linear-gradient(90deg, #ff8a00 0%, #ff6a00 100%);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 700;
+  padding: 12px 12px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  transition: filter 0.2s ease, transform 0.2s ease;
+}
+
+.csvv-ai-ideas-btn:hover:not(:disabled) {
+  filter: brightness(1.06);
+  transform: translateY(-1px);
+}
+
+.csvv-ai-ideas-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.8;
+}
+
+.csvv-ai-ideas-note {
+  border-radius: 10px;
+  font-size: 12px;
+  line-height: 1.45;
+  padding: 8px 10px;
+  margin-bottom: 10px;
+}
+
+.csvv-ai-ideas-note--warn {
+  border: 1px solid rgba(251, 140, 54, 0.35);
+  background: rgba(251, 140, 54, 0.09);
+  color: #fdba74;
+}
+
+:root[data-theme="light"] .csvv-ai-ideas-note--warn {
+  color: #c2410c; /* darker orange for light mode readability */
+  background: rgba(251, 140, 54, 0.15);
+}
+
+.csvv-ai-ideas-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.csvv-ai-ideas-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--csvv-subtle);
+}
+
+.csvv-ai-idea-card {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  padding: 10px;
+  background: rgba(15, 23, 42, 0.55);
+}
+
+:root[data-theme="light"] .csvv-ai-idea-card {
+  background: #ffffff;
+  border-color: #e2e8f0;
+}
+
+.csvv-ai-idea-card h5 {
+  margin: 0;
+  color: var(--csvv-text);
+  font-size: 12px;
+}
+
+.csvv-ai-idea-card p {
+  margin: 6px 0 8px;
+  color: var(--csvv-muted);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.csvv-ai-idea-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.csvv-ai-idea-meta span {
+  border: 1px solid rgba(251, 140, 54, 0.4);
+  border-radius: 999px;
+  padding: 2px 7px;
+  font-size: 10px;
+  color: #fb8c36;
+  background: rgba(251, 140, 54, 0.09);
+}
+
+:root[data-theme="light"] .csvv-ai-idea-meta span {
+  color: #ea580c; /* darker orange for better contrast */
+  border-color: rgba(234, 88, 12, 0.3);
+  background: rgba(234, 88, 12, 0.1);
+}
+
+.csvv-ai-idea-card button {
+  width: 100%;
+  border: 1px solid rgba(251, 140, 54, 0.5);
+  border-radius: 8px;
+  background: rgba(251, 140, 54, 0.1);
+  color: #fb8c36;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 7px 10px;
+}
+
+.csvv-ai-idea-card button:disabled {
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+.csvv-config-group {
+  margin-bottom: 1rem;
+}
+
+.csvv-label {
+  display: block;
+  color: var(--csvv-subtle);
+  font-size: 11px;
+  text-transform: uppercase;
+  margin-bottom: 6px;
+}
+
+.csvv-axis-badge {
+  margin-left: 6px;
+  border-radius: 6px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: lowercase;
+  padding: 2px 6px;
+}
+
+.csvv-axis-badge.numeric {
+  background: rgba(59, 130, 246, 0.14);
+  color: #60a5fa;
+}
+
+.csvv-axis-badge.categorical {
+  background: rgba(148, 163, 184, 0.14);
+  color: var(--csvv-muted);
+}
+
+.csvv-chart-type-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.csvv-chart-type-btn {
+  border-radius: 10px;
+  border: 1px solid #334155;
+  background: #0f172a;
+  color: var(--csvv-muted);
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 600;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 8px;
+  transition: all 0.2s ease;
+}
+
+.csvv-chart-type-btn.active {
+  border-color: #fb8c36;
+  color: #fb8c36;
+  background: rgba(251, 140, 54, 0.08);
+}
+/* --- UPDATE THESE LIGHT MODE STYLES --- */
+:root[data-theme="light"] .csvv-chart-type-btn {
+  background: #ffffff;   /* Pure white background to match your screenshot */
+  border-color: #cbd5e1; /* Soft gray border */
+  color: #475569;        /* Dark gray-blue text */
+}
+
+:root[data-theme="light"] .csvv-chart-type-btn:hover {
+  background: #f8fafc;
+  border-color: #94a3b8;
+}
+
+/* --- ADD THIS MISSING BLOCK FOR THE ACTIVE STATE IN LIGHT MODE --- */
+:root[data-theme="light"] .csvv-chart-type-btn.active {
+  border-color: #f97316; /* Orange border */
+  color: #ea580c;        /* Darker orange text for light mode contrast */
+  background: #fff7ed;   /* Very soft orange background */
+  box-shadow: 0 1px 2px rgba(249, 115, 22, 0.1);
+}
+
+.csvv-select {
+  width: 100%;
+  background: #0f172a;
+  color: var(--csvv-text);
+  border: 1px solid #334155;
+  border-radius: 8px;
+  font-size: 13px;
+  padding: 9px 10px;
+  outline: none;
+}
+
+:root[data-theme="light"] .csvv-select {
+  background: #ffffff;
+  border-color: #cbd5e1;
+}
+
+.csvv-agg-divider {
+  display: flex;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.csvv-agg-divider::before,
+.csvv-agg-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--csvv-border);
+}
+
+.csvv-agg-divider span {
+  padding: 0 8px;
+  color: var(--csvv-muted);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.csvv-agg-select {
+  font-weight: 700;
+}
+
+.csvv-agg-preview {
+  margin-top: 8px;
+  border: 1px solid;
+  border-radius: 10px;
+  padding: 9px 12px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+  color: var(--csvv-muted);
+}
+
+.csvv-build-btn {
+  width: 100%;
+  border: none;
+  border-radius: 10px;
+  background: #fb8c36;
+  color: #fff;
+  font-weight: 700;
+  font-size: 13px;
+  padding: 11px 12px;
+  cursor: pointer;
+  transition: opacity 0.2s ease;
+}
+
+.csvv-build-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+.csvv-viz-main {
+  display: flex;
+  flex-direction: column;
+  gap: 1.2rem;
+}
+
+.csvv-chart-card {
+  margin-bottom: 0;
+  padding: 1.25rem;
+  min-height: 420px;
+  display: flex;
+  flex-direction: column;
+}
+
+.csvv-chart-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.csvv-chart-header h4 {
+  margin: 0;
+  color: var(--csvv-text);
+}
+
+.csvv-chart-header p {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: var(--csvv-muted);
+}
+
+.csvv-download-btn {
+  border: 1px solid var(--csvv-border);
+  border-radius: 8px;
+  background: var(--csvv-surface-light);
+  color: var(--csvv-muted);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 7px 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.csvv-chart-canvas {
+  flex: 1;
+  border: 1px dashed var(--csvv-border);
+  border-radius: 12px;
+  margin-top: 14px;
+  background: rgba(2, 6, 23, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 12px;
+  min-height: 350px;
+}
+
+:root[data-theme="light"] .csvv-chart-canvas {
+  background: rgba(248, 250, 252, 0.7);
+}
+
+.csvv-chart-placeholder,
+.csvv-chart-error,
+.csvv-chart-loading {
+  text-align: center;
+  color: var(--csvv-subtle);
+}
+
+.csvv-chart-placeholder p,
+.csvv-chart-error p,
+.csvv-chart-loading p {
+  margin: 8px 0 0;
+}
+
+.csvv-chart-error p {
+  color: #f87171;
+}
+
+.csvv-chart-error button {
+  margin-top: 8px;
+  background: transparent;
+  color: #fb8c36;
+  border: 1px solid #fb8c36;
+  border-radius: 6px;
+  font-size: 12px;
+  cursor: pointer;
+  padding: 6px 12px;
+}
+
+.csvv-processed-card {
+  margin-bottom: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+.csvv-processed-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  border-bottom: 1px solid var(--csvv-border);
+  padding: 16px 18px;
+}
+
+.csvv-processed-header h4 {
+  margin: 0;
+  color: var(--csvv-text);
+}
+
+.csvv-processed-header p {
+  margin: 4px 0 0;
+  color: var(--csvv-muted);
+  font-size: 12px;
+}
+
+.csvv-processed-header span {
+  border: 1px solid;
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.csvv-processed-body {
+  max-height: 310px;
+  overflow-y: auto;
+}
+
+.csvv-processed-empty {
+  color: var(--csvv-subtle);
+  font-size: 12px;
+  text-align: center;
+  padding: 22px 14px;
+}
+
+.csvv-right {
+  text-align: right !important;
+}
+
+.csvv-bold {
+  font-weight: 700;
+}
+
+@media (max-width: 1024px) {
+  .csvv-viz-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .csvv-tab-strip {
+    width: 100%;
+    overflow-x: auto;
+  }
+}
+
+@media (max-width: 700px) {
+  .csvv-stats-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .csvv-summary-grid {
+    grid-template-columns: 1fr;
+  }
+}
