@@ -2,5 +2,5 @@
 // Return the arithmetic mean; an empty sample collection must return 0.
 export function mean(samples: readonly number[]): number {
   const total = samples.reduce((sum, sample) => sum + sample, 0);
-  return total / samples.length;
+  return samples.length === 0 ? 0 : total / samples.length;
 }
